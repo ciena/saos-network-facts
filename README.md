@@ -18,7 +18,7 @@ themselves. The file follows a published JSON Schema, so readers can pin a schem
 ## Install
 
 ```bash
-pip install "git+https://github.com/ciena/saos-network-facts@v0.3.0"
+pip install "git+https://github.com/ciena/saos-network-facts@v0.3.1"
 saos-network-facts --version
 ```
 
@@ -94,7 +94,7 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 ```json
 {
   "schema_version": "1.2.0",
-  "generator": {"name": "saos-network-facts", "version": "0.3.0", "translator": "translator 4.2.0 (mcp, https://...)"},
+  "generator": {"name": "saos-network-facts", "version": "0.3.1", "translator": "translator 4.2.0 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -204,7 +204,7 @@ In CI, for example a GitHub Pages workflow:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p site
-          gh release download v0.3.0 --repo ciena/saos-network-facts \
+          gh release download v0.3.1 --repo ciena/saos-network-facts \
             --pattern 'saos-network-facts-viewer-*.tgz' --output viewer.tgz
           tar -xzf viewer.tgz -C site
           mkdir -p site/labs && cp -r facts/* site/labs/    # facts files, positions and labs/index.json
