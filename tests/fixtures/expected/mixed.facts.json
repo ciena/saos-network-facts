@@ -125,7 +125,9 @@
             "pw_id": "201",
             "service": null,
             "service_type": null,
-            "tunnel": "TUN1"
+            "tunnel": "TUN1",
+            "tunnel_color": null,
+            "tunnel_type": null
           },
           {
             "in_label": null,
@@ -137,7 +139,9 @@
             "pw_id": "202",
             "service": "VS200",
             "service_type": null,
-            "tunnel": null
+            "tunnel": null,
+            "tunnel_color": null,
+            "tunnel_type": null
           }
         ],
         "recognised": 20,
@@ -327,7 +331,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.0 (recorded)",
-    "version": "0.1.1"
+    "version": "0.2.0"
   },
-  "schema_version": "1.0.0"
+  "schema_version": "1.1.0"
 }

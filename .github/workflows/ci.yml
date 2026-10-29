@@ -55,3 +55,21 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm pack --dry-run
+
+  viewer:
+    name: viewer
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: viewer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: "vitest (the facts importer, on the bundled example and synthetic files)"
+        run: npm test
+      - run: npm run build

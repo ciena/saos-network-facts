@@ -1,0 +1,22 @@
+# Device types of the Adaptive-SR-CFM example (platform map for `saos-network-facts extract --platform-map`).
+devices:
+  CE1:
+    type: 3984-10x
+  PE1:
+    type: 5170-10x
+  PE4:
+    type: 5170-10x
+  PE5:
+    type: 5166-10x
+  PE6:
+    type: 5164-10x
+  P8:
+    type: 5164-10x
+  PE9:
+    type: 5171-10x
+  P2:
+    type: 5166-10x
+  P3:
+    type: 5144-10x
+  P7:
+    type: 5171-10x

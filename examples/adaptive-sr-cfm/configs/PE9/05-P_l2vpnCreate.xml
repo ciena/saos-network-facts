@@ -1,0 +1,13 @@
+<config>
+
+<l2vpn-services xmlns="http://ciena.com/ns/yang/ciena-l2vpn">
+ 
+        <l2vpn>
+            <name>testsat</name>
+                <signaling-type>ldp</signaling-type>
+            <forwarding-domain>testsat</forwarding-domain>
+            <pseudowire>testsat</pseudowire>
+        </l2vpn>
+</l2vpn-services>
+    
+</config>

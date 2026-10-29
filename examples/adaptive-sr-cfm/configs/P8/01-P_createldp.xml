@@ -1,0 +1,306 @@
+<config>
+    <system xmlns="http://openconfig.net/yang/system">
+        <config>
+            <hostname>P8</hostname>
+        </config>
+    </system>
+
+    <cfm-global-config xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-cfm">
+    <admin-state>enable</admin-state>
+    </cfm-global-config>
+    
+
+    <maintenance-domain xmlns="http://metroethernetforum.org/ns/yang/mef-cfm">
+        <id>md3</id>
+        <name-type>character-string</name-type>
+        <name>md3</name><md-level>3</md-level>
+        <mhf-creation>none</mhf-creation>
+        <id-permission>chassis</id-permission>
+    </maintenance-domain>
+
+    <classifiers xmlns="urn:ciena:params:xml:ns:yang:ciena-pn::ciena-mef-classifier">
+        <classifier>
+            <name>if1</name>
+            <filter-entry>
+                <filter-parameter xmlns:classifier="urn:ciena:params:xml:ns:yang:ciena-pn::ciena-mef-classifier">vtag-stack</filter-parameter>
+                <untagged-exclude-priority-tagged>true</untagged-exclude-priority-tagged>
+            </filter-entry>
+        </classifier>
+        <classifier>
+            <name>if2</name>
+            <filter-entry>
+                <filter-parameter xmlns:classifier="urn:ciena:params:xml:ns:yang:ciena-pn::ciena-mef-classifier">vtag-stack</filter-parameter>
+                <untagged-exclude-priority-tagged>true</untagged-exclude-priority-tagged>
+            </filter-entry>
+        </classifier>
+        <classifier>
+            <name>if3</name>
+            <filter-entry>
+                <filter-parameter xmlns:classifier="urn:ciena:params:xml:ns:yang:ciena-pn::ciena-mef-classifier">vtag-stack</filter-parameter>
+                <untagged-exclude-priority-tagged>true</untagged-exclude-priority-tagged>
+            </filter-entry>
+        </classifier>
+        <classifier>
+            <name>Untagged</name>
+            <filter-entry>
+                <filter-parameter xmlns:classifier="urn:ciena:params:xml:ns:yang:ciena-pn::ciena-mef-classifier">vtag-stack</filter-parameter>
+                <untagged-exclude-priority-tagged>true</untagged-exclude-priority-tagged>
+            </filter-entry>
+        </classifier>
+
+    </classifiers>
+    <fds xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fd">
+        <fd>
+            <name>if1</name>
+            <mode>vpls</mode>
+        </fd>
+        <fd>
+            <name>if2</name>
+            <mode>vpls</mode>
+        </fd>
+        <fd>
+            <name>if3</name>
+            <mode>vpls</mode>
+        </fd>
+    </fds>
+    <fps xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fp">
+        <fp>
+            <name>if1</name>
+            <fd-name>if1</fd-name>
+            <logical-port>1</logical-port>
+            <stats-collection>on</stats-collection>
+            <classifier-list>if1</classifier-list>
+        </fp>
+        <fp>
+            <name>if2</name>
+            <fd-name>if2</fd-name>
+            <logical-port>2</logical-port>
+            <stats-collection>on</stats-collection>
+            <classifier-list>if2</classifier-list>
+        </fp>
+        <fp>
+            <name>if3</name>
+            <fd-name>if3</fd-name>
+            <logical-port>3</logical-port>
+            <stats-collection>on</stats-collection>
+            <classifier-list>if3</classifier-list>
+        </fp>
+    </fps>
+    <interfaces xmlns="http://openconfig.net/yang/interfaces">
+        <interface>
+            <name>lb1</name>
+            <config>
+                <name>lb1</name>
+                <mtu>1500</mtu>
+                <admin-status xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">true</admin-status>
+                <type xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">loopback</type>
+            </config>
+            <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
+                <addresses>
+                    <address>
+                        <ip>20.10.10.8</ip>
+                        <config>
+                            <ip>20.10.10.8</ip>
+                            <prefix-length>32</prefix-length>
+                        </config>
+                    </address>
+                </addresses>
+            </ipv4>
+        </interface>
+        <interface>
+            <name>if1</name>
+            <config>
+                <name>if1</name>
+                <mtu>1500</mtu>
+                <admin-status xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">true</admin-status>
+                <type xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">ip</type>
+                <underlay-binding xmlns="http://ciena.com/ns/yang/ciena-underlay-binding">
+                    <config>
+                        <fd>if1</fd>
+                    </config>
+                </underlay-binding>
+                <vrfName xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">default</vrfName>
+            </config>
+            <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
+                <addresses>
+                    <address>
+                        <ip>172.10.10.38</ip>
+                        <config>
+                            <ip>172.10.10.38</ip>
+                            <prefix-length>30</prefix-length>
+                        </config>
+                    </address>
+                </addresses>
+            </ipv4>
+        </interface>
+        <interface>
+            <name>if2</name>
+            <config>
+                <name>if2</name>
+                <mtu>1500</mtu>
+                <admin-status xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">true</admin-status>
+                <type xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">ip</type>
+                <underlay-binding xmlns="http://ciena.com/ns/yang/ciena-underlay-binding">
+                    <config>
+                        <fd>if2</fd>
+                    </config>
+                </underlay-binding>
+                <vrfName xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">default</vrfName>
+            </config>
+            <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
+                <addresses>
+                    <address>
+                        <ip>172.10.10.42</ip>
+                        <config>
+                            <ip>172.10.10.42</ip>
+                            <prefix-length>30</prefix-length>
+                        </config>
+                    </address>
+                </addresses>
+            </ipv4>
+        </interface>
+        <interface>
+            <name>if3</name>
+            <config>
+                <name>if3</name>
+                <mtu>1500</mtu>
+                <admin-status xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">true</admin-status>
+                <type xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">ip</type>
+                <underlay-binding xmlns="http://ciena.com/ns/yang/ciena-underlay-binding">
+                    <config>
+                        <fd>if3</fd>
+                    </config>
+                </underlay-binding>
+                <vrfName xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">default</vrfName>
+            </config>
+            <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
+                <addresses>
+                    <address>
+                        <ip>172.10.10.49</ip>
+                        <config>
+                            <ip>172.10.10.49</ip>
+                            <prefix-length>30</prefix-length>
+                        </config>
+                    </address>
+                </addresses>
+            </ipv4>
+        </interface>
+    </interfaces>
+    <isis xmlns="http://ciena.com/ns/yang/ciena-isis">
+        <instance>
+            <tag>Interop</tag>
+            <net>49.0001.0200.1001.0008.00</net>
+            <level-type>level-1</level-type>
+            <fast-reroute>
+                <level>
+                    <level-type>level-1</level-type>
+                    <lfa>
+                        <per-prefix-enable>true</per-prefix-enable>
+                        <ti-lfa>
+                            <per-prefix-enable>true</per-prefix-enable>
+                        </ti-lfa>
+                    </lfa>
+                </level>
+            </fast-reroute>
+            <interfaces>
+                <interface>
+                    <name>lb1</name>
+                    <interface-type>point-to-point</interface-type>
+                </interface>
+                <interface>
+                    <name>if1</name>
+                    <interface-type>point-to-point</interface-type>
+                    <level-type>level-1</level-type>
+                </interface>
+                <interface>
+                    <name>if2</name>
+                    <interface-type>point-to-point</interface-type>
+                    <level-type>level-1</level-type>
+                </interface>
+                <interface>
+                    <name>if3</name>
+                    <interface-type>point-to-point</interface-type>
+                    <level-type>level-1</level-type>
+                </interface>
+            </interfaces>
+            <mpls-te>
+                <router-id>20.10.10.8</router-id>
+                <level-type>level-1</level-type>
+            </mpls-te>
+            <segment-routing>
+                <srgb>
+                    <lower-bound>16000</lower-bound>
+                    <upper-bound>17000</upper-bound>
+                </srgb>
+                <enabled>true</enabled>
+            </segment-routing>
+        </instance>
+    </isis>
+    <mpls xmlns="http://ciena.com/ns/yang/ciena-mpls">
+        <interfaces>
+            <interface>
+                <name>if1</name>
+                <label-switching>true</label-switching>
+            </interface>
+            <interface>
+                <name>if2</name>
+                <label-switching>true</label-switching>
+            </interface>
+            <interface>
+                <name>if3</name>
+                <label-switching>true</label-switching>
+            </interface>
+        </interfaces>
+    </mpls>
+
+    <segment-routing xmlns="http://ciena.com/ns/yang/ciena-sr">
+
+        <connected-prefix-sid-map>
+            <prefix>20.10.10.8/32</prefix>
+            <interface>lb1</interface>
+            <value-type>index</value-type>
+            <start-sid>8</start-sid>
+        </connected-prefix-sid-map>
+    </segment-routing>
+
+
+    <ldp xmlns="http://ciena.com/ns/yang/ciena/ciena-ldp">
+    <instance>
+    <tag>default</tag>
+    <lsr-id>20.10.10.8</lsr-id>
+    <interfaces>
+            
+                <interface>
+                    <name>lb1</name>
+                    <enable-ipv4>true</enable-ipv4>
+                </interface>
+            
+    </interfaces>
+    </instance>
+    </ldp>
+
+
+
+
+    <bgp xmlns="http://ciena.com/ns/yang/ciena-bgp">
+        <instance>
+            <as>65000</as>
+            <router-id>20.10.10.8</router-id>
+            <address-family>
+                <afi>vpnv4</afi>
+                <safi>unicast</safi>
+            </address-family>
+            <peer>
+                <address>20.10.10.6</address>
+                <remote-as>65000</remote-as>
+                <update-source-interface>lb1</update-source-interface>
+                <address-family>
+                    <afi>vpnv4</afi>
+                    <safi>unicast</safi>
+                    <route-reflector-client>false</route-reflector-client>
+                    <activate>true</activate>
+                </address-family>
+            </peer>
+        </instance>
+    </bgp>
+</config>

@@ -133,7 +133,7 @@ def _pseudowire(facts, name):
 
 def new_pseudowire(name):
     return {"name": name, "kind": None, "peer": None, "pw_id": None, "in_label": None, "out_label": None,
-            "mode": None, "tunnel": None, "service": None, "service_type": None}
+            "mode": None, "tunnel": None, "tunnel_type": None, "tunnel_color": None, "service": None, "service_type": None}
 
 
 def net_parts(net):

@@ -16,6 +16,8 @@ facts file. Python extractor + CLI in `src/saos_network_facts/`, npm reader in `
 | `src/saos_network_facts/schema/facts-v1.schema.json` | **the** schema (single source) |
 | `js/` | npm package: schema copy, generated types (`src/generated/facts.ts`), reader (`src/index.ts`, `src/node.ts`) |
 | `tests/fixtures/` | synthetic labs, recorded translator replies, expected facts files |
+| `examples/adaptive-sr-cfm/` | the published example: rendered lab configs, platform map, facts.json, SOURCE.md |
+| `viewer/` | the example site (three.js, Vite): `src/import/facts.js` facts -> topology; engine and view derived from packet-flow-3d |
 
 ## Rules
 
@@ -39,6 +41,7 @@ facts file. Python extractor + CLI in `src/saos_network_facts/`, npm reader in `
 ```bash
 .venv/bin/ruff check . && .venv/bin/pytest -q
 cd js && npm run check-generated && npm run typecheck && npm test && npm run build
+cd ../viewer && npm ci && npm test && npm run build
 ```
 
 ## Releases

@@ -1,0 +1,79 @@
+<config>
+    
+    <fds xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fd">
+
+        <fd>
+            <name>testcfm</name>
+            <mode>vpws</mode>
+        </fd>
+
+        <fd>
+            <name>testsat</name>
+            <mode>vpws</mode>
+        </fd>
+    </fds>
+
+    <fps xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fp">
+        <fp>
+            <name>testcfm_1</name>
+            <fd-name>testcfm</fd-name>
+            <logical-port>1</logical-port>
+            <stats-collection>on</stats-collection>
+            <classifier-list>Untagged</classifier-list>
+        </fp>
+    
+        <fp>
+            <name>testsat_1</name>
+            <fd-name>testsat</fd-name>
+            <logical-port>24</logical-port>
+            <stats-collection>on</stats-collection>
+            <classifier-list>Untagged</classifier-list>
+        </fp>
+    
+    </fps>
+
+
+    <pseudowires xmlns="urn:ietf:params:xml:ns:yang:ietf-pseudowires">
+        <pseudowire>
+            <name>testsat</name>
+            <mode xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">spoke</mode>
+            <configured-pw>
+                <peer-ip>20.10.10.4</peer-ip>
+                <pw-id>200</pw-id>
+            </configured-pw>
+        </pseudowire>
+        <pseudowire>
+            <name>testcfm</name>
+            <mode xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">spoke</mode>
+            <tunnel-destination-ip xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">20.10.10.6</tunnel-destination-ip>
+            <tunnel-type xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">sr-policy</tunnel-type>
+            <tunnel-color xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">2</tunnel-color>
+            <configured-pw>
+                <peer-ip>20.10.10.6</peer-ip>
+                <pw-id>100</pw-id>
+            </configured-pw>
+        </pseudowire>
+    </pseudowires>
+
+
+    <ldp xmlns="http://ciena.com/ns/yang/ciena/ciena-ldp">
+    <instance><tag>default</tag>
+    <target-ldp>
+    
+    <peers>
+        <address>20.10.10.4</address>
+        <hello-interval>10</hello-interval>
+    </peers>
+    
+    
+    <peers>
+        <address>20.10.10.6</address>
+        <hello-interval>10</hello-interval>
+    </peers>
+    
+    </target-ldp>
+    </instance>
+    </ldp>
+    
+
+</config>

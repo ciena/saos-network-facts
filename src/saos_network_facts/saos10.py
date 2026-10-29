@@ -511,7 +511,8 @@ def _pseudowires(facts, container):
         configured = get(pw, "configured-pw")
         for key, value in (("peer", get(configured, "peer-ip")), ("pw_id", get(configured, "pw-id")),
                            ("in_label", get(configured, "receive-label")), ("out_label", get(configured, "transmit-label")),
-                           ("mode", get(pw, "mode")), ("tunnel", get(pw, "tunnel-name"))):
+                           ("mode", get(pw, "mode")), ("tunnel", get(pw, "tunnel-name")),
+                           ("tunnel_type", get(pw, "tunnel-type")), ("tunnel_color", get(pw, "tunnel-color"))):
             if value is not None:
                 current[key] = text(value)
 

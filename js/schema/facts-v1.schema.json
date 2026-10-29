@@ -945,6 +945,20 @@
           ],
           "description": "The tunnel the PW rides on, when configured (MPLS-TP tunnel name)."
         },
+        "tunnel_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 10: the transport the PW is steered onto, as configured (`sr-policy`, `rsvp-te`, ...); null when not configured (the device resolves the peer address over its default transport: the peer's Prefix-SID or LDP LSP). Since schema 1.1."
+        },
+        "tunnel_color": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 10: with `tunnel_type` `sr-policy`, the color of the SR policy to the peer that carries the PW. Since schema 1.1."
+        },
         "service": {
           "type": [
             "string",

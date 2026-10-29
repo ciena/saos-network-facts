@@ -1,0 +1,35 @@
+<config>
+    
+<sat xmlns="http://www.ciena.com/ns/yang/ciena-sat">
+
+        <entity>
+                <name>testsat</name>
+                <port>4</port>
+                <role>generator</role>
+                <mode>out-of-service</mode>
+                <admin-state>enabled</admin-state>
+        </entity>
+        <test-profile>
+                <name>testsat</name>
+                <bandwidth>9995</bandwidth>
+                <duration>t1hr</duration>
+                <dst-mac>02:00:00:00:00:01</dst-mac>
+                <throughput-test>true</throughput-test>
+        </test-profile>
+        <test-instance>
+                <name>testsat</name>
+                <flow-point-id>testsat_1</flow-point-id>
+                <profile>testsat</profile>
+                <untagged>true</untagged>
+                <admin-state>enabled</admin-state>
+        </test-instance>
+
+
+        <sat-global>
+                <admin-state>enabled</admin-state>
+        </sat-global>
+</sat>
+
+
+
+</config>
