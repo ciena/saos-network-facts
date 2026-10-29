@@ -45,7 +45,7 @@ describe('the bundled Adaptive-SR-CFM example', () => {
     expect(topo.nodes.filter((n) => n.role === 'ce').map((n) => n.id)).toEqual(['CE1']);
     expect(topo.nodes.filter((n) => n.role === 'p').map((n) => n.id)).toEqual(['P2', 'P7']);
     const pe1 = topo.nodes.find((n) => n.id === 'PE1');
-    expect(pe1).toMatchObject({ loopback: '10.255.10.1', systemId: '0200.1001.0001', sidIndex: 1 });
+    expect(pe1).toMatchObject({ loopback: '10.255.10.1', systemId: '0102.5501.0001', sidIndex: 1 });
   });
 
   test('links come from the interface subnets, with the port each interface rides on', () => {

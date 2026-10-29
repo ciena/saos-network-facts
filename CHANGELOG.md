@@ -47,7 +47,8 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 - **Example renumbered into RFC 1918** — the Adaptive-SR-CFM example's loopbacks are now
   10.255.10.0/24 and its core links 172.30.10.0/24 (last octets kept); its other addresses were
   already private. `facts.json` is regenerated (10/10 ok, identical apart from the addresses and
-  the schema 1.2 keys), and `docs/example.png` is rebuilt from the site.
+  the schema 1.2 keys), and `docs/example.png` is rebuilt from the site. The IS-IS system ids are
+  re-derived from the new loopbacks (`0102.5501.000N`, area and NSEL unchanged).
 
 ### Fixed
 

@@ -189,7 +189,7 @@
     <isis xmlns="http://ciena.com/ns/yang/ciena-isis">
         <instance>
             <tag>Interop</tag>
-            <net>49.0001.0200.1001.0005.00</net>
+            <net>49.0001.0102.5501.0005.00</net>
             <level-type>level-1</level-type>
             <fast-reroute>
                 <level>

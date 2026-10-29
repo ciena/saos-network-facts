@@ -42,7 +42,8 @@ Expect `devices 10 / ok 10 / partial 0 / errors 0 / skipped 0`.
 - The SAT sessions name their peer by MAC address; the two MACs of real lab units are replaced by
   locally administered ones (`02:00:00:00:00:01`, `02:00:00:00:00:02`).
 - Lab addresses outside RFC 1918 renumbered into RFC 1918: the loopbacks are now in
-  10.255.10.0/24 and the core links in 172.30.10.0/24, each keeping its last octet. The IS-IS NETs
-  (system ids) are kept as rendered.
+  10.255.10.0/24 and the core links in 172.30.10.0/24, each keeping its last octet. The IS-IS
+  system ids are re-derived from the new loopbacks (`0102.5501.000N` for 10.255.10.N); the area
+  and NSEL of each NET are unchanged.
 - Kept as rendered: the other data-plane addresses (the CE link 172.20.10.0/30, the CE's
   10.40.40.0/24 and its static next hop 172.20.20.1), device names, types and YANG namespaces.
