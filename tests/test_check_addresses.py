@@ -14,7 +14,7 @@ def test_allowed_ranges_pass():
     text = "\n".join([
         "10.1.2.3 172.16.0.1 172.31.255.254 192.168.1.1",  # RFC 1918
         "192.0.2.1 198.51.100.7/31 203.0.113.255",  # RFC 5737
-        "0.0.0.0 area 0.0.0.0",
+        "0.0.0.0 area 0.0.0.0 area 0.0.0.1",  # 0.0.0.0/8: this network, OSPF area ids
         "2001:db8::1 2001:db8:0:1::/64 :: ::1",  # RFC 3849, unspecified, loopback
     ])
     assert check.check_text(text) == []

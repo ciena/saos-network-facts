@@ -17,6 +17,20 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-29
+
+### Added
+
+- **Engine unit tests** — 109 vitest cases over the viewer's engine (`viewer/test/`: BGP, CFM,
+  containerlab import, IS-IS, LAG, MPLS, MPLS-TP, OSPF, failure replay, walks), checking each
+  protocol's tables and packets against the RFC / IEEE behaviour on hand-built topologies. They
+  come with the engine from its earlier home, now Apache-2.0.
+
+### Changed
+
+- **Address check allows 0.0.0.0/8** — "this network" (RFC 1122), never a host's address, where
+  OSPF area ids such as 0.0.0.1 are written; it allowed only 0.0.0.0 before.
+
 ## [0.3.0] - 2026-10-29
 
 ### Added
