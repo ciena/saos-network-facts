@@ -31,6 +31,9 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   parsed directly; SAOS 10 CLI and NETCONF XML go through a translator's open `convert_cli` /
   `convert_xml` MCP tools (no token needed; `SAOS10_TRANSLATOR_TOKEN` is sent when set) or a local
   translator checkout. A device's files are merged in order (status ok / partial / error / skipped).
+  The hosted translator is the default endpoint (`DEFAULT_TRANSLATOR_URL`, overridable with
+  `--translator-url` / `SAOS10_TRANSLATOR_URL`); requests are retried up to 3 times on 429, 5xx
+  and network errors, with 1 s / 2 s backoff.
 - **npm package `@ciena/saos-network-facts`** — the schema, TypeScript types generated from it, and
   a reader: `parseFacts`, `readFacts` (Node), `interfacesOnPort` (flow point -> forwarding domain ->
   interface on SAOS 10, VLAN -> interface on SAOS 6), `loopbacks`, `bgpPeers`, `isisAreaId`,

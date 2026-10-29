@@ -64,12 +64,24 @@ parsed by the SAOS 10 translator, whose `convert_cli` / `convert_xml` MCP tools 
 configuration as JSON keyed by YANG module; this package walks that JSON. No translator code ships
 here: the client speaks only the MCP protocol over HTTP.
 
+By default the client uses the **hosted translator** at `https://dgwl7tykn828q.cloudfront.net`
+(`POST /mcp`). It needs no account or token, so `saos-network-facts extract` works out of the box on
+SAOS 10 configurations. Each SAOS 10 configuration file is sent to that endpoint to be parsed; to
+keep configurations on your machine, use a local translator checkout (`--translator-root`), or skip
+SAOS 10 devices with `--no-saos10`. SAOS 6 / 8 files never leave your machine. The translator in use
+is recorded in the facts file (`generator.translator`).
+
 | Setting | Flag | Environment |
 |---|---|---|
-| Translator endpoint (default: the hosted translator) | `--translator-url URL` | `SAOS10_TRANSLATOR_URL` |
+| Translator endpoint (default: the hosted translator above) | `--translator-url URL` | `SAOS10_TRANSLATOR_URL` |
 | Bearer token, sent only when set (the convert tools need none from translator 4.2.0) | | `SAOS10_TRANSLATOR_TOKEN` |
 | A local translator checkout instead of an endpoint (run under its virtualenv) | `--translator-root DIR` | `SAOS10_TRANSLATOR_ROOT` |
 | SAOS 10 release to parse for (default `10_12_00_0228`) | `--saos-version V` | |
+
+The flag wins over the environment; `SAOS10_TRANSLATOR_URL` wins over `SAOS10_TRANSLATOR_ROOT`.
+When the endpoint throttles (HTTP 429), fails (5xx) or the connection drops, each request is tried
+up to 3 times, waiting 1 s and then 2 s; other errors (a 4xx such as 401) fail at once. `--jobs N`
+(default 8) bounds the parallel requests for one device; lower it if you are throttled.
 
 A file the translator rejects is listed in the device's `failed_templates` and the device is
 `partial`; its other files still count.

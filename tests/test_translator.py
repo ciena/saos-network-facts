@@ -97,3 +97,50 @@ def test_text_helpers():
     assert translator.translator_platform("5162") == "cn5162"
     assert translator.translator_platform("3926v2-10x") == "cn3926"
     assert translator.translator_platform("linux") is None
+
+
+@pytest.fixture
+def flaky(monkeypatch):
+    """An endpoint that fails ``failures`` times (each an exception) before answering; records the waits."""
+    waits, state = [], {"failures": []}
+    monkeypatch.setattr(translator, "sleep", waits.append)
+    monkeypatch.delenv(translator.TOKEN_ENV, raising=False)
+
+    def urlopen(request, timeout):
+        body = json.loads(request.data)
+        if body["method"] != "initialize" and state["failures"]:
+            raise state["failures"].pop(0)
+        result = {"serverInfo": {"version": "4.2.0"}} if body["method"] == "initialize" else {"structuredContent": {"ok": True, "data": {}}}
+        return FakeResponse(json.dumps({"jsonrpc": "2.0", "id": body["id"], "result": result}).encode())
+
+    monkeypatch.setattr(translator, "urlopen", urlopen)
+    return waits, state
+
+
+def http_error(code):
+    return urllib.error.HTTPError("u", code, "x", {}, io.BytesIO(b"busy"))
+
+
+@pytest.mark.parametrize("failure", [http_error(429), http_error(503), http_error(599), urllib.error.URLError("reset"), TimeoutError()])
+def test_throttling_and_server_errors_are_retried(flaky, failure):
+    waits, state = flaky
+    state["failures"] = [failure, failure]
+    assert translator.HttpTranslator("https://translator.example").parse("x\n", "cli") == {}
+    assert waits == [1, 2]
+
+
+def test_retries_are_bounded(flaky):
+    waits, state = flaky
+    state["failures"] = [http_error(429)] * translator.HttpTranslator.RETRIES
+    with pytest.raises(translator.TranslatorError, match="HTTP 429"):
+        translator.HttpTranslator("https://translator.example").parse("x\n", "cli")
+    assert waits == [1, 2]
+    assert state["failures"] == []
+
+
+def test_client_errors_are_not_retried(flaky):
+    waits, state = flaky
+    state["failures"] = [http_error(400), http_error(400)]
+    with pytest.raises(translator.TranslatorError, match="HTTP 400"):
+        translator.HttpTranslator("https://translator.example").parse("x\n", "cli")
+    assert waits == [] and len(state["failures"]) == 1

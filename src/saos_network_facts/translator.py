@@ -26,7 +26,8 @@ from pathlib import Path
 
 from . import __version__
 
-# The hosted translator. Kept in this one constant so it can be changed (or removed) in one place.
+# The hosted translator, the default endpoint. Kept in this one constant; override it with
+# --translator-url or SAOS10_TRANSLATOR_URL, or use --translator-root for a local checkout.
 DEFAULT_TRANSLATOR_URL = "https://dgwl7tykn828q.cloudfront.net"
 SAOS_VERSION = "10_12_00_0228"
 TOKEN_ENV = "SAOS10_TRANSLATOR_TOKEN"
@@ -119,7 +120,7 @@ class HttpTranslator:
     (or set in ``SAOS10_TRANSLATOR_TOKEN``) requests carry ``Authorization: Bearer <token>``."""
 
     parallel = True  # the endpoint is stateless: calls from several threads are fine
-    RETRIES = 3  # on 429, 5xx and network errors, with a short backoff
+    RETRIES = 3  # attempts per request on 429, 5xx and network errors; the waits between them grow 1 s, 2 s
 
     def __init__(self, url, token=None, timeout=120, saos_version=SAOS_VERSION):
         self.url = url.rstrip("/")
@@ -149,12 +150,12 @@ class HttpTranslator:
                 detail = exc.read().decode(errors="replace")[:300]
                 if exc.code == 401:
                     detail = f"{'the token was refused' if self.token else 'no token sent'} (set {TOKEN_ENV}): {detail}"
-                if exc.code not in (429, 500, 502, 503, 504) or attempt == self.RETRIES:
+                if not retryable(exc.code) or attempt == self.RETRIES:
                     raise TranslatorError(f"{method}: HTTP {exc.code}: {detail}") from None
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 if attempt == self.RETRIES:
                     raise TranslatorError(f"{method}: {exc}") from None
-            time.sleep(attempt)
+            sleep(attempt)
         if "error" in reply:
             raise TranslatorError(f"{method}: {reply['error'].get('message', reply['error'])}")
         return reply.get("result") or {}
@@ -181,9 +182,19 @@ class HttpTranslator:
         return reply.get("data")
 
 
+def retryable(status):
+    """Worth another attempt: the endpoint is throttling (429) or failing (5xx). Other 4xx are final."""
+    return status == 429 or 500 <= status <= 599
+
+
 def urlopen(request, timeout):
     """Indirection so tests can stand in for the network."""
     return urllib.request.urlopen(request, timeout=timeout)
+
+
+def sleep(seconds):
+    """Indirection so tests need not wait out the backoff."""
+    time.sleep(seconds)
 
 
 def load_translator(root=None, url=None, saos_version=SAOS_VERSION):
