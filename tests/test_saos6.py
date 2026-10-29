@@ -43,7 +43,27 @@ def test_isis_area_net_and_level():
     assert instance["area"] == "49.0011"
     assert instance["net"] == "49.0011.1920.0000.2001.00"
     assert (instance["area_id"], instance["system_id"]) == ("49.0011", "1920.0000.2001")
-    assert f["isis"]["interfaces"] == [{"interface": "core", "instance": "CORE", "level": "L2", "type": None}]
+    assert f["isis"]["interfaces"] == [{"interface": "core", "instance": "CORE", "level": "L2", "type": None, "metrics": []}]
+
+
+def test_isis_interface_level_wide_metric():
+    f = facts(
+        "isis interface-level set ip-interface early level L2 wide-metric 30",
+        "isis interface attach ip-interface core isis-instance CORE level L1-L2",
+        "isis interface attach ip-interface early isis-instance CORE level L2",
+        "isis interface-level set ip-interface core level L2 wide-metric 100 priority 70",
+        "isis interface-level set ip-interface core level L1 hello-timer 5 wide-metric 50",
+        "isis interface-level set ip-interface core level L1 priority 10",
+    )
+    early, core = f["isis"]["interfaces"]
+    assert core["metrics"] == [{"level": "L2", "metric": None, "wide_metric": "100"},
+                               {"level": "L1", "metric": None, "wide_metric": "50"}]
+    assert early == {"interface": "early", "instance": "CORE", "level": "L2", "type": None,
+                     "metrics": [{"level": "L2", "metric": None, "wide_metric": "30"}]}
+    unset = facts("isis interface attach ip-interface core isis-instance CORE",
+                  "isis interface-level set ip-interface core level L2 wide-metric 100",
+                  "isis interface-level unset ip-interface core level L2 priority wide-metric")
+    assert unset["isis"]["interfaces"][0]["metrics"] == []
 
 
 def test_isis_area_without_net():

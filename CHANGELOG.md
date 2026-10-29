@@ -17,6 +17,40 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-29
+
+### Added
+
+- **IS-IS interface metrics (schema 1.3.0)** — `isis.interfaces[].metrics`: one entry per level the
+  configuration sets a metric for, in configuration order, with the narrow `metric` and the
+  `wide_metric` as written (`level` in the configuration's spelling: SAOS 10 `level-1` /
+  `level-2`, SAOS 6 / 8 `L1` / `L2`). Read from the SAOS 10 interface's `level-1` / `level-2`
+  `metric` and `wide-metric`, and from SAOS 6 / 8 `isis interface-level set ... wide-metric`
+  (`unset` clears it). An empty list when none is configured; optional, so 1.2 files still
+  validate. The npm reader adds `isisMetric(facts, interface, level)`: the wide metric of the
+  level, else the narrow one, else null.
+- **Viewer: LAG links from the facts** — a link whose interfaces ride a LAG at both ends (`lags`,
+  `ports[].lag`) is imported as a LAG, one member per pair of member ports in configured order, so
+  the engine runs LACP on it; LAG members are failure targets of their own.
+- **Viewer: IS-IS metrics from the facts** — core links take each end's metric at the level the
+  view runs (wide, else narrow; level 1-2 runs as level 2), per end when they differ; 10 only
+  where the facts have none, as the Import tab says.
+- **Viewer: OSPF flood area** — the OSPF LSA flood walk picks the area to flood in when the
+  network has more than one.
+- **Viewer: failure detection** — the failure replay chooses loss of signal (both ends down at
+  once) or a silent failure, found by the link's CFM MEG or BFD, else the LACP timeout (3 s) on a
+  LAG or LAG member, else the IS-IS holding time (30 s) / OSPF RouterDeadInterval (40 s).
+
+### Changed
+
+- **Viewer: a silent failure no longer replays as loss of signal** — with no CFM MEG or BFD on
+  the link (every link of an imported facts file), the replay waited for nothing; it now shows
+  the LACP or IGP hello timeout that finds the failure.
+- **Fixtures** — the sr-l2 lab sets IS-IS wide metrics (and a narrow one on PE2) and the mixed lab
+  a SAOS 6 wide metric; the replies for the two changed SAOS 10 files are recorded with translator
+  4.2.1, the others kept. The
+  Adaptive-SR-CFM example is re-extracted (only the schema version and the empty `metrics` differ).
+
 ## [0.3.1] - 2026-10-29
 
 ### Added

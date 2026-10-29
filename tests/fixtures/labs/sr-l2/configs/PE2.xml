@@ -51,7 +51,7 @@
       <level-type>level-2</level-type>
       <interfaces>
         <interface><name>lb0</name><interface-type>point-to-point</interface-type></interface>
-        <interface><name>PE2-PE1</name><interface-type>point-to-point</interface-type><level-type>level-2</level-type></interface>
+        <interface><name>PE2-PE1</name><interface-type>point-to-point</interface-type><level-type>level-2</level-type><level-2><metric>30</metric><wide-metric>100</wide-metric></level-2></interface>
       </interfaces>
       <segment-routing>
         <enabled>true</enabled>

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Reader for saos-network-facts facts files, and the helpers every consumer needs: which IP
 // interfaces ride a port (SAOS 10: flow point -> forwarding domain -> interface; SAOS 6: the VLANs
-// the port carries), loopbacks, BGP neighbours, and the parts of an IS-IS NET. Pure functions, no
+// the port carries), loopbacks, BGP neighbours, the parts of an IS-IS NET and IS-IS interface
+// metrics. Pure functions, no
 // Node APIs, so this entry point works in a browser too; `@ciena/saos-network-facts/node` adds
 // `readFacts(file)`.
 
@@ -137,4 +138,26 @@ export function isisArea(instance: Pick<IsisInstance, "area"> & Partial<IsisInst
   if (instance.area_id) return instance.area_id;
   if (instance.net) return isisAreaId(instance.net);
   return isisAreaId(instance.area) ?? instance.area ?? null;
+}
+
+/** An IS-IS level as a number: `level-1` / `L1` / `1` -> 1, `level-2` / `L2` / `2` -> 2, else null. */
+function levelOf(level: string | number): 1 | 2 | null {
+  const m = /([12])$/.exec(String(level).trim());
+  return m ? (Number(m[1]) as 1 | 2) : null;
+}
+
+/** The IS-IS metric an interface advertises at `level` (1 / 2, or as written: `level-2`, `L2`): the
+ * wide metric (RFC 5305) the configuration sets for that level, else its narrow metric, else null
+ * (the interface advertises its default). Reads `isis.interfaces[].metrics` (schema 1.3); null for
+ * older files. With the interface on several instances, the first that sets one. */
+export function isisMetric(facts: DeviceFacts, iface: string, level: string | number): number | null {
+  const want = levelOf(level);
+  if (want === null) return null;
+  for (const item of facts.isis?.interfaces ?? []) {
+    if (item.interface !== iface) continue;
+    const m = (item.metrics ?? []).find((x) => levelOf(x.level) === want);
+    const value = m?.wide_metric ?? m?.metric ?? null;
+    if (value !== null && value !== "" && Number.isFinite(Number(value))) return Number(value);
+  }
+  return null;
 }

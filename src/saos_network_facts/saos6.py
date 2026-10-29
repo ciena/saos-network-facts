@@ -122,6 +122,32 @@ def _isis_instance(facts, name):
     return instance
 
 
+def _isis_interface(facts, name):
+    """The IS-IS attachment of an IP interface (the first, when it is attached to several instances)."""
+    for item in facts["isis"]["interfaces"]:
+        if item["interface"] == name:
+            return item
+    item = {"interface": name, "instance": None, "level": None, "type": None, "metrics": []}
+    facts["isis"]["interfaces"].append(item)
+    return item
+
+
+def set_isis_metric(item, level, **values):
+    """Set ``metric`` / ``wide_metric`` of ``level`` on an IS-IS interface: the metric the interface
+    advertises at that level. A level gets its entry the first time the configuration sets one, and
+    loses it when neither is set any more."""
+    metrics = item.setdefault("metrics", [])
+    entry = next((m for m in metrics if m["level"] == level), None)
+    if entry is None:
+        if all(v is None for v in values.values()):
+            return
+        entry = {"level": level, "metric": None, "wide_metric": None}
+        metrics.append(entry)
+    entry.update(values)
+    if entry["metric"] is None and entry["wide_metric"] is None:
+        metrics.remove(entry)
+
+
 def _pseudowire(facts, name):
     for pw in facts["pseudowires"]:
         if pw["name"] == name:
@@ -148,7 +174,10 @@ def net_parts(net):
 
 
 def finish_isis(facts):
-    """``nets``, ``net``, ``area_id`` and ``system_id`` on every IS-IS instance, from what the config set."""
+    """``nets``, ``net``, ``area_id`` and ``system_id`` on every IS-IS instance, from what the config set;
+    ``metrics`` on every interface (empty when no metric is configured)."""
+    for item in facts["isis"]["interfaces"]:
+        item.setdefault("metrics", [])
     for instance in facts["isis"]["instances"]:
         nets = instance.setdefault("nets", [])
         instance["net"] = nets[0] if nets else None
@@ -299,8 +328,20 @@ def apply(facts, line):
             _add(instance["nets"], _s(kv["net"]))
         return True
     if head == "isis interface attach" and "ip-interface" in kv:
-        facts["isis"]["interfaces"].append({"interface": kv["ip-interface"], "instance": kv.get("isis-instance"),
-                                            "level": _s(kv.get("level")), "type": _s(kv.get("type"))})
+        # an interface whose metrics were set before it was attached gets its instance now
+        item = next((i for i in facts["isis"]["interfaces"] if i["interface"] == kv["ip-interface"] and i["instance"] is None), None)
+        attach = {"interface": kv["ip-interface"], "instance": kv.get("isis-instance"),
+                  "level": _s(kv.get("level")), "type": _s(kv.get("type")), "metrics": item["metrics"] if item else []}
+        if item is None:
+            facts["isis"]["interfaces"].append(attach)
+        else:
+            item.update(attach)
+        return True
+    if head in ("isis interface-level set", "isis interface-level unset") and "ip-interface" in kv and _s(kv.get("level")):
+        # the per-level settings of an IS-IS interface; the wide metric is the one the interface advertises
+        if "wide-metric" in t:
+            wide = _s(kv.get("wide-metric")) if head.endswith(" set") else None
+            set_isis_metric(_isis_interface(facts, kv["ip-interface"]), _s(kv["level"]), wide_metric=wide)
         return True
 
     if t[0] == "cfm" and len(t) > 2 and t[1] in ("service", "servi") and t[2] == "create":

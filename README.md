@@ -4,7 +4,7 @@ Extract per-device network facts from SAOS 6/8/10 configurations into a versione
 
 Give it a directory of device configurations (and optionally a containerlab topology) and it writes
 one JSON facts file: per device, the hostname, interfaces and addresses, ports, VLANs, LAGs,
-forwarding domains and flow points, IS-IS (level, area, NET), OSPF (instances, areas, interfaces),
+forwarding domains and flow points, IS-IS (level, area, NET, interface metrics), OSPF (instances, areas, interfaces),
 segment routing (SRGB, prefix and node SIDs, SR policies), BGP (neighbours, route reflection),
 MPLS-TP co-routed tunnels, pseudowires and L2VPN services, and CFM MEPs. Diagram tools,
 topology viewers and presentation builds read that file instead of parsing configurations
@@ -18,7 +18,7 @@ themselves. The file follows a published JSON Schema, so readers can pin a schem
 ## Install
 
 ```bash
-pip install "git+https://github.com/ciena/saos-network-facts@v0.3.1"
+pip install "git+https://github.com/ciena/saos-network-facts@v0.4.0"
 saos-network-facts --version
 ```
 
@@ -93,8 +93,8 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 
 ```json
 {
-  "schema_version": "1.2.0",
-  "generator": {"name": "saos-network-facts", "version": "0.3.1", "translator": "translator 4.2.0 (mcp, https://...)"},
+  "schema_version": "1.3.0",
+  "generator": {"name": "saos-network-facts", "version": "0.4.0", "translator": "translator 4.2.1 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -127,7 +127,8 @@ The full schema, with a description on every field, is
 Facts (all devices): `hostname`, `interfaces`, `gateway`, `vlans`, `ports`, `lags`, `sub_ports`,
 `rings`, `peers` (MPLS VCs, MPLS-TP tunnel ends, BGP neighbours with `route_reflector_client`),
 `isis` (`instances` with `level`, `nets`, `net`, `area_id`, `system_id`, `sr_enabled`; `interfaces`
-with `level` and `type`), `segment_routing` (`srgb`, `prefix_sids`, `policies`, `segment_lists`),
+with `level`, `type` and, since schema 1.3, `metrics`: per level the narrow `metric` and
+`wide_metric`), `segment_routing` (`srgb`, `prefix_sids`, `policies`, `segment_lists`),
 `bgp` (`instances` with `router_id`, `cluster_id`, `route_reflector`), `pseudowires` (`peer`,
 `pw_id`, labels, `mode`, `tunnel_type` and `tunnel_color` since schema 1.1, `service`,
 `service_type`), `cfm` (`meps` with `md`, `ma`, `mep_id`, `level`, `direction`, `port`, `vlan`),
@@ -204,7 +205,7 @@ In CI, for example a GitHub Pages workflow:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p site
-          gh release download v0.3.1 --repo ciena/saos-network-facts \
+          gh release download v0.4.0 --repo ciena/saos-network-facts \
             --pattern 'saos-network-facts-viewer-*.tgz' --output viewer.tgz
           tar -xzf viewer.tgz -C site
           mkdir -p site/labs && cp -r facts/* site/labs/    # facts files, positions and labs/index.json
@@ -220,12 +221,13 @@ so they stay as private as the site that serves them.
 
 ```ts
 import { readFacts } from "@ciena/saos-network-facts/node";
-import { devicesByName, interfacesOnPort, isisArea } from "@ciena/saos-network-facts";
+import { devicesByName, interfacesOnPort, isisArea, isisMetric } from "@ciena/saos-network-facts";
 
 const facts = readFacts("facts.json");          // schema 1.x (or a pre-schema bare list)
 const pe1 = devicesByName(facts).get("PE1")!;
 interfacesOnPort(pe1, "1");                     // [{ name: "PE1-PE2", ip: "198.51.100.0/31", vlan: null, isis: "CORE", lag: null }]
 isisArea(pe1.isis.instances[0]!);               // "49.0001"
+isisMetric(pe1, "PE1-PE2", 2);                  // 100: the level-2 wide metric, else the narrow one, else null
 ```
 
 The main entry point has no Node dependencies (`parseFacts(json)` for browsers); see [`js/`](js/).

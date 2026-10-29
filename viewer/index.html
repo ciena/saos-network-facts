@@ -48,7 +48,11 @@
 
         <section>
           <h2>Failure</h2>
-          <select id="fail-target"></select>
+          <select id="fail-target" aria-label="Link or LAG member to fail"></select>
+          <select id="fail-detection" aria-label="Failure detection">
+            <option value="ccm">Silent failure: found by CFM CCM / BFD</option>
+            <option value="los">Loss of signal: interfaces go down at once</option>
+          </select>
           <div class="row">
             <button id="fail-run" class="danger" type="button">Fail &amp; replay</button>
             <button id="fail-restore" type="button">Restore</button>

@@ -183,3 +183,115 @@ describe('layout', () => {
     expect(layoutNodes([], [])).toEqual({});
   });
 });
+
+// Three routers in a line: R1 - R2 over LAG1 (ports 1 and 2 at R1, 11 and 12 at R2), R2 - R3 plain.
+function lagLab({ r2Members = ['11', '12'] } = {}) {
+  const withLag = (d, lag, members) => {
+    d.facts.lags = [{ name: lag, members }];
+    for (const m of members) d.facts.ports[m] = { roles: ['aggregation'], vlans: [], lag };
+    return d;
+  };
+  return file([
+    withLag(device('R1', '192.0.2.1', [['to-r2', '198.51.100.0/31', 'LAG1']]), 'LAG1', ['1', '2']),
+    withLag(device('R2', '192.0.2.2', [['to-r1', '198.51.100.1/31', 'LAG1'], ['to-r3', '198.51.100.2/31', '3']]), 'LAG1', r2Members),
+    device('R3', '192.0.2.3', [['to-r2', '198.51.100.3/31', '1']]),
+  ]);
+}
+
+describe('LAG links from the facts', () => {
+  const imp = importFacts(lagLab());
+  const topo = imp.topology;
+
+  test('a link whose interfaces ride a LAG at both ends is a LAG, members paired in order', () => {
+    const lag = topo.links.find((l) => l.id === 'R1-R2');
+    expect(lag).toMatchObject({ lag: true, a: { node: 'R1', if: 'to-r2', port: 'LAG1' }, b: { node: 'R2', if: 'to-r1', port: 'LAG1' } });
+    expect(lag.members).toEqual([
+      { id: 'R1-R2/1', a: '1', b: '11' },
+      { id: 'R1-R2/2', a: '2', b: '12' },
+    ]);
+    expect(topo.links.find((l) => l.id === 'R2-R3')).toMatchObject({ lag: false, members: [{ id: 'R2-R3', a: 'to-r3', b: 'to-r2' }] });
+    expect(imp.report.gaps.physical.map((i) => i.item)).toContain('1 LAG links');
+    expect(imp.report.warnings).toEqual([]);
+  });
+
+  test('the engine runs LACP on it: a member failure keeps the LAG and the IS-IS adjacency up', () => {
+    const net = buildNetwork(topo, { failures: ['R1-R2/1'] });
+    expect(net.links['R1-R2']).toMatchObject({ lag: true, up: true, distributing: ['R1-R2/2'] });
+    expect(net.isis.adjacencies.find((a) => a.link === 'R1-R2').state).toBe('Up');
+    const r = replayFailure(topo, 'R1-R2/1', { labelMode: imp.labelMode, detection: 'los' });
+    expect(r.replay.steps.map((s) => s.title)).toContain('t=0 ms: LACP removes R1-R2/1 from to-r2');
+    expect(r.after.isis.rib).toEqual(r.before.isis.rib);
+  });
+
+  test('every member down takes the LAG and its adjacency down', () => {
+    const net = buildNetwork(topo, { failures: ['R1-R2/1', 'R1-R2/2'] });
+    expect(net.links['R1-R2'].up).toBe(false);
+    expect(net.isis.adjacencies.find((a) => a.link === 'R1-R2')?.state ?? 'Down').not.toBe('Up');
+  });
+
+  test('a port that is a member of the LAG, not the LAG itself, also makes it a LAG link', () => {
+    const f = lagLab();
+    f.devices[0].facts.fps[0].logical_port = '1';
+    expect(importFacts(f).topology.links.find((l) => l.id === 'R1-R2').lag).toBe(true);
+  });
+
+  test('unequal member counts draw the pairs there are; a LAG at one end only is a plain link', () => {
+    const uneven = importFacts(lagLab({ r2Members: ['11'] }));
+    expect(uneven.topology.links.find((l) => l.id === 'R1-R2').members).toEqual([{ id: 'R1-R2/1', a: '1', b: '11' }]);
+    expect(uneven.report.warnings).toEqual(['R1-R2: R1 LAG1 has 2 members, R2 LAG1 1; 1 are drawn']);
+    const f = lagLab();
+    f.devices[1].facts.lags = [];
+    for (const p of ['11', '12']) delete f.devices[1].facts.ports[p];
+    const oneSided = importFacts(f);
+    expect(oneSided.topology.links.find((l) => l.id === 'R1-R2')).toMatchObject({ lag: false, members: [{ id: 'R1-R2', a: 'to-r2', b: 'to-r1' }] });
+    expect(oneSided.report.warnings).toEqual(['R1-R2: R1 rides LAG LAG1, R2 no LAG; drawn as a plain link']);
+  });
+});
+
+describe('IS-IS interface metrics from the facts (schema 1.3)', () => {
+  test('the sr-l2 fixture: wide metric 100 at both ends of PE1-PE2 (PE2 also sets narrow 30)', () => {
+    const imp = importFacts(readFileSync(new URL('../../tests/fixtures/expected/sr-l2.facts.json', import.meta.url), 'utf8'));
+    expect(imp.topology.links.find((l) => l.id === 'PE1-PE2')).toMatchObject({ kind: 'core', metric: 100 });
+    expect(imp.topology.links.find((l) => l.id === 'PE1-PE2').cost).toBeUndefined();
+    expect(imp.report.gaps.isis.find((i) => i.item === 'link metrics')).toMatchObject({ source: 'facts' });
+  });
+
+  // R1 - R2 - R3 and R1 - R3; metrics as each test sets them on the interfaces.
+  function triangle(metrics, level = 'level-2') {
+    const f = file([
+      device('R1', '192.0.2.1', [['r1-r2', '198.51.100.0/31', '1'], ['r1-r3', '198.51.100.4/31', '2']]),
+      device('R2', '192.0.2.2', [['r2-r1', '198.51.100.1/31', '1'], ['r2-r3', '198.51.100.2/31', '2']]),
+      device('R3', '192.0.2.3', [['r3-r2', '198.51.100.3/31', '1'], ['r3-r1', '198.51.100.5/31', '2']]),
+    ]);
+    for (const d of f.devices) {
+      d.facts.isis.instances[0].level = level;
+      d.facts.isis.interfaces = d.facts.interfaces.filter((i) => i.isis).map((i) => ({ interface: i.name, instance: 'CORE', level: null, type: null, metrics: metrics[i.name] ?? [] }));
+    }
+    return f;
+  }
+  const wide = (level, v) => ({ level, metric: null, wide_metric: String(v) });
+
+  test('per end metrics: wide, else narrow, else 10; SPF follows them', () => {
+    const imp = importFacts(triangle({
+      'r1-r3': [wide('level-2', 100)],
+      'r3-r1': [{ level: 'level-2', metric: '40', wide_metric: null }],
+      'r1-r2': [wide('level-1', 5), wide('level-2', 20)],
+      'r2-r1': [wide('level-2', 20)],
+    }));
+    const link = (id) => imp.topology.links.find((l) => l.id === id);
+    expect(link('R1-R2')).toMatchObject({ metric: 20 });
+    expect(link('R1-R3')).toMatchObject({ metric: 100, cost: { a: 100, b: 40 } });
+    expect(link('R2-R3')).toMatchObject({ metric: 10 });
+    expect(imp.report.gaps.isis.find((i) => i.item === 'link metrics')).toMatchObject({ source: 'default', detail: expect.stringMatching(/^1 of 3 core links/) });
+    const net = buildNetwork(imp.topology, { labelMode: imp.labelMode });
+    // R1 -> R3: via R2 (20 + 10) beats the direct link (100); R3 -> R1: via R2 (10 + 20) beats its direct end (40).
+    expect(net.isis.rib.R1['192.0.2.3/32']).toMatchObject({ metric: 30, nextHops: [expect.objectContaining({ node: 'R2' })] });
+    expect(net.isis.rib.R3['192.0.2.1/32']).toMatchObject({ metric: 30 });
+  });
+
+  test('level 1 and level 1-2: the level the view runs (1-2 runs as 2)', () => {
+    const m = { 'r1-r2': [wide('L1', 7), wide('L2', 70)], 'r2-r1': [wide('L1', 7), wide('L2', 70)] };
+    expect(importFacts(triangle(m, 'level-1')).topology.links.find((l) => l.id === 'R1-R2').metric).toBe(7);
+    expect(importFacts(triangle(m, 'level-1-2')).topology.links.find((l) => l.id === 'R1-R2').metric).toBe(70);
+  });
+});

@@ -7,7 +7,9 @@
 //
 //   IGP          IS-IS, or OSPF when more devices run OSPF than IS-IS (the engine runs one)
 //   nodes        every device with facts; a router when it runs the IGP or an MPLS-TP tunnel, else a CE
-//   links        two interfaces on different devices in one IPv4 subnet; core when both run the IGP
+//   links        two interfaces on different devices in one IPv4 subnet; core when both run the IGP;
+//                a LAG when both interfaces ride a LAG (lags / ports[].lag), members paired in order
+//   IS-IS        per link each end's interface metric at the level the view runs (wide, else narrow, else 10)
 //   OSPF         per link the area and cost of each end's interface, BFD when both ends enable it
 //   SRGB, SIDs   segment_routing.srgb / prefix_sids (node SID of the loopback)
 //   SR policies  segment_routing.policies, the preferred candidate path's first segment list
@@ -16,7 +18,7 @@
 //   pseudowires  the two ends that name each other (peer address + PW id); static on an MPLS-TP tunnel
 //   CFM          MEPs of one MD / MA on two devices, over that service's pseudowire
 
-import { devicesByName, interfacesOnPort, isisArea, isRouted, loopbacks, parseFacts } from '../../../js/src/index.ts';
+import { devicesByName, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts } from '../../../js/src/index.ts';
 import { intToIp, parsePrefix } from '../engine/ip.js';
 import { BACKBONE, normArea } from '../engine/ospf.js';
 import { rfcVendor } from '../engine/vendor.js';
@@ -33,12 +35,41 @@ export function ipv4Subnet(cidr) {
   return { ip: m[1], len, subnet: `${intToIp(parsePrefix(`${m[1]}/${len}`).net)}/${len}` };
 }
 
-// The port an interface rides on: the port whose flow points (SAOS 10) or VLANs (SAOS 6) reach it.
+// The port an interface rides on: the port whose flow points (SAOS 10) or VLANs (SAOS 6) reach it;
+// the LAG when that port is a member of one (a member reaches the LAG's interfaces).
 function portOf(facts, ifname) {
   for (const port of Object.keys(facts.ports ?? {})) {
-    if (interfacesOnPort(facts, port).some((i) => i.name === ifname)) return port;
+    if (interfacesOnPort(facts, port).some((i) => i.name === ifname)) return facts.ports[port].lag ?? port;
   }
   return null;
+}
+
+// The LAG a port is (a LAG name) or is a member of (ports[].lag), as { name, members }, or null.
+function lagOf(facts, port) {
+  if (!port) return null;
+  const lags = facts.lags ?? [];
+  return lags.find((l) => l.name === port) ?? lags.find((l) => l.name === facts.ports?.[port]?.lag) ?? null;
+}
+
+// The members of a link: one per member pair when both ends ride a LAG (802.1AX: the IP
+// interface sits on the aggregator, its members carry the frames), else the link itself.
+// The facts do not say which member faces which, so members are paired in configured order.
+function linkMembers(id, a, b, report) {
+  const plain = { lag: false, members: [{ id, a: a.if, b: b.if }] };
+  if (!a.lag && !b.lag) return plain;
+  if (!a.lag || !b.lag) {
+    report.warn(`${id}: ${a.lag ? a.node : b.node} rides LAG ${(a.lag ?? b.lag).name}, ${a.lag ? b.node : a.node} no LAG; drawn as a plain link`);
+    return plain;
+  }
+  const n = Math.min(a.lag.members.length, b.lag.members.length);
+  if (!n) {
+    report.warn(`${id}: LAG ${!a.lag.members.length ? `${a.node} ${a.lag.name}` : `${b.node} ${b.lag.name}`} has no members; drawn as a plain link`);
+    return plain;
+  }
+  if (a.lag.members.length !== b.lag.members.length) report.warn(`${id}: ${a.node} ${a.lag.name} has ${a.lag.members.length} members, ${b.node} ${b.lag.name} ${b.lag.members.length}; ${n} are drawn`);
+  const members = [];
+  for (let i = 0; i < n; i++) members.push({ id: `${id}/${i + 1}`, a: a.lag.members[i], b: b.lag.members[i] });
+  return { lag: true, members };
 }
 
 // IS-IS level as written (`level-1`, `L2`, `level-1-2`, `L1L2`) -> 1 or 2; level 1-2 runs as 2 here.
@@ -140,7 +171,17 @@ function ospfLink(link, devices, report, defaults) {
   if (cfg.every((c) => c?.bfd)) link.bfd = true;
 }
 
-function buildLinks(devices, nodes, igp, report) {
+// IS-IS on a core link: each end's interface metric at `level` (RFC 5305 wide, else narrow), the
+// default where the configuration sets none; per end when they differ, like OSPF costs.
+function isisLink(link, devices, level, defaults) {
+  const metrics = [link.a, link.b].map((e) => isisMetric(devices.get(e.node), e.if, level));
+  if (metrics.some((m) => m === null)) defaults.metric++;
+  const [ma, mb] = metrics.map((m) => m ?? DEFAULT_METRIC);
+  link.metric = ma;
+  if (ma !== mb) link.cost = { a: ma, b: mb };
+}
+
+function buildLinks(devices, nodes, igp, isisLevel, report) {
   const bySubnet = new Map();
   for (const [name, f] of devices) {
     for (const i of f.interfaces ?? []) {
@@ -149,7 +190,8 @@ function buildLinks(devices, nodes, igp, report) {
         const s = ipv4Subnet(cidr);
         if (!s || s.len >= 32) continue;
         if (!bySubnet.has(s.subnet)) bySubnet.set(s.subnet, []);
-        bySubnet.get(s.subnet).push({ node: name, if: i.name, ip: s.ip, port: portOf(f, i.name), igp: inIgp(igp, f, i) });
+        const port = portOf(f, i.name);
+        bySubnet.get(s.subnet).push({ node: name, if: i.name, ip: s.ip, port, lag: lagOf(f, port), igp: inIgp(igp, f, i) });
       }
     }
   }
@@ -168,12 +210,24 @@ function buildLinks(devices, nodes, igp, report) {
     if (ids.has(id)) id = `${id} ${subnet}`;
     ids.add(id);
     const end = (e) => ({ node: e.node, if: e.if, ip: e.ip, ...(e.port ? { port: e.port } : {}) });
-    links.push({ id, kind: core ? 'core' : 'access', ...(core ? { metric: DEFAULT_METRIC } : {}), subnet, lag: false, a: end(a), b: end(b), members: [{ id, a: a.if, b: b.if }] });
+    const { lag, members } = linkMembers(id, a, b, report);
+    links.push({ id, kind: core ? 'core' : 'access', ...(core ? { metric: DEFAULT_METRIC } : {}), subnet, lag, a: end(a), b: end(b), members });
+  }
+  const lags = links.filter((l) => l.lag);
+  if (lags.length) {
+    report.add('physical', 'facts', `${lags.length} LAG links`, `links whose interfaces ride a LAG at both ends: ${lags.map((l) => `${l.id} (${l.members.length} members)`).join(', ')}`);
+    report.add('physical', 'derived', 'LAG member pairing', 'the facts do not say which member faces which: members are paired in configured order');
   }
   const core = links.filter((l) => l.kind === 'core');
   const name = igp === 'ospf' ? 'OSPF' : 'IS-IS';
   report.add('physical', 'derived', `${links.length} links`, `from interface subnets (two interfaces of different devices in one IPv4 subnet); ${core.length} core (${name} at both ends), ${links.length - core.length} access`);
-  if (igp === 'isis' && core.length) report.add('isis', 'default', 'link metrics', `the facts carry no IS-IS metrics: every core link has metric ${DEFAULT_METRIC}`);
+  if (igp === 'isis' && core.length) {
+    const defaults = { metric: 0 };
+    for (const l of core) isisLink(l, devices, isisLevel, defaults);
+    report.add('isis', defaults.metric ? 'default' : 'facts', 'link metrics', defaults.metric
+      ? `${defaults.metric} of ${core.length} core links have an end without a level-${isisLevel} metric in the facts: metric ${DEFAULT_METRIC} there`
+      : `per interface level-${isisLevel} metric (wide, else narrow)`);
+  }
   if (igp === 'ospf') {
     const defaults = { area: 0, metric: 0 };
     for (const l of core) ospfLink(l, devices, report, defaults);
@@ -489,8 +543,10 @@ export function importFacts(input, { name, positions } = {}) {
   for (const r of file.devices) if (!devices.has(r.device)) report.warn(`${r.device}: ${r.status}${r.reason ? ` (${r.reason})` : ''}; not shown`);
 
   const igp = chooseIgp(devices, report);
+  // The IS-IS level the view runs: the first instance's (level 1-2 runs as 2).
+  const levels = [...new Set([...devices.values()].map((f) => levelNumber(f.isis?.instances?.[0]?.level)).filter(Boolean))];
   const nodes = buildNodes(devices, igp, report);
-  const links = buildLinks(devices, nodes, igp, report);
+  const links = buildLinks(devices, nodes, igp, levels[0] ?? 2, report);
   const owner = ownerIndex(devices);
   const bgp = buildBgp(devices, owner, report);
   const srgb = srgbOf(devices, report);
@@ -505,7 +561,6 @@ export function importFacts(input, { name, positions } = {}) {
   for (const n of nodes) if (n.role !== 'ce' && edge.has(n.id)) n.role = 'pe';
   report.add('physical', 'derived', 'roles', `CE: no ${igp === 'ospf' ? 'OSPF' : 'IS-IS'} and no MPLS-TP tunnel; PE: a router that speaks BGP, ends a pseudowire or faces a CE; P: the other routers`);
 
-  const levels = [...new Set([...devices.values()].map((f) => levelNumber(f.isis?.instances?.[0]?.level)).filter(Boolean))];
   const routers = nodes.filter((n) => n.role !== 'ce');
   if (igp === 'isis') {
     if (levels.length > 1) report.warn(`IS-IS levels ${levels.join(' and ')} mixed; the view runs one level (${levels[0]})`);

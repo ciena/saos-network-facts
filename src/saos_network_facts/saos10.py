@@ -25,7 +25,7 @@ Two translator quirks are handled here:
 import ipaddress
 import xml.etree.ElementTree as ET
 
-from .saos6 import finish_isis, new_pseudowire
+from .saos6 import finish_isis, new_pseudowire, set_isis_metric
 from .saos6 import new_facts as _base_facts
 
 NETCONF_NS = "urn:ietf:params:xml:ns:netconf:base:1.0"
@@ -310,9 +310,15 @@ def _isis(facts, container):
                     "level": text(get(interface, "level-type")), "type": text(get(interface, "interface-type"))}
             current = next((i for i in facts["isis"]["interfaces"] if i["interface"] == item["interface"] and i["instance"] == tag), None)
             if current is None:
-                facts["isis"]["interfaces"].append(item)
+                current = dict(item, metrics=[])
+                facts["isis"]["interfaces"].append(current)
             else:
                 current.update({k: v for k, v in item.items() if v is not None})
+            for level in ("level-1", "level-2"):
+                # the metric the interface advertises at the level: narrow `metric`, wide `wide-metric` (RFC 5305)
+                settings = get(interface, level)
+                values = {"metric": text(get(settings, "metric")), "wide_metric": text(get(settings, "wide-metric"))}
+                set_isis_metric(current, level, **{k: v for k, v in values.items() if v is not None})
 
 
 def _bgp_peer(facts, asn, peer):
