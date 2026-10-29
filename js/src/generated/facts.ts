@@ -176,6 +176,15 @@ export interface DeviceFacts {
    * SAOS 10: top-level YANG objects seen across the device's files.
    */
   objects?: number;
+  ospf?: Ospf;
+  /**
+   * SAOS 10 MPLS-TP co-routed tunnels, one entry per tunnel this node is on. Since schema 1.2.
+   */
+  tp_corouted_tunnels?: TpCoroutedTunnel[];
+  /**
+   * SAOS 10 L2VPN services. Since schema 1.2.
+   */
+  l2vpn_services?: L2VpnService[];
 }
 /**
  * A layer-3 interface: loopback, IP interface, management interface (SAOS 6), or any SAOS 10 openconfig interface that is not a physical port.
@@ -834,6 +843,246 @@ export interface EthernetSegment {
    * DF-election preference.
    */
   preference: string | null;
+}
+/**
+ * SAOS 10 OSPFv2 (`ciena-ospf`). Since schema 1.2.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "Ospf".
+ */
+export interface Ospf {
+  /**
+   * OSPF instances.
+   */
+  instances: OspfInstance[];
+  /**
+   * Interfaces per instance, in configuration order.
+   */
+  interfaces: OspfInterface[];
+}
+/**
+ * An OSPFv2 instance (SAOS 10). Since schema 1.2.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "OspfInstance".
+ */
+export interface OspfInstance {
+  /**
+   * The instance tag.
+   */
+  name: string;
+  /**
+   * Router id; null when not configured (the device picks one).
+   */
+  router_id: string | null;
+  /**
+   * The VRF the instance runs in; null when not configured (the default VRF).
+   */
+  vrf: string | null;
+  /**
+   * Areas, in configuration order.
+   */
+  areas: OspfArea[];
+}
+/**
+ * An OSPF area of an instance.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "OspfArea".
+ */
+export interface OspfArea {
+  /**
+   * The area id, dotted (`0.0.0.0` is the backbone).
+   */
+  area: string;
+  /**
+   * Area type when configured (`stub`, `nssa`); null for a normal area.
+   */
+  type: string | null;
+  /**
+   * The prefixes whose interfaces are in the area, as configured (`network`).
+   */
+  networks: string[];
+}
+/**
+ * An interface an OSPF instance runs on (SAOS 10). Since schema 1.2.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "OspfInterface".
+ */
+export interface OspfInterface {
+  /**
+   * The instance tag.
+   */
+  instance: string;
+  /**
+   * The interface name (an entry of `interfaces`).
+   */
+  interface: string;
+  /**
+   * The area: the area of the instance whose `networks` cover the interface's address (derived); null when none does.
+   */
+  area: string | null;
+  /**
+   * Network type (`point-to-point`, `broadcast`); null when not configured.
+   */
+  type: string | null;
+  /**
+   * Interface cost; null when not configured.
+   */
+  metric: string | null;
+  /**
+   * Hello interval in seconds; null when not configured.
+   */
+  hello_interval: string | null;
+  /**
+   * Dead interval in seconds; null when not configured.
+   */
+  dead_interval: string | null;
+  /**
+   * DR election priority; null when not configured.
+   */
+  priority: string | null;
+  /**
+   * No adjacency is formed: configured `passive`, or the interface is a loopback (advertised as a stub network).
+   */
+  passive: boolean;
+  /**
+   * BFD is enabled on the interface.
+   */
+  bfd: boolean;
+}
+/**
+ * One node's segment of a static MPLS-TP co-routed (bidirectional) tunnel (SAOS 10 `ciena-mpls-tp-corouted`). Every node on the path configures the tunnel under the same name, source and destination: the ingress its forward-out and reverse-in labels, a transit node all four, the egress forward-in and reverse-out. Labels are null where the node's role has none. Since schema 1.2.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "TpCoroutedTunnel".
+ */
+export interface TpCoroutedTunnel {
+  /**
+   * Tunnel name.
+   */
+  name: string;
+  /**
+   * Source (ingress) address.
+   */
+  source: string | null;
+  /**
+   * Destination (egress) address.
+   */
+  destination: string | null;
+  /**
+   * This node's role in the tunnel: `static-ingress-corouted`, `static-transit-corouted` or `static-egress-corouted`.
+   */
+  type: string | null;
+  /**
+   * `primary` or `backup` (1:1 protection); `primary` when not configured.
+   */
+  role: string;
+  /**
+   * A backup tunnel: the primary it protects; null otherwise.
+   */
+  primary: TpTunnelRef | null;
+  /**
+   * `enable` or `disable`; `enable` when not configured.
+   */
+  admin_state: string;
+  /**
+   * Reversion to the primary after a protection switch, `enable` or `disable`; `enable` when not configured.
+   */
+  reversion: string;
+  /**
+   * Reversion hold time in seconds; null when not configured.
+   */
+  reversion_hold_time: string | null;
+  /**
+   * Label received in the forward direction (transit, egress).
+   */
+  forward_in_label: string | null;
+  /**
+   * Label sent in the forward direction (ingress, transit).
+   */
+  forward_out_label: string | null;
+  /**
+   * Forward-direction next hop (ingress, transit).
+   */
+  next_hop_ip: string | null;
+  /**
+   * Label received in the reverse direction (ingress, transit).
+   */
+  reverse_in_label: string | null;
+  /**
+   * Label sent in the reverse direction (transit, egress).
+   */
+  reverse_out_label: string | null;
+  /**
+   * Reverse-direction next hop: the previous node of the forward path (transit, egress).
+   */
+  prev_hop_ip: string | null;
+  /**
+   * LSP BFD parameters; null when not configured.
+   */
+  bfd: TpTunnelBfd | null;
+}
+/**
+ * The primary tunnel a backup tunnel protects.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "TpTunnelRef".
+ */
+export interface TpTunnelRef {
+  /**
+   * Primary tunnel name.
+   */
+  name: string | null;
+  /**
+   * Primary tunnel type.
+   */
+  type: string | null;
+}
+/**
+ * LSP BFD (proactive OAM) on an MPLS-TP tunnel.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "TpTunnelBfd".
+ */
+export interface TpTunnelBfd {
+  /**
+   * BFD runs: configured and not `admin-down`.
+   */
+  enabled: boolean;
+  /**
+   * Desired minimum transmit interval in milliseconds (derived: SAOS 10 configures microseconds); null when not configured.
+   */
+  interval_ms: number | null;
+}
+/**
+ * A SAOS 10 L2VPN service (`ciena-l2vpn`): binds a forwarding domain to pseudowires. Since schema 1.2.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "L2vpnService".
+ */
+export interface L2VpnService {
+  /**
+   * Service name (the `service` of its pseudowires).
+   */
+  name: string;
+  /**
+   * The forwarding domain carrying the attachment circuits.
+   */
+  fd: string | null;
+  /**
+   * Pseudowire names, in configuration order.
+   */
+  pseudowires: string[];
+  /**
+   * Service MTU; null when not configured.
+   */
+  mtu: string | null;
+  /**
+   * `static` or `ldp`; null when not configured.
+   */
+  signaling_type: string | null;
 }
 /**
  * A configuration file the SAOS 10 translator could not parse.

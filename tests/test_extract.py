@@ -120,11 +120,12 @@ def test_platform_map_shorthand_and_configs(tmp_path):
 
 
 def test_fixtures_are_synthetic():
-    """Only documentation / private address space in the fixtures (RFC 5737, RFC 1918) and no secrets."""
+    """Only documentation / private address space in the fixtures (RFC 5737, RFC 1918) and no secrets
+    (``0.0.0.0`` is the OSPF backbone area id)."""
     import re
     for path in FIXTURES.rglob("*"):
         if path.is_file() and path.suffix != ".json":
             text = path.read_text()
             for ip in re.findall(r"\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b", text):
-                assert ip.startswith(("192.0.2.", "198.51.100.", "203.0.113.", "10.")), f"{path.name}: {ip}"
+                assert ip == "0.0.0.0" or ip.startswith(("192.0.2.", "198.51.100.", "203.0.113.", "10.")), f"{path.name}: {ip}"
             assert not re.search(r"password|secret|token", text, re.I), path.name

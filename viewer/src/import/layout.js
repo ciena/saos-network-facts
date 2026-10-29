@@ -51,6 +51,18 @@ export function layoutNodes(ids, edges) {
   return fit(ids, pos);
 }
 
+// Authored positions, as a diagram gives them: { NAME: [x, y] } or { NAME: { x, y } } in any unit,
+// y down (a `{ "positions": {...} }` wrapper is accepted). Scaled into the same frame as the layout,
+// a tall diagram turned a quarter so its long side runs along x. `missing`: the ids without one.
+export function scalePositions(ids, positions) {
+  const table = positions?.positions ?? positions ?? {};
+  const xy = (p) => (Array.isArray(p) ? p : [p?.x, p?.y ?? p?.z]).map(Number);
+  const known = ids.filter((id) => table[id] !== undefined && xy(table[id]).every(Number.isFinite));
+  const missing = ids.filter((id) => !known.includes(id));
+  if (missing.length || !ids.length) return { pos: {}, missing };
+  return { pos: fit(ids, ids.map((id) => ({ x: xy(table[id])[0], z: xy(table[id])[1] }))), missing };
+}
+
 // Centre on the origin; the longer side of the layout along x, scaled into WIDTH x DEPTH.
 function fit(ids, pos) {
   const span = (axis) => Math.max(...pos.map((p) => p[axis])) - Math.min(...pos.map((p) => p[axis]));

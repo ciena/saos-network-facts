@@ -4,18 +4,21 @@ Extract per-device network facts from SAOS 6/8/10 configurations into a versione
 
 Give it a directory of device configurations (and optionally a containerlab topology) and it writes
 one JSON facts file: per device, the hostname, interfaces and addresses, ports, VLANs, LAGs,
-forwarding domains and flow points, IS-IS (level, area, NET), segment routing (SRGB, prefix and node
-SIDs, SR policies), BGP (neighbours, route reflection), pseudowires and CFM MEPs. Diagram tools,
+forwarding domains and flow points, IS-IS (level, area, NET), OSPF (instances, areas, interfaces),
+segment routing (SRGB, prefix and node SIDs, SR policies), BGP (neighbours, route reflection),
+MPLS-TP co-routed tunnels, pseudowires and L2VPN services, and CFM MEPs. Diagram tools,
 topology viewers and presentation builds read that file instead of parsing configurations
 themselves. The file follows a published JSON Schema, so readers can pin a schema version.
 
 - **Python** (`saos_network_facts`, CLI `saos-network-facts`): the extractor.
 - **npm** (`@ciena/saos-network-facts`, in [`js/`](js/)): the schema, TypeScript types and a reader.
+- **Viewer** ([`viewer/`](viewer/)): a static site that shows a facts file in 3D; released as a
+  download to stage next to your own facts ([below](#use-the-viewer-in-your-repo)).
 
 ## Install
 
 ```bash
-pip install "git+https://github.com/ciena/saos-network-facts@v0.2.0"
+pip install "git+https://github.com/ciena/saos-network-facts@v0.3.0"
 saos-network-facts --version
 ```
 
@@ -90,8 +93,8 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 
 ```json
 {
-  "schema_version": "1.1.0",
-  "generator": {"name": "saos-network-facts", "version": "0.2.0", "translator": "translator 4.2.0 (mcp, https://...)"},
+  "schema_version": "1.2.0",
+  "generator": {"name": "saos-network-facts", "version": "0.3.0", "translator": "translator 4.2.0 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -129,10 +132,15 @@ with `level` and `type`), `segment_routing` (`srgb`, `prefix_sids`, `policies`, 
 `pw_id`, labels, `mode`, `tunnel_type` and `tunnel_color` since schema 1.1, `service`,
 `service_type`), `cfm` (`meps` with `md`, `ma`, `mep_id`, `level`, `direction`, `port`, `vlan`),
 `lines`, `recognised`. SAOS 10 only: `fds`, `fps`,
-`classifiers`, `vrfs`, `segments` (EVPN ethernet segments), `objects`.
+`classifiers`, `vrfs`, `segments` (EVPN ethernet segments), `objects`, and since schema 1.2 `ospf`
+(`instances` with `router_id`, `vrf` and `areas` with their `networks`; `interfaces` with `area`,
+`type`, `metric`, timers, `passive`, `bfd`), `tp_corouted_tunnels` (each node's segment of a static
+MPLS-TP co-routed tunnel: `source`, `destination`, `type` ingress / transit / egress, `role`,
+`primary` of a backup, forward and reverse in / out labels, next / previous hop, LSP `bfd`) and
+`l2vpn_services` (`fd`, `pseudowires`, `mtu`, `signaling_type`).
 
 Values read from a configuration are text as written (`"mtu": "9000"`); flags the extractor derives
-are booleans. Segment routing and BGP are extracted from SAOS 10 only.
+are booleans. Segment routing, BGP, OSPF and MPLS-TP tunnels are extracted from SAOS 10 only.
 
 **Compatibility.** `schema_version` is semver. Within 1.x, new versions only add optional fields, so
 a reader must ignore fields it does not know; a breaking change is schema 2.
@@ -159,6 +167,54 @@ cd ../../viewer && npm ci && npm run build      # the site, in dist/
 
 The site is built by `.github/workflows/pages.yml`: deployed to GitHub Pages from `main`, and
 uploaded as the `site-preview` artifact on every pull request.
+
+## Use the viewer in your repo
+
+Every release carries the built viewer, `saos-network-facts-viewer-X.Y.Z.tgz`: a static site
+(`index.html`, `assets/`) with relative paths, so it runs from any directory of any web server,
+private GitHub Pages included. Put your facts files beside it and point the page at them:
+
+| URL | Opens |
+|---|---|
+| `index.html?facts=facts.json` | that facts file (relative to the page) |
+| `index.html?facts=facts.json&positions=positions.json` | the same, with authored node positions |
+| `index.html?labs=labs/index.json` | the default lab of a lab index, with a picker for the others |
+| `index.html?labs=labs/index.json&lab=core` | lab `core` of that index |
+| `index.html?lab=core` | lab `core` of `labs/index.json` beside the page |
+| `index.html` | the bundled example; *Load your facts.json* still opens a local file |
+
+A lab index lists facts files (URLs relative to the index):
+
+```json
+{
+  "labs": [
+    {"id": "core", "title": "Core lab", "facts": "core/facts.json", "positions": "core/positions.json", "default": true},
+    {"id": "metro", "title": "Metro ring", "facts": "metro/facts.json"}
+  ]
+}
+```
+
+Positions are optional: `{"positions": {"PE1": [100, 300], "P1": [300, 150], ...}}`, diagram
+coordinates in any unit with y down, one per device (else the view lays the topology out itself).
+In CI, for example a GitHub Pages workflow:
+
+```yaml
+      - name: Stage the viewer with our facts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p site
+          gh release download v0.3.0 --repo ciena/saos-network-facts \
+            --pattern 'saos-network-facts-viewer-*.tgz' --output viewer.tgz
+          tar -xzf viewer.tgz -C site
+          mkdir -p site/labs && cp -r facts/* site/labs/    # facts files, positions and labs/index.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+```
+
+Then link to `.../index.html?labs=labs/index.json`. The page fetches the facts from the same site,
+so they stay as private as the site that serves them.
 
 ## Reading facts from JavaScript / TypeScript
 

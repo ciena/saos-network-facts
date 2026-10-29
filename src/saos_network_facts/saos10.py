@@ -5,7 +5,8 @@ The translator turns a CLI or XML configuration into one JSON document keyed by 
 (``openconfig-interfaces:interfaces``, ``ciena-mef-fp:fps``, ...). This module walks that document
 for the facts and returns the same dict shape as ``saos6`` (hostname, interfaces, loopbacks, VLANs,
 ports, LAGs, peers, IS-IS, segment routing, BGP, pseudowires, CFM), extended with the SAOS 10 objects
-that carry the same information: forwarding domains, flow points, classifiers, VRFs, EVPN segments.
+that carry the same information: forwarding domains, flow points, classifiers, VRFs, EVPN segments,
+OSPF, MPLS-TP co-routed tunnels and L2VPN services.
 
 Two translator quirks are handled here:
 
@@ -20,6 +21,7 @@ Two translator quirks are handled here:
   drops those objects.
 """
 
+import ipaddress
 import xml.etree.ElementTree as ET
 
 from .saos6 import finish_isis, new_pseudowire
@@ -32,7 +34,8 @@ REMOVAL_KINDS = {"interface": "interfaces", "fp": "fps", "fd": "fds", "logical-p
 
 def new_facts():
     facts = _base_facts()
-    facts.update({"fds": [], "fps": [], "classifiers": {}, "vrfs": [], "segments": [], "objects": 0})
+    facts.update({"fds": [], "fps": [], "classifiers": {}, "vrfs": [], "segments": [], "objects": 0,
+                  "ospf": {"instances": [], "interfaces": []}, "tp_corouted_tunnels": [], "l2vpn_services": []})
     return facts
 
 
@@ -518,14 +521,140 @@ def _pseudowires(facts, container):
 
 
 def _l2vpn_services(facts, container):
-    """``ciena-l2vpn:l2vpn-services``: which service (and forwarding domain) each pseudowire carries."""
-    services = facts.setdefault("_l2vpn", {})
+    """``ciena-l2vpn:l2vpn-services``: an L2VPN service binds a forwarding domain (its attachment
+    circuits) to one or more pseudowires; ``finish`` also names the service on each pseudowire."""
+    if removed(container):
+        facts["l2vpn_services"] = []
+        return
     for svc in entries(container, "l2vpn"):
         name = text(get(svc, "name"))
-        if not name or removed(svc):
+        if not name:
             continue
+        current = next((s for s in facts["l2vpn_services"] if s["name"] == name), None)
+        if removed(svc):
+            facts["l2vpn_services"] = [s for s in facts["l2vpn_services"] if s is not current]
+            continue
+        if current is None:
+            if path_only(svc):
+                continue
+            current = {"name": name, "fd": None, "pseudowires": [], "mtu": None, "signaling_type": None}
+            facts["l2vpn_services"].append(current)
+        for key, leaf in (("fd", "forwarding-domain"), ("mtu", "mtu"), ("signaling_type", "signaling-type")):
+            if get(svc, leaf) is not None:
+                current[key] = text(get(svc, leaf))
         for pw in as_list(get(svc, "pseudowire")):
-            services[text(pw)] = {"service": name, "fd": text(get(svc, "forwarding-domain"))}
+            _add(current["pseudowires"], text(pw))
+
+
+def _ospf(facts, container):
+    """``ciena-ospf:ospf``: OSPFv2 instances (router id, VRF, areas and the networks that put
+    interfaces in them) and the interfaces each instance runs on (network type, metric, timers,
+    passive, BFD). An interface's area is filled in ``finish`` from the area networks."""
+    ospf = facts["ospf"]
+    if removed(container):
+        facts["ospf"] = {"instances": [], "interfaces": []}
+        return
+    for instance in entries(container, "instance"):
+        tag = text(get(instance, "tag"))
+        current = next((i for i in ospf["instances"] if i["name"] == tag), None)
+        if removed(instance):
+            ospf["instances"] = [i for i in ospf["instances"] if i is not current]
+            ospf["interfaces"] = [i for i in ospf["interfaces"] if i["instance"] != tag]
+            continue
+        if current is None:
+            if path_only(instance):
+                continue
+            current = {"name": tag, "router_id": None, "vrf": None, "areas": []}
+            ospf["instances"].append(current)
+        for key, leaf in (("router_id", "router-id"), ("vrf", "vrf")):
+            if get(instance, leaf) is not None:
+                current[key] = text(get(instance, leaf))
+        for area in entries(get(instance, "areas"), "area"):
+            area_id = text(get(area, "id"))
+            entry = next((a for a in current["areas"] if a["area"] == area_id), None)
+            if removed(area):
+                current["areas"] = [a for a in current["areas"] if a is not entry]
+                continue
+            if entry is None:
+                entry = {"area": area_id, "type": None, "networks": []}
+                current["areas"].append(entry)
+            kind = get(area, "type")
+            if kind is not None:
+                # a YANG choice: {"stub": {}} / {"nssa": {...}}, or plain text
+                entry["type"] = next((local(k) for k in kind), None) if isinstance(kind, dict) else text(kind)
+            for network in entries(area, "network"):
+                prefix = text(get(network, "prefix"))
+                if prefix and not removed(network):
+                    _add(entry["networks"], prefix)
+        for interface in entries(get(instance, "interfaces"), "interface"):
+            name = text(get(interface, "name"))
+            item = next((i for i in ospf["interfaces"] if i["instance"] == tag and i["interface"] == name), None)
+            if removed(interface):
+                ospf["interfaces"] = [i for i in ospf["interfaces"] if i is not item]
+                continue
+            if item is None:
+                item = {"instance": tag, "interface": name, "area": None, "type": None, "metric": None,
+                        "hello_interval": None, "dead_interval": None, "priority": None, "passive": False, "bfd": False}
+                ospf["interfaces"].append(item)
+            for key, leaf in (("type", "type"), ("metric", "metric"), ("hello_interval", "hello-interval"),
+                              ("dead_interval", "dead-interval"), ("priority", "priority")):
+                if get(interface, leaf) is not None:
+                    item[key] = text(get(interface, leaf))
+            if get(interface, "passive") is not None:
+                item["passive"] = bool(flag(get(interface, "passive")))
+            if get(get(interface, "bfd"), "enable") is not None:
+                item["bfd"] = bool(flag(get(get(interface, "bfd"), "enable")))
+
+
+def _tp_bfd(params):
+    """LSP BFD on a co-routed tunnel: enabled unless ``admin-down``; SAOS 10 gives the intervals in microseconds."""
+    if not isinstance(params, dict):
+        return None
+    tx = text(get(params, "desired-min-tx-interval"))
+    return {"enabled": not flag(get(params, "admin-down")), "interval_ms": int(tx) // 1000 if tx and tx.isdigit() else None}
+
+
+def _tp_tunnels(facts, container):
+    """``ciena-mpls-tp-corouted:tp-corouted-tunnels``: static MPLS-TP co-routed (bidirectional) tunnels.
+    Each node of the path configures its own segment of a tunnel, keyed by name, source and
+    destination: the ingress its forward-out and reverse-in labels, a transit node all four, the
+    egress forward-in and reverse-out. A backup tunnel names the primary it protects (1:1)."""
+    if removed(container):
+        facts["tp_corouted_tunnels"] = []
+        return
+    tunnels = facts["tp_corouted_tunnels"]
+    for tunnel in entries(container, "tunnel"):
+        key = (text(get(tunnel, "name")), text(get(tunnel, "source-ip")), text(get(tunnel, "destination-ip")))
+        current = next((t for t in tunnels if (t["name"], t["source"], t["destination"]) == key), None)
+        if removed(tunnel):
+            facts["tp_corouted_tunnels"] = tunnels = [t for t in tunnels if t is not current]
+            continue
+        if current is None:
+            if path_only(tunnel):
+                continue
+            current = {"name": key[0], "source": key[1], "destination": key[2], "type": None, "role": "primary",
+                       "primary": None, "admin_state": "enable", "reversion": "enable", "reversion_hold_time": None,
+                       "forward_in_label": None, "forward_out_label": None, "next_hop_ip": None,
+                       "reverse_in_label": None, "reverse_out_label": None, "prev_hop_ip": None, "bfd": None}
+            tunnels.append(current)
+        for key_, leaf in (("type", "tunnel-type"), ("role", "tunnel-role-type"), ("admin_state", "tunnel-admin-state"),
+                           ("reversion", "tunnel-reversion-state"), ("reversion_hold_time", "reversion-hold-time")):
+            if get(tunnel, leaf) is not None:
+                current[key_] = text(get(tunnel, leaf))
+        primary = get(tunnel, "primary-tunnel-configuration")
+        if isinstance(primary, dict) and get(primary, "primary-tunnel-name") is not None:
+            current["primary"] = {"name": text(get(primary, "primary-tunnel-name")), "type": text(get(primary, "primary-tunnel-type"))}
+        for segment, leaves in (("forward-in-segment", ("forward-in-label",)),
+                                ("forward-out-segment", ("forward-out-label", "next-hop-ip")),
+                                ("reverse-in-segment", ("reverse-in-label",)),
+                                ("reverse-out-segment", ("reverse-out-label", "prev-hop-ip"))):
+            for leaf in leaves:
+                value = get(get(tunnel, segment), leaf)
+                if value is not None:
+                    current[leaf.replace("-", "_")] = text(value)
+        bfd = _tp_bfd(get(tunnel, "bfd-cfg-parms"))
+        if bfd is not None:
+            current["bfd"] = bfd
 
 
 def _cfm(facts, container):
@@ -572,6 +701,8 @@ HANDLERS = {
     "segment-routing-traffic-engineering": _sr_policy,
     "pseudowires": _pseudowires,
     "l2vpn-services": _l2vpn_services,
+    "ospf": _ospf,
+    "tp-corouted-tunnels": _tp_tunnels,
     "maintenance-domain": _cfm,
 }
 
@@ -619,13 +750,14 @@ def finish(facts):
     for instance in facts["bgp"]["instances"]:
         instance["route_reflector"] = any(p["route_reflector_client"] for p in facts["peers"]
                                           if p["kind"] == "bgp" and p["name"] == f"as{instance['as']}")
-    services = facts.pop("_l2vpn", {})
+    services = {pw: svc for svc in facts["l2vpn_services"] for pw in svc["pseudowires"]}
     modes = {fd["name"]: fd["mode"] for fd in facts["fds"]}
     for pw in facts["pseudowires"]:
         svc = services.get(pw["name"])
         if svc:
-            pw["service"] = svc["service"]
+            pw["service"] = svc["name"]
             pw["service_type"] = modes.get(svc["fd"]) if modes.get(svc["fd"]) in ("vpws", "vpls") else None
+    _ospf_areas(facts)
     fps = {fp["name"]: fp for fp in facts["fps"]}
     for mep in facts["cfm"]["meps"]:
         fp = fps.get(mep["interface"])
@@ -636,6 +768,33 @@ def finish(facts):
             if mep["port"]:
                 _add(_port(facts, mep["port"])["roles"], "cfm-mep")
     return finish_isis(facts)
+
+
+def _ospf_areas(facts):
+    """Each OSPF interface's area: the area of its instance whose ``network`` covers the interface's
+    address (SAOS 10 puts interfaces in areas by network). Loopbacks are passive: advertised as a
+    stub network, never an adjacency."""
+    addresses = {i["name"]: i["ip"] for i in facts["interfaces"]}
+    kinds = {i["name"]: i["kind"] for i in facts["interfaces"]}
+    instances = {i["name"]: i for i in facts["ospf"]["instances"]}
+    for item in facts["ospf"]["interfaces"]:
+        if kinds.get(item["interface"]) == "loopback":
+            item["passive"] = True
+        instance, address = instances.get(item["instance"]), addresses.get(item["interface"])
+        if item["area"] is not None or instance is None or not address:
+            continue
+        try:
+            ip = ipaddress.ip_interface(address).ip
+        except ValueError:
+            continue
+        item["area"] = next((a["area"] for a in instance["areas"] if any(_covers(n, ip) for n in a["networks"])), None)
+
+
+def _covers(network, ip):
+    try:
+        return ip in ipaddress.ip_network(network, strict=False)
+    except ValueError:
+        return False
 
 
 # ---------------------------------------------------------------- NETCONF removals

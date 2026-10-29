@@ -267,9 +267,14 @@
             }
           ]
         },
+        "l2vpn_services": [],
         "lags": [],
         "lines": 10,
         "objects": 10,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
         "peers": [],
         "ports": {
           "1": {
@@ -306,6 +311,7 @@
         },
         "segments": [],
         "sub_ports": [],
+        "tp_corouted_tunnels": [],
         "vlans": {},
         "vrfs": [
           "CUST-A"
@@ -330,7 +336,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.0 (recorded)",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
-  "schema_version": "1.1.0"
+  "schema_version": "1.2.0"
 }

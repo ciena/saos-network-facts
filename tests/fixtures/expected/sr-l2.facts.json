@@ -129,9 +129,24 @@
             }
           ]
         },
+        "l2vpn_services": [
+          {
+            "fd": "FD-VPWS-100",
+            "mtu": null,
+            "name": "VPWS-100",
+            "pseudowires": [
+              "PW-100"
+            ],
+            "signaling_type": null
+          }
+        ],
         "lags": [],
         "lines": 13,
         "objects": 13,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
         "peers": [
           {
             "address_families": [
@@ -229,6 +244,7 @@
         },
         "segments": [],
         "sub_ports": [],
+        "tp_corouted_tunnels": [],
         "vlans": {
           "100": {
             "ports": [
@@ -372,9 +388,24 @@
             }
           ]
         },
+        "l2vpn_services": [
+          {
+            "fd": "FD-VPWS-100",
+            "mtu": null,
+            "name": "VPWS-100",
+            "pseudowires": [
+              "PW-100"
+            ],
+            "signaling_type": null
+          }
+        ],
         "lags": [],
         "lines": 11,
         "objects": 11,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
         "peers": [
           {
             "address_families": [
@@ -448,6 +479,7 @@
         },
         "segments": [],
         "sub_ports": [],
+        "tp_corouted_tunnels": [],
         "vlans": {
           "100": {
             "ports": [
@@ -479,7 +511,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.0 (recorded)",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
-  "schema_version": "1.1.0"
+  "schema_version": "1.2.0"
 }

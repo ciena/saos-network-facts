@@ -17,6 +17,27 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
+### Added
+
+- **OSPF, MPLS-TP tunnels and L2VPN services (schema 1.2.0)** — SAOS 10 devices carry `ospf`
+  (instances with router id, VRF and areas with their networks; interfaces with area, network type,
+  metric, timers, passive, BFD), `tp_corouted_tunnels` (each node's segment of a static MPLS-TP
+  co-routed tunnel: ends, ingress / transit / egress, primary or backup, forward and reverse
+  labels, next and previous hop, LSP BFD) and `l2vpn_services` (forwarding domain, pseudowires,
+  MTU, signalling). Optional fields, so 1.0 and 1.1 readers are unaffected. A new synthetic fixture
+  lab (`tests/fixtures/labs/ospf-tp/`) covers them.
+- **Viewer: OSPF and MPLS-TP** — the facts importer runs OSPF as the IGP when more devices run it
+  than IS-IS (areas, costs, router ids, BFD from the facts), stitches MPLS-TP tunnels from their
+  per-node segments (1:1 protection, LSP BFD) and carries static pseudowires over them, with an
+  MPLS-TP BFD walk and the tunnels in the overview.
+- **Viewer by URL, and as a release download** — `?facts=<url>` (with `&positions=<url>` for
+  authored node positions), `?labs=<index.json>` (a list of labs: id, title, facts, positions,
+  default) and `?lab=<id>` open facts served beside the site. Releases attach the built site as
+  `saos-network-facts-viewer-X.Y.Z.tgz`; the README's "Use the viewer in your repo" shows how to
+  stage it with your own facts in CI.
+
 ## [0.2.0] - 2026-10-29
 
 ### Added

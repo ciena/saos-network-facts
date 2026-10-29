@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-// The viewer page: loads a facts file (the bundled example by default, or one
-// the visitor picks), imports it into the engine topology, builds the network
-// and shows it as stacked layers, with the overview / device / service panels,
-// walks and failure replays. Routes: #device=NAME, #service=ID, #topology
-// (panels hidden); anything else is the overview.
+// The viewer page: loads a facts file (the one the URL names, see labs.js; else
+// the bundled example; or one the visitor picks), imports it into the engine
+// topology, builds the network and shows it as stacked layers, with the
+// overview / device / service panels, walks and failure replays. Routes:
+// #device=NAME, #service=ID, #topology (panels hidden); anything else is the overview.
 
 import exampleFacts from '../../examples/adaptive-sr-cfm/facts.json?raw';
-import { buildNetwork, ccmWalk, isisFloodWalk, replayFailure, vpwsWalk } from './engine/index.js';
+import { buildNetwork, ccmWalk, isisFloodWalk, ospfFloodWalk, replayFailure, tpTunnelWalk, vpwsWalk } from './engine/index.js';
 import { importFacts } from './import/facts.js';
+import { labParams, loadFromParams, loadLab } from './labs.js';
 import { renderDevice, renderOverview, renderService } from './panels.js';
 import { Animator, DWELL_MS, TRAVEL_MS } from './view/animator.js';
 import { LAYERS, LayerView, hex } from './view/layers.js';
@@ -28,12 +29,12 @@ const state = { imp: null, net: null, failures: [], walk: null, step: 0, playing
 
 // ---- loading ---------------------------------------------------------------
 
-function load(text, name) {
+function load(text, name, positions = null) {
   let imp;
   try {
-    imp = importFacts(text, { name });
+    imp = importFacts(text, { name: name ?? undefined, positions });
   } catch (err) {
-    showError(`${name}: ${err.message}`);
+    showError(`${name ?? 'facts'}: ${err.message}`);
     return false;
   }
   showError(null);
@@ -160,7 +161,9 @@ function fillWalkParams() {
     box.appendChild(s);
     return s;
   };
-  if (kind === 'vpws') {
+  if (kind === 'tp') {
+    add('wp-a', net.tp.tunnels.map((t) => ({ value: t.id, label: `${t.id} (${t.src}–${t.dst})${t.role === 'backup' ? ' backup' : ''}` })));
+  } else if (kind === 'vpws') {
     const pw = add('wp-a', net.vpws.pseudowires.map((p) => ({ value: p.id, label: `${p.service} PW ${p.pwid} (${p.ends.map((e) => e.node).join('–')})` })));
     const from = add('wp-b', []);
     const ends = () => options(from, (net.vpws.pseudowires.find((p) => p.id === pw.value)?.ends ?? []).map((e) => ({ value: e.node, label: `from ${e.node}` })));
@@ -175,7 +178,8 @@ function fillWalkParams() {
 }
 
 function fillSelects() {
-  const has = { vpws: state.net.vpws.pseudowires.length > 0, ccm: state.net.cfm.megs.length > 0, isis: state.net.igp.routers.length > 0 };
+  const has = { vpws: state.net.vpws.pseudowires.length > 0, ccm: state.net.cfm.megs.length > 0, tp: state.net.tp.tunnels.length > 0, isis: state.net.igp.routers.length > 0 };
+  $('walk-kind').querySelector('option[value="isis"]').textContent = state.net.igpName === 'ospf' ? 'OSPF LSA flood' : 'IS-IS LSP flood';
   for (const o of $('walk-kind').options) o.disabled = !has[o.value];
   if (!has[$('walk-kind').value]) $('walk-kind').value = Object.keys(has).find((k) => has[k]) ?? 'vpws';
   fillWalkParams();
@@ -207,7 +211,8 @@ $('walk-run').addEventListener('click', () => {
   const b = $('wp-b')?.value;
   if (kind === 'vpws') walkActions.walkPw(a, b);
   else if (kind === 'ccm') walkActions.walkCcm(a);
-  else runWalk(() => isisFloodWalk(state.net, a));
+  else if (kind === 'tp') runWalk(() => tpTunnelWalk(state.net, a));
+  else runWalk(() => (state.net.igpName === 'ospf' ? ospfFloodWalk(state.net, a) : isisFloodWalk(state.net, a)));
 });
 
 function setWalk(walk) {
@@ -311,7 +316,7 @@ $('facts-file').addEventListener('change', async (e) => {
 });
 $('facts-example').addEventListener('click', () => {
   load(exampleFacts, EXAMPLE_NAME);
-  location.hash = '';
+  history.replaceState(null, '', location.pathname);
 });
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', async (e) => {
@@ -344,5 +349,53 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-load(exampleFacts, EXAMPLE_NAME);
+// ---- labs by URL --------------------------------------------------------------
+
+let labIndex = null;
+
+function loadLabResult(lab) {
+  return load(lab.factsText, lab.title, lab.positions);
+}
+
+function fillLabSelect() {
+  const sel = $('lab-select');
+  sel.hidden = !labIndex || labIndex.labs.length < 2;
+  if (!labIndex) return;
+  options(sel, labIndex.labs.map((l) => ({ value: l.id, label: l.title })));
+}
+
+$('lab-select').addEventListener('change', async (e) => {
+  const lab = labIndex?.labs.find((l) => l.id === e.target.value);
+  if (!lab) return;
+  try {
+    if (loadLabResult(await loadLab(fetch, lab))) {
+      const q = new URLSearchParams(location.search);
+      q.set('lab', lab.id);
+      history.replaceState(null, '', `${location.pathname}?${q}`);
+    }
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+async function start() {
+  let found = null;
+  try {
+    found = await loadFromParams(labParams(location.search), { base: location.href, fetch });
+  } catch (err) {
+    load(exampleFacts, EXAMPLE_NAME);
+    showError(`${err.message}; showing the example`);
+    return;
+  }
+  if (!found) {
+    load(exampleFacts, EXAMPLE_NAME);
+    return;
+  }
+  labIndex = found.index;
+  fillLabSelect();
+  if (labIndex) $('lab-select').value = found.lab.id;
+  loadLabResult(found.lab);
+}
+
+start();
 requestAnimationFrame(frame);
