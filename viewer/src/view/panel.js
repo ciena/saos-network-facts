@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // DOM rendering for the detail panel: step list, step detail with the header
 // stack, and per-node tables.
 

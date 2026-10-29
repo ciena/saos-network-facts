@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // MPLS label distribution. A label protocol turns the IGP routing table into
 // per-LSR label bindings, an LFIB (incoming label -> swap/pop) and an FTN
 // (FEC -> label to push). LDP and SR-MPLS implement the same interface, so the

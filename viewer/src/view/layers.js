@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // Builds the stacked protocol layers for a network (engine/network.js) as
 // Three.js groups: one translucent plane per layer over the same node positions.
 

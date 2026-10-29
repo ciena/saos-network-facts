@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // buildNetwork: the whole control plane for one topology + failure set, as
 // plain data. Pure and deterministic: the same inputs give the same output.
 

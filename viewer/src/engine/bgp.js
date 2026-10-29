@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // BGP-4 (RFC 4271) with Multiprotocol Extensions (RFC 4760) carrying VPN-IPv4
 // routes for BGP/MPLS IP VPNs (RFC 4364), labels encoded per RFC 8277.
 // iBGP between router loopbacks: a full mesh between the PEs, or the sessions

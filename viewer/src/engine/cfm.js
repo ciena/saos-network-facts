@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // Connectivity Fault Management: IEEE 802.1ag (now IEEE 802.1Q clause 18-21)
 // and ITU-T Y.1731. By default one maintenance association (MEG) per core link
 // with a Down MEP at each end (topo.cfm.linkMegs: false turns them off). A

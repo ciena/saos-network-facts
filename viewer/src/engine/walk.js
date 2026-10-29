@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // Packet walks: step-by-step traces over a built network (see network.js).
 //
 // walk: { kind, title, layer, steps: [step] }

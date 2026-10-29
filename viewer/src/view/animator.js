@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // Animates the moves of the current walk step as packets travelling over links.
 
 import * as THREE from 'three';

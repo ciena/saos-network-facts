@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // IS-IS, ISO/IEC 10589 + RFC 1195 (IP), with RFC 5305 wide metrics and
 // RFC 5303 three-way point-to-point adjacencies. One level (topo.isis.level,
 // 1 or 2, default 2) and one area.

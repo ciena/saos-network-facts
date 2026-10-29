@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // Link aggregation, IEEE 802.1AX-2014 (LACP, clause 6).
 //
 // Each physical member runs LACP. A member that is up and exchanges LACPDUs

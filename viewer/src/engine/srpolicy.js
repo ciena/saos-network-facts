@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // SR Policy, RFC 9256 (Segment Routing Policy Architecture), SR-MPLS data plane.
 // A policy is identified by (headend, color, endpoint) (§2.1) and here has one
 // explicit candidate path with one segment list of Prefix-SID labels (§2.2,

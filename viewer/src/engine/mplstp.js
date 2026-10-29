@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // MPLS-TP co-routed bidirectional LSPs, statically provisioned: RFC 5654
 // (requirements), RFC 5921 (framework), RFC 5960 (data plane), identifiers per
 // RFC 6370. A co-routed bidirectional LSP is two unidirectional LSPs, forward

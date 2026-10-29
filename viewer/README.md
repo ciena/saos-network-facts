@@ -29,5 +29,3 @@ they do not say is derived or defaulted and listed in the **Import** tab: links 
 in one IPv4 subnet; roles (CE: no IS-IS; PE: speaks BGP, ends a pseudowire or faces a CE); IS-IS
 metrics (10); CFM level and CCM interval when not configured; positions. PW labels and LFIBs are
 computed by the engine from the RFCs, not read from devices.
-
-The engine and view are derived from Ciena packet-flow-3d (see [NOTICE](../NOTICE)).

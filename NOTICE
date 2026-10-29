@@ -2,7 +2,3 @@ saos-network-facts
 Copyright 2026 Ciena Corporation
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
-
-The viewer (viewer/) is derived from Ciena packet-flow-3d: its engine
-(viewer/src/engine/) and view (viewer/src/view/) are released by Ciena
-Corporation under the Apache License, Version 2.0.

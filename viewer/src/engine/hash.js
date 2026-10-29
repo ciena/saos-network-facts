@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // FNV-1a 32-bit (http://www.isthe.com/chongo/tech/comp/fnv/). Deterministic and
 // simple to hand-check: fnv1a32('a') === 0xe40c292c.
 export function fnv1a32(str) {

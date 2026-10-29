@@ -26,7 +26,7 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   and facts file (10/10 ok), with `SOURCE.md` on where it comes from and how to regenerate it.
   `viewer/`: a three.js view of a facts file (physical, IS-IS, SR policy, BGP, pseudowire and CFM
   planes; overview, device and service panels; packet walks and link-failure replays; load your own
-  facts.json in the browser), whose engine and view are derived from Ciena packet-flow-3d.
+  facts.json in the browser), on an engine that models IS-IS, SR-MPLS, BGP, VPWS and CFM from the RFCs.
   `pages.yml` deploys it to GitHub Pages from `main` and uploads a preview on pull requests; CI
   runs its tests and build.
 - **Pseudowire transport (schema 1.1.0)** — SAOS 10 pseudowires carry `tunnel_type` and

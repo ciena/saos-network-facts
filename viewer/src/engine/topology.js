@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // Topology model: nodes, links (every link has >= 1 physical member; a LAG has
 // several), and L3VPN sites. Plain data, so it serializes and diffs cleanly.
 //

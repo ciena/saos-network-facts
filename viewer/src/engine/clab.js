@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // Containerlab topology import (nodes and links only; configs are ignored).
 // https://containerlab.dev/manual/topo-def-file/
 //

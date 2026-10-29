@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // Link-failure -> reconvergence replay. Builds the network before and after the
 // failure and lays out, on one timeline, what each protocol does in between:
 // LACP member removal, CFM/BFD loss of continuity, IGP adjacency down (IS-IS

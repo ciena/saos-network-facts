@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // VPWS: point-to-point Ethernet pseudowires, RFC 4448 (Ethernet over MPLS)
 // signaled with LDP FEC 128 / PWid (RFC 8077 §5-6) over a targeted LDP
 // session between the two PE loopbacks. Each end advertises the PW label it

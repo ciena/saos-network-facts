@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // Vendor profile: every knob the RFC models leave to the implementation lives
 // here, so a vendor model (e.g. Ciena SAOS) can be dropped in later by passing a
 // different profile to buildNetwork(). The default is a neutral, standards-only

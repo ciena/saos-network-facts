@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // OSPFv2, RFC 2328. Every core link between two routers is a point-to-point
 // network (§1.2, §12.4.1.1); routers are grouped in areas, area 0.0.0.0 being
 // the backbone. Per area each router originates one Router-LSA (type 1)

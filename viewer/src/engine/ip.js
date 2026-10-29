@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Derived from Ciena packet-flow-3d (see NOTICE).
 // IPv4 helpers: dotted quads <-> 32-bit unsigned integers, prefixes, longest match.
 
 export function ipToInt(ip) {
