@@ -7,3 +7,6 @@ js/node_modules/
 js/dist/
 js/LICENSE
 js/NOTICE
+viewer/node_modules/
+viewer/dist/
+docs/pr-draft.md

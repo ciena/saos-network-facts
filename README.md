@@ -15,7 +15,7 @@ themselves. The file follows a published JSON Schema, so readers can pin a schem
 ## Install
 
 ```bash
-pip install "git+https://github.com/ciena/saos-network-facts@v0.1.0"
+pip install "git+https://github.com/ciena/saos-network-facts@v0.2.0"
 saos-network-facts --version
 ```
 
@@ -90,8 +90,8 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 
 ```json
 {
-  "schema_version": "1.0.0",
-  "generator": {"name": "saos-network-facts", "version": "0.1.0", "translator": "translator 4.2.0 (mcp, https://...)"},
+  "schema_version": "1.1.0",
+  "generator": {"name": "saos-network-facts", "version": "0.2.0", "translator": "translator 4.2.0 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -126,8 +126,9 @@ Facts (all devices): `hostname`, `interfaces`, `gateway`, `vlans`, `ports`, `lag
 `isis` (`instances` with `level`, `nets`, `net`, `area_id`, `system_id`, `sr_enabled`; `interfaces`
 with `level` and `type`), `segment_routing` (`srgb`, `prefix_sids`, `policies`, `segment_lists`),
 `bgp` (`instances` with `router_id`, `cluster_id`, `route_reflector`), `pseudowires` (`peer`,
-`pw_id`, labels, `mode`, `service`, `service_type`), `cfm` (`meps` with `md`, `ma`, `mep_id`,
-`level`, `direction`, `port`, `vlan`), `lines`, `recognised`. SAOS 10 only: `fds`, `fps`,
+`pw_id`, labels, `mode`, `tunnel_type` and `tunnel_color` since schema 1.1, `service`,
+`service_type`), `cfm` (`meps` with `md`, `ma`, `mep_id`, `level`, `direction`, `port`, `vlan`),
+`lines`, `recognised`. SAOS 10 only: `fds`, `fps`,
 `classifiers`, `vrfs`, `segments` (EVPN ethernet segments), `objects`.
 
 Values read from a configuration are text as written (`"mtu": "9000"`); flags the extractor derives
@@ -135,6 +136,29 @@ are booleans. Segment routing and BGP are extracted from SAOS 10 only.
 
 **Compatibility.** `schema_version` is semver. Within 1.x, new versions only add optional fields, so
 a reader must ignore fields it does not know; a breaking change is schema 2.
+
+## Example
+
+**[ciena.github.io/saos-network-facts](https://ciena.github.io/saos-network-facts/)** shows the
+facts of a ten-device SAOS 10 lab (segment routing, SR policies, VPWS pseudowires, CFM, iBGP route
+reflection) in the [viewer](viewer/): one plane per layer over the topology, a panel per device and
+per service, packet walks and link-failure replays. *Load your facts.json* there to see your own
+network; the file stays in your browser.
+
+![The Adaptive-SR-CFM example in the viewer](docs/example.png)
+
+The example lives in [`examples/adaptive-sr-cfm/`](examples/adaptive-sr-cfm/): the rendered
+startup configurations, the platform map and the facts file. To regenerate the facts and the site
+from the committed configurations ([SOURCE.md](examples/adaptive-sr-cfm/SOURCE.md) has the details):
+
+```bash
+cd examples/adaptive-sr-cfm
+saos-network-facts extract --configs configs --platform-map devices.yaml --recipe Adaptive-SR-CFM -o facts.json
+cd ../../viewer && npm ci && npm run build      # the site, in dist/
+```
+
+The site is built by `.github/workflows/pages.yml`: deployed to GitHub Pages from `main`, and
+uploaded as the `site-preview` artifact on every pull request.
 
 ## Reading facts from JavaScript / TypeScript
 

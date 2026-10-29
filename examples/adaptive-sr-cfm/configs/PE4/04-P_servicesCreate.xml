@@ -1,0 +1,49 @@
+<config>
+    
+    <fds xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fd">
+
+        <fd>
+            <name>testsat</name>
+            <mode>vpws</mode>
+        </fd>
+    </fds>
+
+    <fps xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fp">
+        <fp>
+            <name>testsat_1</name>
+            <fd-name>testsat</fd-name>
+            <logical-port>4</logical-port>
+            <stats-collection>on</stats-collection>
+            <classifier-list>Untagged</classifier-list>
+        </fp>
+    
+    </fps>
+
+
+    <pseudowires xmlns="urn:ietf:params:xml:ns:yang:ietf-pseudowires">
+        <pseudowire>
+            <name>testsat</name>
+            <mode xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">spoke</mode>
+            <configured-pw>
+                <peer-ip>20.10.10.3</peer-ip>
+                <pw-id>200</pw-id>
+            </configured-pw>
+        </pseudowire>
+    </pseudowires>
+
+
+    <ldp xmlns="http://ciena.com/ns/yang/ciena/ciena-ldp">
+    <instance><tag>default</tag>
+    <target-ldp>
+    
+    <peers>
+        <address>20.10.10.3</address>
+        <hello-interval>10</hello-interval>
+    </peers>
+    
+    </target-ldp>
+    </instance>
+    </ldp>
+    
+
+</config>

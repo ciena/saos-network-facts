@@ -13,6 +13,7 @@
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/ruff check . && .venv/bin/pytest -q
 cd js && npm ci && npm run check-generated && npm run typecheck && npm test && npm run build
+cd ../viewer && npm ci && npm test && npm run build     # the example site
 ```
 
 Tests never touch the network: SAOS 10 translator replies for the fixtures are recorded in
@@ -29,7 +30,7 @@ A new optional field is a minor schema version; removing or changing a field is 
 
 ## Licence headers
 
-The project is Apache-2.0 (`LICENSE`, `NOTICE`). Every source file (`.py`, `.ts`, `.mjs`, `.sh`)
+The project is Apache-2.0 (`LICENSE`, `NOTICE`). Every source file (`.py`, `.ts`, `.mjs`, `.sh`, `.js`, `.css`, `.html`)
 starts with `SPDX-License-Identifier: Apache-2.0` as a comment (after the shebang line, if any);
 `tests/test_repo.py` checks it.
 

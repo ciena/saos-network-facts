@@ -1,0 +1,39 @@
+<config>
+    
+
+<maintenance-domain xmlns="http://metroethernetforum.org/ns/yang/mef-cfm">
+        <id>md3</id>
+
+    
+        <maintenance-association>
+            <id>testcfm</id>
+            <name-type>character-string</name-type>
+            <name>testcfm</name>
+            <component-list><component-id>1</component-id><mhf-creation>none</mhf-creation><id-permission>chassis</id-permission>
+            <fd-name xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-cfm">testcfm</fd-name>
+            </component-list><ccm-interval>1s</ccm-interval>
+        
+            <maintenance-association-end-point>
+                <mep-identifier>33</mep-identifier>
+                <interface>testcfm_1</interface>
+                <direction>up</direction>
+                <administrative-state>true</administrative-state>
+                <ccm-ltm-priority>4</ccm-ltm-priority><continuity-check><cci-enabled>true</cci-enabled>
+                <lowest-fault-priority-defect>remote-rdi</lowest-fault-priority-defect></continuity-check>
+            
+                <delay-measurements xmlns="http://metroethernetforum.org/ns/yang/mef-soam-pm">
+                <delay-measurement-config xmlns="http://www.ciena.com/ns/yang/ciena-soam-pm">
+                <session-id>1</session-id>
+                <operation-type>create</operation-type>
+                <remote-mep-id>22</remote-mep-id>
+                <priority>4</priority><frame-size>1400</frame-size>
+                <measurement-interval>1</measurement-interval><session-type>proactive</session-type>
+                <start-time-type>immediate</start-time-type><stop-time-type>none</stop-time-type>
+                <average-frame-delay-two-way-threshold>60</average-frame-delay-two-way-threshold>
+                </delay-measurement-config>
+                </delay-measurements>
+        </maintenance-association-end-point>
+        </maintenance-association>
+        
+</maintenance-domain>
+</config>

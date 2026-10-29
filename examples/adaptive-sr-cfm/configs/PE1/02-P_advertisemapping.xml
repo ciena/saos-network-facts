@@ -1,0 +1,15 @@
+<config> 
+    
+  
+    <isis xmlns="http://ciena.com/ns/yang/ciena-isis">
+        <instance>
+            <tag>Interop</tag>
+            <segment-routing>  
+                <bindings>
+                    <advertise>true</advertise>
+                </bindings>
+            </segment-routing>
+        </instance>
+    </isis>
+    
+</config>

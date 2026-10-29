@@ -17,6 +17,22 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-29
+
+### Added
+
+- **Example and site** — `examples/adaptive-sr-cfm/`: a ten-device SAOS 10 lab (SR policies,
+  VPWS pseudowires, CFM, iBGP route reflection) as rendered startup configurations, platform map
+  and facts file (10/10 ok), with `SOURCE.md` on where it comes from and how to regenerate it.
+  `viewer/`: a three.js view of a facts file (physical, IS-IS, SR policy, BGP, pseudowire and CFM
+  planes; overview, device and service panels; packet walks and link-failure replays; load your own
+  facts.json in the browser), on an engine that models IS-IS, SR-MPLS, BGP, VPWS and CFM from the RFCs.
+  `pages.yml` deploys it to GitHub Pages from `main` and uploads a preview on pull requests; CI
+  runs its tests and build.
+- **Pseudowire transport (schema 1.1.0)** — SAOS 10 pseudowires carry `tunnel_type` and
+  `tunnel_color` (`sr-policy`, color 2): which SR policy a PW is steered onto. Optional fields, so
+  1.0 readers are unaffected.
+
 ## [0.1.1] - 2026-10-29
 
 ### Fixed

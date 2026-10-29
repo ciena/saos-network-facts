@@ -59,7 +59,8 @@ def test_pseudowires_static_and_dynamic():
     )
     vc1, vc2 = f["pseudowires"]
     assert vc1 == {"name": "VC1", "kind": "static", "peer": "203.0.113.30", "pw_id": "201", "in_label": "8001",
-                   "out_label": "8002", "mode": None, "tunnel": "TUN1", "service": None, "service_type": None}
+                   "out_label": "8002", "mode": None, "tunnel": "TUN1", "tunnel_type": None, "tunnel_color": None,
+                   "service": None, "service_type": None}
     assert (vc2["kind"], vc2["peer"], vc2["pw_id"], vc2["mode"], vc2["service"]) == ("dynamic", "203.0.113.31", "202", "mesh", "VS200")
     # the static VC is still a peer, as before the pseudowire list existed
     assert f["peers"] == [{"kind": "mpls-vc", "name": "VC1", "ip": "203.0.113.30"}]

@@ -1,0 +1,28 @@
+<config>
+    
+<sat xmlns="http://www.ciena.com/ns/yang/ciena-sat">
+
+
+        <entity>
+                <name>testsat</name>
+                <port>4</port>
+                <role>reflector</role>
+                <reflection-level>l2-to-l4</reflection-level>
+                <mode>out-of-service</mode>
+                <admin-state>enabled</admin-state>
+        </entity>
+        <test-instance>
+                <name>testsat</name>
+                <flow-point-id>testsat_1</flow-point-id>
+                <untagged>true</untagged>
+                <admin-state>enabled</admin-state>
+        </test-instance>
+
+        <sat-global>
+                <admin-state>enabled</admin-state>
+        </sat-global>
+</sat>
+
+
+
+</config>

@@ -177,7 +177,9 @@
             "pw_id": "100",
             "service": "VPWS-100",
             "service_type": "vpws",
-            "tunnel": null
+            "tunnel": null,
+            "tunnel_color": null,
+            "tunnel_type": null
           }
         ],
         "recognised": 12,
@@ -417,7 +419,9 @@
             "pw_id": "100",
             "service": "VPWS-100",
             "service_type": "vpws",
-            "tunnel": null
+            "tunnel": null,
+            "tunnel_color": null,
+            "tunnel_type": null
           }
         ],
         "recognised": 11,
@@ -475,7 +479,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.0 (recorded)",
-    "version": "0.1.1"
+    "version": "0.2.0"
   },
-  "schema_version": "1.0.0"
+  "schema_version": "1.1.0"
 }

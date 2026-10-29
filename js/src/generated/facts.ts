@@ -691,6 +691,14 @@ export interface Pseudowire {
    */
   tunnel: string | null;
   /**
+   * SAOS 10: the transport the PW is steered onto, as configured (`sr-policy`, `rsvp-te`, ...); null when not configured (the device resolves the peer address over its default transport: the peer's Prefix-SID or LDP LSP). Since schema 1.1.
+   */
+  tunnel_type?: string | null;
+  /**
+   * SAOS 10: with `tunnel_type` `sr-policy`, the color of the SR policy to the peer that carries the PW. Since schema 1.1.
+   */
+  tunnel_color?: string | null;
+  /**
    * The service carrying the PW: SAOS 6 the virtual switch it is attached to, SAOS 10 the l2vpn service.
    */
   service: string | null;

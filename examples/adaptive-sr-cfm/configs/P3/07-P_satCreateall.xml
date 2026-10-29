@@ -1,0 +1,70 @@
+<config>
+    
+<sat xmlns="http://www.ciena.com/ns/yang/ciena-sat">
+
+        <entity>
+                <name>testsat</name>
+                <port>24</port>
+                <role>generator</role>
+                <mode>out-of-service</mode>
+                <admin-state>enabled</admin-state>
+        </entity>
+        <test-profile>
+                <name>testsat</name>
+                <bandwidth>9995</bandwidth>
+                <duration>t1hr</duration>
+                <dst-mac>02:00:00:00:00:02</dst-mac>
+                <throughput-test>true</throughput-test>
+        </test-profile>
+        <test-instance>
+                <name>testsat</name>
+                <flow-point-id>testsat_1</flow-point-id>
+                <profile>testsat</profile>
+                <untagged>true</untagged>
+                <admin-state>enabled</admin-state>
+        </test-instance>
+
+
+        <sat-global>
+                <admin-state>enabled</admin-state>
+        </sat-global>
+</sat>
+
+
+
+
+<hello-params xmlns="http://www.ciena.com/tls/yang/ciena-tls"
+                    xmlns:ncx="http://netconfcentral.org/ns/yuma-ncx">
+        <profile-name>tls-profile</profile-name>
+        <cipher-suites>
+          <cipher-suite xmlns:tlscmn="urn:ietf:params:xml:ns:yang:ietf-tls-common">tlscmn:ecdhe-rsa-with-aes-128-cbc-sha</cipher-suite>
+        </cipher-suites>
+        <elliptic-curves>
+          <elliptic-curve xmlns:ciena-tls-types="http://www.ciena.com/tls/yang/ciena-tls-types">ciena-tls-types:secp256r1</elliptic-curve>
+        </elliptic-curves>
+        <session-resumption-timeout>3600</session-resumption-timeout>
+      </hello-params>
+      <pkix:pkix xmlns:pkix="http://www.ciena.com/ns/yang/ciena-pkix">
+        <pkix:peer-auth-profiles>
+          <pkix:peer-auth-profile>
+            <pkix:peer-auth-profile-name>peer-auth-profile</pkix:peer-auth-profile-name>
+            <pkix:check-cert-expiry>true</pkix:check-cert-expiry>
+          </pkix:peer-auth-profile>
+        </pkix:peer-auth-profiles>
+      </pkix:pkix>
+      <ciena-tls-service-profile:tls-service-profiles xmlns:ciena-tls-service-profile="http://www.ciena.com/tls/yang/ciena-tls-service-profile">
+        <ciena-tls-service-profile:tls-service-profile-name>test</ciena-tls-service-profile:tls-service-profile-name>
+        <ciena-tls-service-profile:tls-profile-name>tls-profile</ciena-tls-service-profile:tls-profile-name>
+        <ciena-tls-service-profile:tls-peer-auth-profile-name>peer-auth-profile</ciena-tls-service-profile:tls-peer-auth-profile-name>
+        <ciena-tls-service-profile:tls-certificate-name>cert-openssl-1.1.1</ciena-tls-service-profile:tls-certificate-name>
+      </ciena-tls-service-profile:tls-service-profiles>
+      <oc-telemetry:telemetry-system xmlns:oc-telemetry="http://openconfig.net/yang/telemetry">
+        <ciena-oc-tmet:server xmlns:ciena-oc-tmet="http://www.ciena.com/ns/yang/ciena-openconfig-telemetry">
+          <ciena-oc-tmet:config>
+            <ciena-oc-tmet:enable>true</ciena-oc-tmet:enable>
+            <ciena-oc-tmet:tls-service-profile>test</ciena-oc-tmet:tls-service-profile>
+          </ciena-oc-tmet:config>
+        </ciena-oc-tmet:server>
+      </oc-telemetry:telemetry-system>
+
+</config>

@@ -1,0 +1,53 @@
+<config>
+<segment-routing-traffic-engineering xmlns="http://ciena.com/ns/yang/ciena-sr-policy" xmlns:ncx="http://Netconfcentral.org/ns/yuma-ncx">
+<attributes>
+    <segment-lists>
+
+      <segment-list>
+        <name>PE4_PE3</name>
+        <segments>
+
+          <segment>
+            <index>1</index>
+            <segment-type-1>
+              <sid-value>16003</sid-value>
+            </segment-type-1>
+          </segment>
+          
+        </segments>
+      </segment-list>
+       
+    </segment-lists>
+  </attributes>
+
+
+  <policies>
+
+    <policy>
+      <color>2</color>
+      <endpoint>20.10.10.3</endpoint>
+      <name>SR4to3color2</name>
+      <signaling-type>path-setup-sr-isis</signaling-type>
+      <source>20.10.10.4</source>
+      <admin-state>enable</admin-state>
+      <reversion-hold-timer>60</reversion-hold-timer>
+      <reversion-state>enable</reversion-state>
+      <candidate-paths>
+        <candidate-path>
+          <protocol-origin>local</protocol-origin>
+          <originator>20.10.10.4</originator>
+          <discriminator>1</discriminator>
+          <preference>100</preference>
+          <segment-lists>
+            <segment-list>
+              <name>PE4_PE3</name>
+              <weight>1</weight>
+            </segment-list>
+          </segment-lists>
+        </candidate-path>
+      </candidate-paths>
+    </policy>
+   
+  </policies>
+</segment-routing-traffic-engineering>
+</config>

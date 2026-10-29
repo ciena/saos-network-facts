@@ -24,6 +24,6 @@ def test_source_files_carry_the_spdx_header():
     import subprocess
 
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()
-    missing = [f for f in tracked if f.endswith((".py", ".ts", ".mjs", ".sh"))
+    missing = [f for f in tracked if f.endswith((".py", ".ts", ".mjs", ".sh", ".js", ".css", ".html"))
                and "SPDX-License-Identifier: Apache-2.0" not in "".join((ROOT / f).read_text().splitlines(True)[:2])]
     assert missing == []

@@ -1,0 +1,107 @@
+<config>
+    <system xmlns="http://openconfig.net/yang/system">
+        <config>
+            <hostname>CE1</hostname>
+        </config>
+    </system>
+    <classifiers xmlns="urn:ciena:params:xml:ns:yang:ciena-pn::ciena-mef-classifier">
+        <classifier>
+            <name>if1</name>
+            <filter-entry>
+                <filter-parameter xmlns:classifier="urn:ciena:params:xml:ns:yang:ciena-pn::ciena-mef-classifier">vtag-stack</filter-parameter>
+                <untagged-exclude-priority-tagged>true</untagged-exclude-priority-tagged>
+            </filter-entry>
+        </classifier>
+    </classifiers>
+    <fds xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fd">
+        <fd>
+            <name>if1</name>
+            <mode>vpls</mode>
+            <vlan-id>10</vlan-id>
+        </fd>
+    </fds>
+    <fps xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fp">
+        <fp>
+            <name>if1</name>
+            <fd-name>if1</fd-name>
+            <logical-port>1</logical-port>
+            <classifier-list>if1</classifier-list>
+            <stats-collection>on</stats-collection>
+            <ingress-l2-transform>
+                <ingress-name>push-vid-10</ingress-name>
+                <vlan-stack>
+                    <tag>1</tag>
+                    <push-tpid>tpid-8100</push-tpid>
+                    <push-pcp>map</push-pcp>
+                    <push-vid>10</push-vid>
+                </vlan-stack>
+            </ingress-l2-transform>
+            <egress-l2-transform>
+                <egress-name>pop-stag-10</egress-name>
+                <vlan-stack>
+                    <tag>1</tag>
+                    <pop-type/>
+                </vlan-stack>
+            </egress-l2-transform>
+        </fp>
+    </fps>
+    <interfaces xmlns="http://openconfig.net/yang/interfaces">
+        <interface>
+            <name>lb1</name>
+            <config>
+                <name>lb1</name>
+                <mtu>1500</mtu>
+                <admin-status xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">true</admin-status>
+                <type xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">loopback</type>
+            </config>
+            <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
+                <addresses>
+                    <address>
+                        <ip>10.40.40.1</ip>
+                        <config>
+                            <ip>10.40.40.1</ip>
+                            <prefix-length>32</prefix-length>
+                        </config>
+                    </address>
+                </addresses>
+            </ipv4>
+        </interface>
+        <interface>
+            <name>if1</name>
+            <config>
+                <name>if1</name>
+                <mtu>1500</mtu>
+                <admin-status xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">true</admin-status>
+                <type xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">ip</type>
+                <underlay-binding xmlns="http://ciena.com/ns/yang/ciena-underlay-binding">
+                    <config>
+                        <fd>if1</fd>
+                    </config>
+                </underlay-binding>
+                <vrfName xmlns="http://ciena.com/ns/yang/ciena-openconfig-interfaces">default</vrfName>
+            </config>
+            <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
+                <addresses>
+                    <address>
+                        <ip>172.20.10.2</ip>
+                        <config>
+                            <ip>172.20.10.2</ip>
+                            <prefix-length>30</prefix-length>
+                        </config>
+                    </address>
+                </addresses>
+            </ipv4>
+        </interface>
+    </interfaces>
+    <rib xmlns="http://ciena.com/ns/yang/ciena/ciena-rib">
+        <vrf>
+            <name>default</name>
+            <ipv4>
+                <destination-prefix>10.40.40.0/24</destination-prefix>
+                <next-hop>
+                    <address>172.20.20.1</address>
+                </next-hop>
+            </ipv4>
+        </vrf>
+    </rib>
+</config>

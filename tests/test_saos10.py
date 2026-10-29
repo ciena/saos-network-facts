@@ -111,6 +111,16 @@ def test_pseudowire_service_and_cfm_mep_port():
     assert "_l2vpn" not in f
 
 
+def test_pseudowire_steered_onto_an_sr_policy():
+    f = run({"ietf-pseudowires:pseudowires": {"pseudowire": [
+        {"name": "PW1", "configured-pw": {"peer-ip": "192.0.2.2", "pw-id": 100},
+         "ciena-ietf-pseudowires:tunnel-type": "sr-policy", "ciena-ietf-pseudowires:tunnel-color": 2},
+        {"name": "PW2", "configured-pw": {"peer-ip": "192.0.2.3", "pw-id": 200}}]}})
+    pw1, pw2 = f["pseudowires"]
+    assert (pw1["tunnel_type"], pw1["tunnel_color"]) == ("sr-policy", "2")
+    assert (pw2["tunnel_type"], pw2["tunnel_color"]) == (None, None)
+
+
 def test_top_level_vrf_list():
     f = run({"ciena-vrf:vrf": [{"vrfName": "A"}, {"vrfName": "B"}]}, {"ciena-vrf:vrf": [{"vrfName": "A", "__operation__": "remove"}]})
     assert f["vrfs"] == ["B"]
