@@ -8,7 +8,7 @@ import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 export const LAYERS = [
   { id: 'physical', name: 'Physical / LAG', y: 0, color: 0x8b98a8 },
   { id: 'isis', name: 'IGP (IS-IS / OSPF)', y: 6, color: 0x3fb950 },
-  { id: 'mpls', name: 'MPLS: SR policies / LSPs', y: 12, color: 0xd29922 },
+  { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', y: 12, color: 0xd29922 },
   { id: 'bgp', name: 'BGP', y: 18, color: 0xa371f7 },
   { id: 'pw', name: 'Pseudowires (VPWS)', y: 24, color: 0xf778ba },
   { id: 'cfm', name: 'CFM MEG', y: 30, color: 0x39c5cf },

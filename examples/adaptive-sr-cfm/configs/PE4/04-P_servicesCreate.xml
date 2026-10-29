@@ -25,7 +25,7 @@
             <name>testsat</name>
             <mode xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">spoke</mode>
             <configured-pw>
-                <peer-ip>20.10.10.3</peer-ip>
+                <peer-ip>10.255.10.3</peer-ip>
                 <pw-id>200</pw-id>
             </configured-pw>
         </pseudowire>
@@ -37,7 +37,7 @@
     <target-ldp>
     
     <peers>
-        <address>20.10.10.3</address>
+        <address>10.255.10.3</address>
         <hello-interval>10</hello-interval>
     </peers>
     

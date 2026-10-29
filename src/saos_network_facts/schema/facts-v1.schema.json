@@ -1336,6 +1336,23 @@
           "type": "integer",
           "minimum": 0,
           "description": "SAOS 10: top-level YANG objects seen across the device's files."
+        },
+        "ospf": {
+          "$ref": "#/$defs/Ospf"
+        },
+        "tp_corouted_tunnels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TpCoroutedTunnel"
+          },
+          "description": "SAOS 10 MPLS-TP co-routed tunnels, one entry per tunnel this node is on. Since schema 1.2."
+        },
+        "l2vpn_services": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/L2vpnService"
+          },
+          "description": "SAOS 10 L2VPN services. Since schema 1.2."
         }
       },
       "required": [
@@ -1355,6 +1372,402 @@
         "cfm",
         "lines",
         "recognised"
+      ]
+    },
+    "OspfArea": {
+      "title": "OspfArea",
+      "type": "object",
+      "description": "An OSPF area of an instance.",
+      "properties": {
+        "area": {
+          "type": "string",
+          "description": "The area id, dotted (`0.0.0.0` is the backbone)."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Area type when configured (`stub`, `nssa`); null for a normal area."
+        },
+        "networks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The prefixes whose interfaces are in the area, as configured (`network`)."
+        }
+      },
+      "required": [
+        "area",
+        "type",
+        "networks"
+      ]
+    },
+    "OspfInstance": {
+      "title": "OspfInstance",
+      "type": "object",
+      "description": "An OSPFv2 instance (SAOS 10). Since schema 1.2.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The instance tag."
+        },
+        "router_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Router id; null when not configured (the device picks one)."
+        },
+        "vrf": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The VRF the instance runs in; null when not configured (the default VRF)."
+        },
+        "areas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OspfArea"
+          },
+          "description": "Areas, in configuration order."
+        }
+      },
+      "required": [
+        "name",
+        "router_id",
+        "vrf",
+        "areas"
+      ]
+    },
+    "OspfInterface": {
+      "title": "OspfInterface",
+      "type": "object",
+      "description": "An interface an OSPF instance runs on (SAOS 10). Since schema 1.2.",
+      "properties": {
+        "instance": {
+          "type": "string",
+          "description": "The instance tag."
+        },
+        "interface": {
+          "type": "string",
+          "description": "The interface name (an entry of `interfaces`)."
+        },
+        "area": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The area: the area of the instance whose `networks` cover the interface's address (derived); null when none does."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Network type (`point-to-point`, `broadcast`); null when not configured."
+        },
+        "metric": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Interface cost; null when not configured."
+        },
+        "hello_interval": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Hello interval in seconds; null when not configured."
+        },
+        "dead_interval": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Dead interval in seconds; null when not configured."
+        },
+        "priority": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "DR election priority; null when not configured."
+        },
+        "passive": {
+          "type": "boolean",
+          "description": "No adjacency is formed: configured `passive`, or the interface is a loopback (advertised as a stub network)."
+        },
+        "bfd": {
+          "type": "boolean",
+          "description": "BFD is enabled on the interface."
+        }
+      },
+      "required": [
+        "instance",
+        "interface",
+        "area",
+        "type",
+        "metric",
+        "hello_interval",
+        "dead_interval",
+        "priority",
+        "passive",
+        "bfd"
+      ]
+    },
+    "Ospf": {
+      "title": "Ospf",
+      "type": "object",
+      "description": "SAOS 10 OSPFv2 (`ciena-ospf`). Since schema 1.2.",
+      "properties": {
+        "instances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OspfInstance"
+          },
+          "description": "OSPF instances."
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OspfInterface"
+          },
+          "description": "Interfaces per instance, in configuration order."
+        }
+      },
+      "required": [
+        "instances",
+        "interfaces"
+      ]
+    },
+    "TpTunnelBfd": {
+      "title": "TpTunnelBfd",
+      "type": "object",
+      "description": "LSP BFD (proactive OAM) on an MPLS-TP tunnel.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "BFD runs: configured and not `admin-down`."
+        },
+        "interval_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Desired minimum transmit interval in milliseconds (derived: SAOS 10 configures microseconds); null when not configured."
+        }
+      },
+      "required": [
+        "enabled",
+        "interval_ms"
+      ]
+    },
+    "TpTunnelRef": {
+      "title": "TpTunnelRef",
+      "type": "object",
+      "description": "The primary tunnel a backup tunnel protects.",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Primary tunnel name."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Primary tunnel type."
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ]
+    },
+    "TpCoroutedTunnel": {
+      "title": "TpCoroutedTunnel",
+      "type": "object",
+      "description": "One node's segment of a static MPLS-TP co-routed (bidirectional) tunnel (SAOS 10 `ciena-mpls-tp-corouted`). Every node on the path configures the tunnel under the same name, source and destination: the ingress its forward-out and reverse-in labels, a transit node all four, the egress forward-in and reverse-out. Labels are null where the node's role has none. Since schema 1.2.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tunnel name."
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Source (ingress) address."
+        },
+        "destination": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Destination (egress) address."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "This node's role in the tunnel: `static-ingress-corouted`, `static-transit-corouted` or `static-egress-corouted`."
+        },
+        "role": {
+          "type": "string",
+          "description": "`primary` or `backup` (1:1 protection); `primary` when not configured."
+        },
+        "primary": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TpTunnelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A backup tunnel: the primary it protects; null otherwise."
+        },
+        "admin_state": {
+          "type": "string",
+          "description": "`enable` or `disable`; `enable` when not configured."
+        },
+        "reversion": {
+          "type": "string",
+          "description": "Reversion to the primary after a protection switch, `enable` or `disable`; `enable` when not configured."
+        },
+        "reversion_hold_time": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Reversion hold time in seconds; null when not configured."
+        },
+        "forward_in_label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Label received in the forward direction (transit, egress)."
+        },
+        "forward_out_label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Label sent in the forward direction (ingress, transit)."
+        },
+        "next_hop_ip": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Forward-direction next hop (ingress, transit)."
+        },
+        "reverse_in_label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Label received in the reverse direction (ingress, transit)."
+        },
+        "reverse_out_label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Label sent in the reverse direction (transit, egress)."
+        },
+        "prev_hop_ip": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Reverse-direction next hop: the previous node of the forward path (transit, egress)."
+        },
+        "bfd": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TpTunnelBfd"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "LSP BFD parameters; null when not configured."
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "destination",
+        "type",
+        "role",
+        "primary",
+        "admin_state",
+        "reversion",
+        "reversion_hold_time",
+        "forward_in_label",
+        "forward_out_label",
+        "next_hop_ip",
+        "reverse_in_label",
+        "reverse_out_label",
+        "prev_hop_ip",
+        "bfd"
+      ]
+    },
+    "L2vpnService": {
+      "title": "L2vpnService",
+      "type": "object",
+      "description": "A SAOS 10 L2VPN service (`ciena-l2vpn`): binds a forwarding domain to pseudowires. Since schema 1.2.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Service name (the `service` of its pseudowires)."
+        },
+        "fd": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The forwarding domain carrying the attachment circuits."
+        },
+        "pseudowires": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Pseudowire names, in configuration order."
+        },
+        "mtu": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Service MTU; null when not configured."
+        },
+        "signaling_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`static` or `ldp`; null when not configured."
+        }
+      },
+      "required": [
+        "name",
+        "fd",
+        "pseudowires",
+        "mtu",
+        "signaling_type"
       ]
     }
   }

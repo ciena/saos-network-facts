@@ -108,7 +108,7 @@ def test_pseudowire_service_and_cfm_mep_port():
     assert f["cfm"]["meps"] == [{"md": "MD5", "ma": "MA1", "mep_id": "11", "level": "5", "direction": "up", "interface": "AC",
                                  "port": "3", "vlan": "100", "service": "FD-V"}]
     assert f["ports"]["3"]["roles"] == ["fp", "cfm-mep"]
-    assert "_l2vpn" not in f
+    assert f["l2vpn_services"] == [{"name": "SVC", "fd": "FD-V", "pseudowires": ["PW1"], "mtu": None, "signaling_type": None}]
 
 
 def test_pseudowire_steered_onto_an_sr_policy():
@@ -124,3 +124,95 @@ def test_pseudowire_steered_onto_an_sr_policy():
 def test_top_level_vrf_list():
     f = run({"ciena-vrf:vrf": [{"vrfName": "A"}, {"vrfName": "B"}]}, {"ciena-vrf:vrf": [{"vrfName": "A", "__operation__": "remove"}]})
     assert f["vrfs"] == ["B"]
+
+
+def test_ospf_areas_interfaces_and_merge():
+    first = {"ciena-ospf:ospf": {"instance": [{"tag": 1, "router-id": "192.0.2.1", "interfaces": {"interface": [
+        {"name": "core", "type": "point-to-point", "metric": 20}, {"name": "lb0"}]},
+        "areas": {"area": [{"id": "0.0.0.0", "network": [{"prefix": "198.51.100.0/31"}, {"prefix": "192.0.2.1/32"}]}]}}]}}
+    later = {"ciena-ospf:ospf": {"instance": [{"tag": 1, "interfaces": {"interface": [
+        {"name": "core", "hello-interval": 5, "dead-interval": 20, "bfd": {"enable": True}}, {"name": "other", "passive": True}]},
+        "areas": {"area": [{"id": 1, "type": {"stub": {}}}]}}]}}
+    f = run(IFACES, first, later)
+    (instance,) = f["ospf"]["instances"]
+    assert instance == {"name": "1", "router_id": "192.0.2.1", "vrf": None, "areas": [
+        {"area": "0.0.0.0", "type": None, "networks": ["198.51.100.0/31", "192.0.2.1/32"]},
+        {"area": "1", "type": "stub", "networks": []}]}
+    core, lb0, other = f["ospf"]["interfaces"]
+    assert core == {"instance": "1", "interface": "core", "area": "0.0.0.0", "type": "point-to-point", "metric": "20",
+                    "hello_interval": "5", "dead_interval": "20", "priority": None, "passive": False, "bfd": True}
+    assert (lb0["area"], lb0["passive"]) == ("0.0.0.0", True)  # a loopback is passive
+    assert (other["area"], other["passive"]) == (None, True)  # no such interface: no address, no area
+
+
+def test_ospf_removals():
+    ospf = {"ciena-ospf:ospf": {"instance": [{"tag": 1, "interfaces": {"interface": [{"name": "core"}, {"name": "lb0"}]}}]}}
+    f = run(IFACES, ospf, {"ciena-ospf:ospf": {"instance": [{"tag": 1, "interfaces": {"interface": [
+        {"name": "lb0", "__operation__": "remove"}]}}]}})
+    assert [i["interface"] for i in f["ospf"]["interfaces"]] == ["core"]
+    f = run(IFACES, ospf, {"ciena-ospf:ospf": {"instance": [{"tag": 1, "__operation__": "remove"}]}})
+    assert f["ospf"] == {"instances": [], "interfaces": []}
+
+
+TUNNEL = {"name": "TP-1", "source-ip": "192.0.2.1", "destination-ip": "192.0.2.3"}
+
+
+def test_tp_corouted_tunnel_segments_backup_and_bfd():
+    f = run({"ciena-mpls-tp-corouted:tp-corouted-tunnels": {"tunnel": [
+        dict(TUNNEL, **{"tunnel-type": "static-transit-corouted", "forward-in-segment": {"forward-in-label": 1001},
+                        "forward-out-segment": {"next-hop-ip": "198.51.100.5", "forward-out-label": 1003},
+                        "reverse-in-segment": {"reverse-in-label": 1004},
+                        "reverse-out-segment": {"prev-hop-ip": "198.51.100.0", "reverse-out-label": 1002}}),
+        dict(TUNNEL, name="TP-1-B", **{"tunnel-type": "static-ingress-corouted", "tunnel-role-type": "backup",
+                                        "primary-tunnel-configuration": {"primary-tunnel-name": "TP-1",
+                                                                         "primary-tunnel-type": "static-ingress-corouted"},
+                                        "ciena-bfd-mpls-tp:bfd-cfg-parms": {"desired-min-tx-interval": "3300", "admin-down": False}}),
+    ]}})
+    transit, backup = f["tp_corouted_tunnels"]
+    assert transit == {"name": "TP-1", "source": "192.0.2.1", "destination": "192.0.2.3", "type": "static-transit-corouted",
+                       "role": "primary", "primary": None, "admin_state": "enable", "reversion": "enable", "reversion_hold_time": None,
+                       "forward_in_label": "1001", "forward_out_label": "1003", "next_hop_ip": "198.51.100.5",
+                       "reverse_in_label": "1004", "reverse_out_label": "1002", "prev_hop_ip": "198.51.100.0", "bfd": None}
+    assert backup["role"] == "backup" and backup["primary"] == {"name": "TP-1", "type": "static-ingress-corouted"}
+    assert backup["bfd"] == {"enabled": True, "interval_ms": 3}
+
+
+def test_tp_tunnel_merge_and_removal():
+    tunnels = lambda *t: {"ciena-mpls-tp-corouted:tp-corouted-tunnels": {"tunnel": list(t)}}  # noqa: E731
+    f = run(tunnels(dict(TUNNEL, **{"tunnel-type": "static-ingress-corouted"})),
+            tunnels(dict(TUNNEL, **{"tunnel-admin-state": "disable", "forward-out-segment": {"forward-out-label": 7}})))
+    (t,) = f["tp_corouted_tunnels"]
+    assert (t["type"], t["admin_state"], t["forward_out_label"]) == ("static-ingress-corouted", "disable", "7")
+    f = run(tunnels(TUNNEL), tunnels(dict(TUNNEL, __operation__="remove")))
+    assert f["tp_corouted_tunnels"] == []
+
+
+def test_l2vpn_service_removed():
+    svc = {"ciena-l2vpn:l2vpn-services": {"l2vpn": [{"name": "A", "forwarding-domain": "FD-A", "mtu": 1500, "signaling-type": "static",
+                                                     "pseudowire": ["PW1", "PW2"]}, {"name": "B"}]}}
+    f = run(svc, {"ciena-l2vpn:l2vpn-services": {"l2vpn": [{"name": "B", "__operation__": "remove"}]}})
+    assert f["l2vpn_services"] == [{"name": "A", "fd": "FD-A", "pseudowires": ["PW1", "PW2"], "mtu": "1500", "signaling_type": "static"}]
+
+
+def test_a_leaf_delete_creates_nothing():
+    """``no oc-if:interfaces interface 9 config ptp-id`` (translator 4.2.1): the entry carries only its
+    key and ``__remove__``; it is the path to the deleted leaf, not a new interface or port."""
+    f = run(IFACES, {
+        "openconfig-interfaces:interfaces": {"__operation__": "none", "interface": [
+            {"name": "9", "__operation__": "none",
+             "config": {"__operation__": "none", "__remove__": {"ciena-openconfig-if-ethernet-port:ptp-id": []}}}]},
+        "ciena-mef-logical-port:logical-ports": {"logical-port": [
+            {"name": "9", "__operation__": "none", "__remove__": {"description": []}}]},
+        "ciena-packet-ptp:ptps": {"ptp": [{"ptp-id": "9", "properties": {"transmitter": {"__remove__": {"state": []}}}}]},
+        "ciena-mpls-tp-corouted:tp-corouted-tunnels": {"tunnel": [dict(TUNNEL, **{"__remove__": {"reversion-hold-time": []}})]},
+        "ciena-ospf:ospf": {"instance": [{"tag": 1, "interfaces": {"interface": [{"name": "core", "__remove__": {"metric": []}}]}}]},
+    })
+    assert [i["name"] for i in f["interfaces"]] == ["lb0", "core"]
+    assert f["ports"] == {}
+    assert f["tp_corouted_tunnels"] == [] and f["ospf"] == {"instances": [], "interfaces": []}
+
+
+def test_a_leaf_delete_beside_a_set_is_an_edit():
+    f = run({"openconfig-interfaces:interfaces": {"interface": [
+        {"name": "x", "config": {"name": "x", "type": "ip", "__remove__": {"description": []}}}]}})
+    assert [(i["name"], i["kind"]) for i in f["interfaces"]] == [("x", "ip")]

@@ -24,7 +24,7 @@ const HEADER_COLORS = {
   Payload: '#f778ba',
 };
 
-const SOURCE_COLORS = { facts: '#3fb950', derived: '#8b98a8', default: '#d29922' };
+const SOURCE_COLORS = { facts: '#3fb950', authored: '#58a6ff', derived: '#8b98a8', default: '#d29922' };
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -174,7 +174,7 @@ export function renderImportReport(el, report) {
   const { topology, gaps, warnings } = report;
   const chip = (src) => `<span class="layer-tag" style="background:${SOURCE_COLORS[src]}">${esc(src)}</span>`;
   let html = `<h2 style="color:var(--text);font-size:14px;text-transform:none">${esc(topology.name)}</h2>`;
-  html += `<p class="sub">Where each layer's data came from: ${Object.keys(SOURCE_COLORS).map(chip).join(' ')}. Derived and default items are not in the configurations.</p>`;
+  html += `<p class="sub">Where each layer's data came from: ${Object.keys(SOURCE_COLORS).map(chip).join(' ')}. Authored, derived and default items are not in the configurations.</p>`;
   for (const [layer, items] of Object.entries(gaps)) {
     html += `<h2><span class="layer-tag" style="background:${hex(layerColor(layer))}">${esc(layer)}</span></h2>`;
     html += '<ul class="gaps">';

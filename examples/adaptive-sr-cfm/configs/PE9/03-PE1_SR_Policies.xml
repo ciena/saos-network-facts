@@ -37,17 +37,17 @@
 
     <policy>
       <color>2</color>
-      <endpoint>20.10.10.1</endpoint>
+      <endpoint>10.255.10.1</endpoint>
       <name>SR9to1color2</name>
       <signaling-type>path-setup-sr-isis</signaling-type>
-      <source>20.10.10.9</source>
+      <source>10.255.10.9</source>
       <admin-state>enable</admin-state>
       <reversion-hold-timer>60</reversion-hold-timer>
       <reversion-state>enable</reversion-state>
       <candidate-paths>
         <candidate-path>
           <protocol-origin>local</protocol-origin>
-          <originator>20.10.10.9</originator>
+          <originator>10.255.10.9</originator>
           <discriminator>1</discriminator>
           <preference>100</preference>
           <segment-lists>

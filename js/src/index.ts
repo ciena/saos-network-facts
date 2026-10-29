@@ -99,11 +99,17 @@ export function loopbacks(facts: DeviceFacts): Array<{ name: string; ip: string;
   return (facts.interfaces ?? []).filter((i) => i.kind === "loopback" && i.ip).map((i) => ({ name: i.name, ip: i.ip!, isis: i.isis ?? null }));
 }
 
-/** BGP neighbours, with the remote AS as a number (null when not set). */
-export function bgpPeers(facts: DeviceFacts): Array<{ ip: string | null; remoteAs: number | null; routeReflectorClient: boolean }> {
+/** BGP neighbours, with the remote AS as a number (null when not set). `routeReflectorClient` is null
+ * when the record does not say (a SAOS 6 peer, a pre-schema file), so a caller can fall back to
+ * another source; only an explicit flag is true or false. */
+export function bgpPeers(facts: DeviceFacts): Array<{ ip: string | null; remoteAs: number | null; routeReflectorClient: boolean | null }> {
   return (facts.peers ?? [])
     .filter((p) => p.kind === "bgp")
-    .map((p) => ({ ip: p.ip, remoteAs: p.remote_as == null ? null : Number(p.remote_as), routeReflectorClient: Boolean(p.route_reflector_client) }));
+    .map((p) => ({
+      ip: p.ip,
+      remoteAs: p.remote_as == null ? null : Number(p.remote_as),
+      routeReflectorClient: p.route_reflector_client == null ? null : Boolean(p.route_reflector_client),
+    }));
 }
 
 function netParts(net: string | null | undefined): string[] | null {

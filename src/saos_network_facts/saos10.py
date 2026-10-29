@@ -5,7 +5,8 @@ The translator turns a CLI or XML configuration into one JSON document keyed by 
 (``openconfig-interfaces:interfaces``, ``ciena-mef-fp:fps``, ...). This module walks that document
 for the facts and returns the same dict shape as ``saos6`` (hostname, interfaces, loopbacks, VLANs,
 ports, LAGs, peers, IS-IS, segment routing, BGP, pseudowires, CFM), extended with the SAOS 10 objects
-that carry the same information: forwarding domains, flow points, classifiers, VRFs, EVPN segments.
+that carry the same information: forwarding domains, flow points, classifiers, VRFs, EVPN segments,
+OSPF, MPLS-TP co-routed tunnels and L2VPN services.
 
 Two translator quirks are handled here:
 
@@ -14,12 +15,14 @@ Two translator quirks are handled here:
   (``ciena-openconfig-interfaces:type``); lookups go by local name;
 * edits: a CLI ``no`` and an XML ``nc:operation="remove"`` / ``"delete"`` put ``__operation__:
   "remove"`` on the entry (``"replace"`` for a remove-then-recreate), and an entry that exists only
-  as the path to a leaf reset carries ``__edit_path__``; both are honoured here: a removed object
-  leaves the facts, a path-only entry is not a create. Translators before 1.13.0 drop the XML
+  as the path to a leaf reset carries ``__edit_path__``, or (translator 4.2.1) only its keys and a
+  ``__remove__`` naming the deleted leaves (``no oc-if:interfaces interface 9 config ptp-id``); all
+  are honoured here: a removed object leaves the facts, a path-only entry is not a create. Translators before 1.13.0 drop the XML
   operation, so ``removed_objects(xml_text)`` still reads it from the XML and ``apply_removals``
   drops those objects.
 """
 
+import ipaddress
 import xml.etree.ElementTree as ET
 
 from .saos6 import finish_isis, new_pseudowire
@@ -32,7 +35,8 @@ REMOVAL_KINDS = {"interface": "interfaces", "fp": "fps", "fd": "fds", "logical-p
 
 def new_facts():
     facts = _base_facts()
-    facts.update({"fds": [], "fps": [], "classifiers": {}, "vrfs": [], "segments": [], "objects": 0})
+    facts.update({"fds": [], "fps": [], "classifiers": {}, "vrfs": [], "segments": [], "objects": 0,
+                  "ospf": {"instances": [], "interfaces": []}, "tp_corouted_tunnels": [], "l2vpn_services": []})
     return facts
 
 
@@ -44,13 +48,17 @@ def local(key):
 
 OPERATION = "__operation__"
 EDIT_PATH = "__edit_path__"
+REMOVE = "__remove__"
+# List keys (and the leaves naming an entry) that a leaf delete repeats on its path.
+KEYS = {"name", "tag", "id", "ptp-id", "xcvr-id", "source-ip", "destination-ip", "vrfName", "prefix", "address",
+        "as", "color", "endpoint", "mep-identifier"}
 
 
 def clean(obj):
-    """The pivot without the translator's ``__*`` bookkeeping keys, except the two edit markers
-    this module acts on (``__operation__``, ``__edit_path__``)."""
+    """The pivot without the translator's ``__*`` bookkeeping keys, except the edit markers this
+    module acts on (``__operation__``, ``__edit_path__``, ``__remove__``)."""
     if isinstance(obj, dict):
-        return {k: clean(v) for k, v in obj.items() if not k.startswith("__") or k in (OPERATION, EDIT_PATH)}
+        return {k: clean(v) for k, v in obj.items() if not k.startswith("__") or k in (OPERATION, EDIT_PATH, REMOVE)}
     if isinstance(obj, list):
         return [clean(v) for v in obj]
     return obj
@@ -61,9 +69,33 @@ def removed(obj):
     return isinstance(obj, dict) and obj.get(OPERATION) in ("remove", "delete")
 
 
+def _deletes_leaf(obj):
+    if isinstance(obj, list):
+        return any(_deletes_leaf(v) for v in obj)
+    return isinstance(obj, dict) and (REMOVE in obj or any(_deletes_leaf(v) for v in obj.values()))
+
+
+def _sets_leaf(obj, top=True):
+    """True when the entry sets a leaf other than its keys (a nested container or list counts by its leaves)."""
+    if not isinstance(obj, dict):
+        return False
+    for key, value in obj.items():
+        if key.startswith("__") or (top and local(key) in KEYS):
+            continue
+        if isinstance(value, list) and value and all(isinstance(v, dict) for v in value):
+            if any(_sets_leaf(v) for v in value):  # entries of a nested list, each with its own keys
+                return True
+        elif not isinstance(value, dict) or _sets_leaf(value, top=False):
+            return True
+    return False
+
+
 def path_only(obj):
-    """True when this entry exists in the pivot only as the path to a leaf edit."""
-    return isinstance(obj, dict) and obj.get(EDIT_PATH) is not None and not removed(obj)
+    """True when this entry exists in the pivot only as the path to a leaf edit: marked with
+    ``__edit_path__``, or a leaf delete (``__remove__``) that sets nothing besides its keys."""
+    if not isinstance(obj, dict) or removed(obj):
+        return False
+    return obj.get(EDIT_PATH) is not None or (_deletes_leaf(obj) and not _sets_leaf(obj))
 
 
 def get(obj, name, default=None):
@@ -518,14 +550,142 @@ def _pseudowires(facts, container):
 
 
 def _l2vpn_services(facts, container):
-    """``ciena-l2vpn:l2vpn-services``: which service (and forwarding domain) each pseudowire carries."""
-    services = facts.setdefault("_l2vpn", {})
+    """``ciena-l2vpn:l2vpn-services``: an L2VPN service binds a forwarding domain (its attachment
+    circuits) to one or more pseudowires; ``finish`` also names the service on each pseudowire."""
+    if removed(container):
+        facts["l2vpn_services"] = []
+        return
     for svc in entries(container, "l2vpn"):
         name = text(get(svc, "name"))
-        if not name or removed(svc):
+        if not name:
             continue
+        current = next((s for s in facts["l2vpn_services"] if s["name"] == name), None)
+        if removed(svc):
+            facts["l2vpn_services"] = [s for s in facts["l2vpn_services"] if s is not current]
+            continue
+        if current is None:
+            if path_only(svc):
+                continue
+            current = {"name": name, "fd": None, "pseudowires": [], "mtu": None, "signaling_type": None}
+            facts["l2vpn_services"].append(current)
+        for key, leaf in (("fd", "forwarding-domain"), ("mtu", "mtu"), ("signaling_type", "signaling-type")):
+            if get(svc, leaf) is not None:
+                current[key] = text(get(svc, leaf))
         for pw in as_list(get(svc, "pseudowire")):
-            services[text(pw)] = {"service": name, "fd": text(get(svc, "forwarding-domain"))}
+            _add(current["pseudowires"], text(pw))
+
+
+def _ospf(facts, container):
+    """``ciena-ospf:ospf``: OSPFv2 instances (router id, VRF, areas and the networks that put
+    interfaces in them) and the interfaces each instance runs on (network type, metric, timers,
+    passive, BFD). An interface's area is filled in ``finish`` from the area networks."""
+    ospf = facts["ospf"]
+    if removed(container):
+        facts["ospf"] = {"instances": [], "interfaces": []}
+        return
+    for instance in entries(container, "instance"):
+        tag = text(get(instance, "tag"))
+        current = next((i for i in ospf["instances"] if i["name"] == tag), None)
+        if removed(instance):
+            ospf["instances"] = [i for i in ospf["instances"] if i is not current]
+            ospf["interfaces"] = [i for i in ospf["interfaces"] if i["instance"] != tag]
+            continue
+        if current is None:
+            if path_only(instance):
+                continue
+            current = {"name": tag, "router_id": None, "vrf": None, "areas": []}
+            ospf["instances"].append(current)
+        for key, leaf in (("router_id", "router-id"), ("vrf", "vrf")):
+            if get(instance, leaf) is not None:
+                current[key] = text(get(instance, leaf))
+        for area in entries(get(instance, "areas"), "area"):
+            area_id = text(get(area, "id"))
+            entry = next((a for a in current["areas"] if a["area"] == area_id), None)
+            if removed(area):
+                current["areas"] = [a for a in current["areas"] if a is not entry]
+                continue
+            if entry is None:
+                entry = {"area": area_id, "type": None, "networks": []}
+                current["areas"].append(entry)
+            kind = get(area, "type")
+            if kind is not None:
+                # a YANG choice: {"stub": {}} / {"nssa": {...}}, or plain text
+                entry["type"] = next((local(k) for k in kind if not k.startswith("__")), None) if isinstance(kind, dict) else text(kind)
+            for network in entries(area, "network"):
+                prefix = text(get(network, "prefix"))
+                if prefix and not removed(network):
+                    _add(entry["networks"], prefix)
+        for interface in entries(get(instance, "interfaces"), "interface"):
+            name = text(get(interface, "name"))
+            item = next((i for i in ospf["interfaces"] if i["instance"] == tag and i["interface"] == name), None)
+            if removed(interface):
+                ospf["interfaces"] = [i for i in ospf["interfaces"] if i is not item]
+                continue
+            if item is None:
+                if path_only(interface):
+                    continue
+                item = {"instance": tag, "interface": name, "area": None, "type": None, "metric": None,
+                        "hello_interval": None, "dead_interval": None, "priority": None, "passive": False, "bfd": False}
+                ospf["interfaces"].append(item)
+            for key, leaf in (("type", "type"), ("metric", "metric"), ("hello_interval", "hello-interval"),
+                              ("dead_interval", "dead-interval"), ("priority", "priority")):
+                if get(interface, leaf) is not None:
+                    item[key] = text(get(interface, leaf))
+            if get(interface, "passive") is not None:
+                item["passive"] = bool(flag(get(interface, "passive")))
+            if get(get(interface, "bfd"), "enable") is not None:
+                item["bfd"] = bool(flag(get(get(interface, "bfd"), "enable")))
+
+
+def _tp_bfd(params):
+    """LSP BFD on a co-routed tunnel: enabled unless ``admin-down``; SAOS 10 gives the intervals in microseconds."""
+    if not isinstance(params, dict):
+        return None
+    tx = text(get(params, "desired-min-tx-interval"))
+    return {"enabled": not flag(get(params, "admin-down")), "interval_ms": int(tx) // 1000 if tx and tx.isdigit() else None}
+
+
+def _tp_tunnels(facts, container):
+    """``ciena-mpls-tp-corouted:tp-corouted-tunnels``: static MPLS-TP co-routed (bidirectional) tunnels.
+    Each node of the path configures its own segment of a tunnel, keyed by name, source and
+    destination: the ingress its forward-out and reverse-in labels, a transit node all four, the
+    egress forward-in and reverse-out. A backup tunnel names the primary it protects (1:1)."""
+    if removed(container):
+        facts["tp_corouted_tunnels"] = []
+        return
+    tunnels = facts["tp_corouted_tunnels"]
+    for tunnel in entries(container, "tunnel"):
+        key = (text(get(tunnel, "name")), text(get(tunnel, "source-ip")), text(get(tunnel, "destination-ip")))
+        current = next((t for t in tunnels if (t["name"], t["source"], t["destination"]) == key), None)
+        if removed(tunnel):
+            facts["tp_corouted_tunnels"] = tunnels = [t for t in tunnels if t is not current]
+            continue
+        if current is None:
+            if path_only(tunnel):
+                continue
+            current = {"name": key[0], "source": key[1], "destination": key[2], "type": None, "role": "primary",
+                       "primary": None, "admin_state": "enable", "reversion": "enable", "reversion_hold_time": None,
+                       "forward_in_label": None, "forward_out_label": None, "next_hop_ip": None,
+                       "reverse_in_label": None, "reverse_out_label": None, "prev_hop_ip": None, "bfd": None}
+            tunnels.append(current)
+        for key_, leaf in (("type", "tunnel-type"), ("role", "tunnel-role-type"), ("admin_state", "tunnel-admin-state"),
+                           ("reversion", "tunnel-reversion-state"), ("reversion_hold_time", "reversion-hold-time")):
+            if get(tunnel, leaf) is not None:
+                current[key_] = text(get(tunnel, leaf))
+        primary = get(tunnel, "primary-tunnel-configuration")
+        if isinstance(primary, dict) and get(primary, "primary-tunnel-name") is not None:
+            current["primary"] = {"name": text(get(primary, "primary-tunnel-name")), "type": text(get(primary, "primary-tunnel-type"))}
+        for segment, leaves in (("forward-in-segment", ("forward-in-label",)),
+                                ("forward-out-segment", ("forward-out-label", "next-hop-ip")),
+                                ("reverse-in-segment", ("reverse-in-label",)),
+                                ("reverse-out-segment", ("reverse-out-label", "prev-hop-ip"))):
+            for leaf in leaves:
+                value = get(get(tunnel, segment), leaf)
+                if value is not None:
+                    current[leaf.replace("-", "_")] = text(value)
+        bfd = _tp_bfd(get(tunnel, "bfd-cfg-parms"))
+        if bfd is not None:
+            current["bfd"] = bfd
 
 
 def _cfm(facts, container):
@@ -572,6 +732,8 @@ HANDLERS = {
     "segment-routing-traffic-engineering": _sr_policy,
     "pseudowires": _pseudowires,
     "l2vpn-services": _l2vpn_services,
+    "ospf": _ospf,
+    "tp-corouted-tunnels": _tp_tunnels,
     "maintenance-domain": _cfm,
 }
 
@@ -619,13 +781,14 @@ def finish(facts):
     for instance in facts["bgp"]["instances"]:
         instance["route_reflector"] = any(p["route_reflector_client"] for p in facts["peers"]
                                           if p["kind"] == "bgp" and p["name"] == f"as{instance['as']}")
-    services = facts.pop("_l2vpn", {})
+    services = {pw: svc for svc in facts["l2vpn_services"] for pw in svc["pseudowires"]}
     modes = {fd["name"]: fd["mode"] for fd in facts["fds"]}
     for pw in facts["pseudowires"]:
         svc = services.get(pw["name"])
         if svc:
-            pw["service"] = svc["service"]
+            pw["service"] = svc["name"]
             pw["service_type"] = modes.get(svc["fd"]) if modes.get(svc["fd"]) in ("vpws", "vpls") else None
+    _ospf_areas(facts)
     fps = {fp["name"]: fp for fp in facts["fps"]}
     for mep in facts["cfm"]["meps"]:
         fp = fps.get(mep["interface"])
@@ -636,6 +799,33 @@ def finish(facts):
             if mep["port"]:
                 _add(_port(facts, mep["port"])["roles"], "cfm-mep")
     return finish_isis(facts)
+
+
+def _ospf_areas(facts):
+    """Each OSPF interface's area: the area of its instance whose ``network`` covers the interface's
+    address (SAOS 10 puts interfaces in areas by network). Loopbacks are passive: advertised as a
+    stub network, never an adjacency."""
+    addresses = {i["name"]: i["ip"] for i in facts["interfaces"]}
+    kinds = {i["name"]: i["kind"] for i in facts["interfaces"]}
+    instances = {i["name"]: i for i in facts["ospf"]["instances"]}
+    for item in facts["ospf"]["interfaces"]:
+        if kinds.get(item["interface"]) == "loopback":
+            item["passive"] = True
+        instance, address = instances.get(item["instance"]), addresses.get(item["interface"])
+        if item["area"] is not None or instance is None or not address:
+            continue
+        try:
+            ip = ipaddress.ip_interface(address).ip
+        except ValueError:
+            continue
+        item["area"] = next((a["area"] for a in instance["areas"] if any(_covers(n, ip) for n in a["networks"])), None)
+
+
+def _covers(network, ip):
+    try:
+        return ip in ipaddress.ip_network(network, strict=False)
+    except ValueError:
+        return False
 
 
 # ---------------------------------------------------------------- NETCONF removals

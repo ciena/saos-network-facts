@@ -1,6 +1,6 @@
 {
   "name": "@ciena/saos-network-facts",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Schema, TypeScript types and a reader for saos-network-facts facts files (per-device facts from SAOS 6/8/10 configurations).",
   "license": "Apache-2.0",
   "repository": {

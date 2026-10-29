@@ -5,17 +5,22 @@
 // (IS-IS metrics, CFM level and interval), and each such choice is listed in
 // the report so the view never passes a guess off as configuration.
 //
-//   nodes        every device with facts; a router when it runs IS-IS, else a CE
-//   links        two interfaces on different devices in one IPv4 subnet
+//   IGP          IS-IS, or OSPF when more devices run OSPF than IS-IS (the engine runs one)
+//   nodes        every device with facts; a router when it runs the IGP or an MPLS-TP tunnel, else a CE
+//   links        two interfaces on different devices in one IPv4 subnet; core when both run the IGP
+//   OSPF         per link the area and cost of each end's interface, BFD when both ends enable it
 //   SRGB, SIDs   segment_routing.srgb / prefix_sids (node SID of the loopback)
 //   SR policies  segment_routing.policies, the preferred candidate path's first segment list
+//   MPLS-TP      tp_corouted_tunnels: each node's segment, stitched from the ingress along next hops
 //   BGP          peers of kind bgp, matched to the device owning the address
-//   pseudowires  the two ends that name each other (peer address + PW id)
+//   pseudowires  the two ends that name each other (peer address + PW id); static on an MPLS-TP tunnel
 //   CFM          MEPs of one MD / MA on two devices, over that service's pseudowire
 
 import { devicesByName, interfacesOnPort, isisArea, isRouted, loopbacks, parseFacts } from '../../../js/src/index.ts';
 import { intToIp, parsePrefix } from '../engine/ip.js';
-import { layoutNodes } from './layout.js';
+import { BACKBONE, normArea } from '../engine/ospf.js';
+import { rfcVendor } from '../engine/vendor.js';
+import { layoutNodes, scalePositions } from './layout.js';
 
 const DEFAULT_METRIC = 10;
 
@@ -65,29 +70,77 @@ class Report {
   }
 }
 
-function buildNodes(devices, report) {
+// OSPF of a device: the instances of the default VRF and the interfaces they run on, by name.
+export function ospfOf(f) {
+  const instances = (f.ospf?.instances ?? []).filter((i) => !i.vrf || i.vrf === 'default');
+  const names = new Set(instances.map((i) => i.name));
+  return { instances, interfaces: new Map((f.ospf?.interfaces ?? []).filter((x) => names.has(x.instance)).map((x) => [x.interface, x])) };
+}
+
+// The IGP the engine runs: IS-IS, unless more devices run OSPF than IS-IS.
+function chooseIgp(devices, report) {
+  const count = (has) => [...devices.values()].filter(has).length;
+  const isis = count((f) => f.isis?.instances?.length);
+  const ospf = count((f) => ospfOf(f).instances.length);
+  const igp = ospf > isis ? 'ospf' : 'isis';
+  if (isis && ospf) report.warn(`IS-IS on ${isis} and OSPF on ${ospf} devices: the view runs one IGP, ${igp === 'ospf' ? 'OSPF' : 'IS-IS'}`);
+  return igp;
+}
+
+// Whether an interface of a device runs the IGP (a passive OSPF interface forms no adjacency).
+function inIgp(igp, f, iface) {
+  if (igp === 'isis') return Boolean(iface.isis);
+  const o = ospfOf(f).interfaces.get(iface.name);
+  return Boolean(o) && !o.passive;
+}
+
+function buildNodes(devices, igp, report) {
   const nodes = [];
   for (const [name, f] of devices) {
-    const lo = loopbacks(f)[0] ?? null;
+    const ospf = ospfOf(f);
+    const los = loopbacks(f);
+    const lo = (igp === 'ospf' ? los.find((l) => ospf.interfaces.has(l.name)) : los.find((l) => l.isis)) ?? los[0] ?? null;
     const loIp = lo ? ipv4Subnet(lo.ip)?.ip ?? null : null;
     const isis = f.isis?.instances?.[0] ?? null;
-    const router = Boolean(isis) && Boolean(loIp);
+    const runsIgp = igp === 'ospf' ? ospf.instances.length > 0 : Boolean(isis);
+    const router = (runsIgp || (f.tp_corouted_tunnels ?? []).length > 0) && Boolean(loIp);
     const node = { id: name, role: router ? 'p' : 'ce', pos: { x: 0, z: 0 } };
     if (loIp) node.loopback = loIp;
     if (isis?.system_id) node.systemId = isis.system_id;
+    if (igp === 'ospf' && router) {
+      const rid = ospf.instances[0]?.router_id;
+      if (rid) node.routerId = rid;
+      const area = normArea(ospf.interfaces.get(lo.name)?.area);
+      if (area) node.loopbackArea = area;
+    }
     if (router) {
       const sid = (f.segment_routing?.prefix_sids ?? []).find((s) => s.prefix === `${loIp}/32`);
       if (sid?.value_type === 'index') node.sidIndex = Number(sid.sid);
-      if (isis && !isis.system_id) report.warn(`${name}: IS-IS instance ${isis.name} has no NET; its LSP ID is made up`);
-    } else if (isis) {
-      report.warn(`${name}: runs IS-IS but has no loopback address; shown as a host`);
+      if (igp === 'isis' && isis && !isis.system_id) report.warn(`${name}: IS-IS instance ${isis.name} has no NET; its LSP ID is made up`);
+    } else if (runsIgp) {
+      report.warn(`${name}: runs ${igp === 'ospf' ? 'OSPF' : 'IS-IS'} but has no loopback address; shown as a host`);
     }
     nodes.push(node);
   }
   return nodes;
 }
 
-function buildLinks(devices, nodes, report) {
+// OSPF on a core link: each end's area and cost (RFC 2328 §C.3, per interface), BFD when both ends enable it.
+function ospfLink(link, devices, report, defaults) {
+  const cfg = [link.a, link.b].map((e) => ospfOf(devices.get(e.node)).interfaces.get(e.if) ?? null);
+  const areas = cfg.map((c) => normArea(c?.area));
+  if (areas[0] && areas[1] && areas[0] !== areas[1]) report.warn(`${link.id}: OSPF areas ${areas[0]} and ${areas[1]} on its two ends; no adjacency forms on a real network, the view uses ${areas[0]}`);
+  link.area = areas[0] ?? areas[1] ?? BACKBONE;
+  if (!areas[0] && !areas[1]) defaults.area++;
+  const costs = cfg.map((c) => num(c?.metric));
+  if (costs.some((c) => c === null)) defaults.metric++;
+  const [ca, cb] = costs.map((c) => c ?? rfcVendor.ospf.defaultCost);
+  link.metric = ca;
+  if (ca !== cb) link.cost = { a: ca, b: cb };
+  if (cfg.every((c) => c?.bfd)) link.bfd = true;
+}
+
+function buildLinks(devices, nodes, igp, report) {
   const bySubnet = new Map();
   for (const [name, f] of devices) {
     for (const i of f.interfaces ?? []) {
@@ -96,7 +149,7 @@ function buildLinks(devices, nodes, report) {
         const s = ipv4Subnet(cidr);
         if (!s || s.len >= 32) continue;
         if (!bySubnet.has(s.subnet)) bySubnet.set(s.subnet, []);
-        bySubnet.get(s.subnet).push({ node: name, if: i.name, ip: s.ip, port: portOf(f, i.name), isis: i.isis ?? null });
+        bySubnet.get(s.subnet).push({ node: name, if: i.name, ip: s.ip, port: portOf(f, i.name), igp: inIgp(igp, f, i) });
       }
     }
   }
@@ -110,16 +163,26 @@ function buildLinks(devices, nodes, report) {
       continue;
     }
     const [a, b] = ends;
-    const core = role[a.node] !== 'ce' && role[b.node] !== 'ce' && Boolean(a.isis) && Boolean(b.isis);
+    const core = role[a.node] !== 'ce' && role[b.node] !== 'ce' && a.igp && b.igp;
     let id = `${a.node}-${b.node}`;
     if (ids.has(id)) id = `${id} ${subnet}`;
     ids.add(id);
     const end = (e) => ({ node: e.node, if: e.if, ip: e.ip, ...(e.port ? { port: e.port } : {}) });
     links.push({ id, kind: core ? 'core' : 'access', ...(core ? { metric: DEFAULT_METRIC } : {}), subnet, lag: false, a: end(a), b: end(b), members: [{ id, a: a.if, b: b.if }] });
   }
-  const core = links.filter((l) => l.kind === 'core').length;
-  report.add('physical', 'derived', `${links.length} links`, `from interface subnets (two interfaces of different devices in one IPv4 subnet); ${core} core (IS-IS at both ends), ${links.length - core} access`);
-  if (core) report.add('isis', 'default', 'link metrics', `the facts carry no IS-IS metrics: every core link has metric ${DEFAULT_METRIC}`);
+  const core = links.filter((l) => l.kind === 'core');
+  const name = igp === 'ospf' ? 'OSPF' : 'IS-IS';
+  report.add('physical', 'derived', `${links.length} links`, `from interface subnets (two interfaces of different devices in one IPv4 subnet); ${core.length} core (${name} at both ends), ${links.length - core.length} access`);
+  if (igp === 'isis' && core.length) report.add('isis', 'default', 'link metrics', `the facts carry no IS-IS metrics: every core link has metric ${DEFAULT_METRIC}`);
+  if (igp === 'ospf') {
+    const defaults = { area: 0, metric: 0 };
+    for (const l of core) ospfLink(l, devices, report, defaults);
+    const areas = [...new Set(core.map((l) => l.area))].sort();
+    report.add('ospf', defaults.area ? 'default' : 'facts', 'areas', `${areas.join(', ') || '-'}, from the area networks covering each interface${defaults.area ? `; ${defaults.area} links in no area on either end are in the backbone` : ''}`);
+    report.add('ospf', defaults.metric ? 'default' : 'facts', 'interface costs', defaults.metric ? `${defaults.metric} links have an end without a configured metric: cost ${rfcVendor.ospf.defaultCost} there` : 'per interface metric');
+    report.add('ospf', 'facts', 'BFD', `${core.filter((l) => l.bfd).length} links with BFD on both ends`);
+    report.add('ospf', 'default', 'network type and timers', `point-to-point on every core link; hello ${rfcVendor.ospf.helloIntervalS} s, dead ${rfcVendor.ospf.deadIntervalS} s (engine model values)`);
+  }
   return links;
 }
 
@@ -193,17 +256,125 @@ function srgbOf(devices, report) {
   return { base: first.base, size: first.size };
 }
 
-// The attachment circuit of a service on a device: the flow point on the service's forwarding domain.
+// MPLS-TP co-routed tunnels. Each node configures its own segment of a tunnel; a tunnel is
+// stitched from its ingress segment by following the forward next hop to the neighbour whose
+// segment of the same source / destination receives our forward out label, up to the egress.
+function buildTpTunnels(devices, links, report) {
+  const segs = [...devices].flatMap(([node, f]) => (f.tp_corouted_tunnels ?? []).map((t) => ({
+    node,
+    name: t.name,
+    source: t.source,
+    destination: t.destination,
+    kind: /ingress/.test(t.type ?? '') ? 'ingress' : /egress/.test(t.type ?? '') ? 'egress' : 'transit',
+    role: t.role ?? 'primary',
+    primary: t.primary?.name ?? null,
+    admin: t.admin_state === 'disable' ? 'down' : 'up',
+    fwdIn: num(t.forward_in_label),
+    fwdOut: num(t.forward_out_label),
+    revIn: num(t.reverse_in_label),
+    revOut: num(t.reverse_out_label),
+    nextHop: t.next_hop_ip ?? null,
+    prevHop: t.prev_hop_ip ?? null,
+    bfd: t.bfd?.enabled ? { intervalMs: t.bfd.interval_ms ?? null } : null,
+  })));
+  const used = new Set();
+  const tunnels = [];
+  // The link from `node` to the neighbour that has address `ip`.
+  const toward = (node, ip) => {
+    const l = links.find((x) => (x.a.node === node && x.b.ip === ip) || (x.b.node === node && x.a.ip === ip));
+    return l ? { link: l, near: l.a.node === node ? l.a : l.b, far: l.a.node === node ? l.b : l.a } : null;
+  };
+  for (const s0 of segs.filter((x) => x.kind === 'ingress')) {
+    const what = `${s0.node} tunnel ${s0.name}`;
+    const hop = (x) => ({ node: x.node, name: x.name, fwdIn: x.fwdIn, fwdOut: x.fwdOut, revIn: x.revIn, revOut: x.revOut });
+    const hops = [hop(s0)];
+    const via = [];
+    const mine = [s0];
+    let cur = s0;
+    let err = null;
+    while (cur.kind !== 'egress' && !err) {
+      const nh = toward(cur.node, cur.nextHop);
+      if (!nh) {
+        err = `${cur.node}: next hop ${cur.nextHop} is on none of its links`;
+        break;
+      }
+      const next = segs.find((x) => x.node === nh.far.node && !used.has(x) && !mine.includes(x) && x.kind !== 'ingress' && x.source === s0.source && x.destination === s0.destination && x.fwdIn === cur.fwdOut);
+      if (!next) err = `${nh.far.node}: no segment of ${s0.source} -> ${s0.destination} with forward in label ${cur.fwdOut}`;
+      else {
+        if (next.prevHop && next.prevHop !== nh.near.ip) report.warn(`${what}: ${next.node} prev hop ${next.prevHop} is not ${cur.node}'s address ${nh.near.ip} on ${nh.link.id}`);
+        mine.push(next);
+        via.push(nh.link.id);
+        hops.push(hop(next));
+        cur = next;
+        if (hops.length > 64) err = 'loop';
+      }
+    }
+    if (err) {
+      report.warn(`${what}: ${err}; not drawn`);
+      continue;
+    }
+    for (const x of mine) used.add(x);
+    const bfd = s0.bfd ?? cur.bfd;
+    tunnels.push({
+      id: tunnels.some((t) => t.id === s0.name) ? `${s0.node}:${s0.name}` : s0.name,
+      name: s0.name,
+      src: s0.node,
+      dst: cur.node,
+      role: s0.role,
+      primaryName: s0.primary,
+      ...(s0.admin === 'down' ? { admin: 'down' } : {}),
+      hops,
+      links: via,
+      oam: bfd ? { kind: 'bfd', ...(bfd.intervalMs ? { intervalMs: bfd.intervalMs } : {}) } : null,
+    });
+  }
+  for (const t of tunnels) {
+    if (t.role === 'backup') {
+      const p = tunnels.find((x) => x.role !== 'backup' && x.src === t.src && x.name === t.primaryName);
+      if (p) t.protects = p.id;
+      else report.warn(`${t.src} tunnel ${t.name}: backup of ${t.primaryName}, which is no tunnel here`);
+    }
+    delete t.primaryName;
+  }
+  for (const x of segs.filter((y) => !used.has(y))) report.warn(`${x.node}: tunnel segment ${x.name} (${x.kind}, ${x.source} -> ${x.destination}) is on no stitched tunnel`);
+  if (segs.length) {
+    const bfd = tunnels.filter((t) => t.oam).length;
+    report.add('mpls-tp', 'facts', `${tunnels.length} co-routed tunnels`, `stitched from ${segs.length} per-node segments: per-hop labels in both directions, next / previous hops`);
+    if (tunnels.length) {
+      report.add('mpls-tp', 'facts', '1:1 protection', `${tunnels.filter((t) => t.protects).length} backup tunnels`);
+      report.add('mpls-tp', 'facts', 'proactive OAM (LSP BFD)', `${bfd} of ${tunnels.length} tunnels; a tunnel without it only sees its own interfaces fail`);
+      report.add('mpls-tp', 'derived', 'tunnel numbers (RFC 6370)', 'ordinal per source node; Global_ID 0');
+      report.add('mpls-tp', 'default', 'protection timers', `switch in ${rfcVendor.mplsTp.protectionSwitchMs} ms; reversion hold time not modeled`);
+    }
+  }
+  return tunnels;
+}
+
+// The attachment circuit of a service on a device: the flow point on the service's forwarding
+// domain (the l2vpn service's, else a forwarding domain named like the service).
 function attachment(f, service) {
-  const fp = (f.fps ?? []).find((x) => x.fd === service);
+  const fd = (f.l2vpn_services ?? []).find((s) => s.name === service)?.fd ?? service;
+  const fp = (f.fps ?? []).find((x) => x.fd === fd);
   return fp ? { port: fp.logical_port ?? null, name: fp.name } : { port: null, name: null };
 }
 
-function pwEnd(name, f, pw, peer, report) {
+// The MPLS-TP tunnel a PW end rides: the one this node is the ingress or egress of, by name.
+function tpTunnelOf(tpTunnels, node, name) {
+  return tpTunnels.find((t) => t.role !== 'backup' && ((t.src === node && t.hops[0].name === name) || (t.dst === node && t.hops.at(-1).name === name)));
+}
+
+function pwEnd(name, f, pw, peer, tpTunnels, report) {
   const end = { node: name, ac: attachment(f, pw.service) };
   if (pw.tunnel_type === 'sr-policy') {
     end.underlay = 'sr-policy';
     end.color = num(pw.tunnel_color);
+  } else if (/corouted/.test(pw.tunnel_type ?? '') && pw.tunnel) {
+    const t = tpTunnelOf(tpTunnels, name, pw.tunnel);
+    if (!t) report.warn(`${name}: PW ${pw.name} rides MPLS-TP tunnel ${pw.tunnel}, which is not stitched`);
+    end.underlay = 'mpls-tp';
+    end.tunnel = t?.id ?? pw.tunnel;
+    end.rxLabel = num(pw.in_label);
+    end.txLabel = num(pw.out_label);
   } else if (pw.tunnel_type || pw.tunnel) {
     report.warn(`${name}: PW ${pw.name} rides ${pw.tunnel_type ?? `tunnel ${pw.tunnel}`}, which the view does not model; shown over the Prefix-SID`);
     end.underlay = 'sr';
@@ -214,7 +385,7 @@ function pwEnd(name, f, pw, peer, report) {
   return end;
 }
 
-function buildPseudowires(devices, owner, report) {
+function buildPseudowires(devices, owner, tpTunnels, report) {
   const used = new Set();
   const pseudowires = [];
   for (const [name, f] of devices) {
@@ -230,16 +401,20 @@ function buildPseudowires(devices, owner, report) {
       used.add(`${name}#${i}`).add(`${peer}#${j}`);
       const other = g.pseudowires[j];
       if (other.service !== pw.service) report.warn(`PW ${pw.pw_id} ${name}-${peer}: service ${pw.service} at ${name}, ${other.service} at ${peer}`);
+      const ends = [pwEnd(name, f, pw, peer, tpTunnels, report), pwEnd(peer, g, other, name, tpTunnels, report)];
       pseudowires.push({
         id: `${pw.service ?? pw.name} ${name}-${peer}`,
         service: pw.service ?? pw.name,
         serviceType: pw.service_type ?? other.service_type ?? null,
         pwid: num(pw.pw_id),
-        ends: [pwEnd(name, f, pw, peer, report), pwEnd(peer, g, other, name, report)],
+        ...(ends.every((e) => e.underlay === 'mpls-tp') ? { static: true } : {}),
+        ends,
       });
     });
   }
   if (pseudowires.length) report.add('pw', 'facts', `${pseudowires.length} pseudowires`, 'paired by PW id where each end names the other as peer; transport from tunnel type and color');
+  const tp = pseudowires.filter((p) => p.static).length;
+  if (tp) report.add('pw', 'facts', `${tp} static pseudowires on MPLS-TP`, 'transmit / receive labels and the tunnel as configured');
   return pseudowires;
 }
 
@@ -288,50 +463,80 @@ function buildServices(pseudowires, megs) {
   }));
 }
 
+// Node positions: the authored ones when they place every device (see layout.js
+// scalePositions), else a force-directed layout of the links.
+function placeNodes(nodes, links, positions, report) {
+  const ids = nodes.map((n) => n.id);
+  if (positions) {
+    const { pos, missing } = scalePositions(ids, positions);
+    if (!missing.length) {
+      report.add('physical', 'authored', 'positions', 'from the positions file');
+      return pos;
+    }
+    report.warn(`positions: no position for ${missing.join(', ')}; the layout is computed instead`);
+  }
+  report.add('physical', 'derived', 'positions', 'the facts carry no layout: a force-directed layout of the links');
+  return layoutNodes(ids, links.map((l) => [l.a.node, l.b.node]));
+}
+
 // facts file (JSON text or value) -> { topology, file, devices, services, labelMode, report }
-export function importFacts(input, { name } = {}) {
+// `positions`: optional authored node positions (layout.js scalePositions).
+export function importFacts(input, { name, positions } = {}) {
   const file = parseFacts(input);
   const devices = devicesByName(file);
   const report = new Report();
   if (!devices.size) throw new Error('no device in this facts file has facts (status ok or partial)');
   for (const r of file.devices) if (!devices.has(r.device)) report.warn(`${r.device}: ${r.status}${r.reason ? ` (${r.reason})` : ''}; not shown`);
 
-  const nodes = buildNodes(devices, report);
-  const links = buildLinks(devices, nodes, report);
+  const igp = chooseIgp(devices, report);
+  const nodes = buildNodes(devices, igp, report);
+  const links = buildLinks(devices, nodes, igp, report);
   const owner = ownerIndex(devices);
   const bgp = buildBgp(devices, owner, report);
   const srgb = srgbOf(devices, report);
   const srPolicies = buildSrPolicies(devices, report);
-  const pseudowires = buildPseudowires(devices, owner, report);
+  const tpTunnels = buildTpTunnels(devices, links, report);
+  const pseudowires = buildPseudowires(devices, owner, tpTunnels, report);
   const megs = buildCfm(devices, pseudowires, report);
 
   // Roles: a router is a PE when it speaks BGP, ends a pseudowire or faces a CE.
   const edge = new Set([...bgp.sessions.flatMap((s) => [s.a, s.b]), ...pseudowires.flatMap((p) => p.ends.map((e) => e.node))]);
   for (const l of links) if (l.kind === 'access') for (const e of [l.a, l.b]) edge.add(e.node);
   for (const n of nodes) if (n.role !== 'ce' && edge.has(n.id)) n.role = 'pe';
-  report.add('physical', 'derived', 'roles', 'CE: no IS-IS; PE: a router that speaks BGP, ends a pseudowire or faces a CE; P: the other routers');
+  report.add('physical', 'derived', 'roles', `CE: no ${igp === 'ospf' ? 'OSPF' : 'IS-IS'} and no MPLS-TP tunnel; PE: a router that speaks BGP, ends a pseudowire or faces a CE; P: the other routers`);
 
   const levels = [...new Set([...devices.values()].map((f) => levelNumber(f.isis?.instances?.[0]?.level)).filter(Boolean))];
-  if (levels.length > 1) report.warn(`IS-IS levels ${levels.join(' and ')} mixed; the view runs one level (${levels[0]})`);
-  const areas = [...new Set([...devices.values()].map((f) => f.isis?.instances?.[0]).filter(Boolean).map(isisArea).filter(Boolean))];
-  if (nodes.some((n) => n.role !== 'ce')) report.add('isis', 'facts', 'IS-IS', `level ${levels[0] ?? 2}, area ${areas.join(', ') || '?'}; system ids from the NETs`);
+  const routers = nodes.filter((n) => n.role !== 'ce');
+  if (igp === 'isis') {
+    if (levels.length > 1) report.warn(`IS-IS levels ${levels.join(' and ')} mixed; the view runs one level (${levels[0]})`);
+    const areas = [...new Set([...devices.values()].map((f) => f.isis?.instances?.[0]).filter(Boolean).map(isisArea).filter(Boolean))];
+    if (routers.length) report.add('isis', 'facts', 'IS-IS', `level ${levels[0] ?? 2}, area ${areas.join(', ') || '?'}; system ids from the NETs`);
+  } else {
+    const instances = [...new Set([...devices.values()].flatMap((f) => ospfOf(f).instances.map((i) => i.name)))];
+    const noRid = routers.filter((n) => !n.routerId).map((n) => n.id);
+    report.add('ospf', 'facts', 'OSPF', `instance ${instances.join(', ')} on ${routers.length - noRid.length === routers.length ? 'every router' : `${routers.length - noRid.length} of ${routers.length} routers`}; the IGP of this view`);
+    report.add('ospf', noRid.length ? 'default' : 'facts', 'router ids', noRid.length ? `${noRid.join(', ')}: no router id configured, the loopback is used` : 'ospf instance router-id');
+  }
 
-  const positions = layoutNodes(nodes.map((n) => n.id), links.map((l) => [l.a.node, l.b.node]));
-  for (const n of nodes) n.pos = positions[n.id];
-  report.add('physical', 'derived', 'positions', 'the facts carry no layout: a force-directed layout of the links');
+  const placed = placeNodes(nodes, links, positions, report);
+  for (const n of nodes) n.pos = placed[n.id];
 
   const recipe = file.devices.find((r) => r.recipe)?.recipe;
+  // Labels: SR-MPLS with an SRGB; static only when MPLS-TP tunnels carry every pseudowire; else LDP.
+  const needsLdp = pseudowires.some((p) => p.ends.some((e) => e.underlay === 'ldp'));
+  const labelMode = srgb ? 'sr' : tpTunnels.length && !needsLdp ? 'none' : 'ldp';
   const topology = {
     name: name ?? recipe ?? 'facts import',
     asn: bgp.asn ?? 65000,
-    igp: 'isis',
-    isis: { level: levels[0] ?? 2 },
+    igp,
+    ...(igp === 'ospf' ? { ospf: { area: BACKBONE } } : { isis: { level: levels[0] ?? 2 } }),
     ...(srgb ? { srgb } : {}),
     nodes,
     links,
     vrfs: [],
     bgp: { sessions: bgp.sessions },
     srPolicies,
+    tpTunnels,
     pseudowires,
     cfm: { linkMegs: false, megs },
   };
@@ -340,7 +545,7 @@ export function importFacts(input, { name } = {}) {
     file,
     devices,
     services: buildServices(pseudowires, megs),
-    labelMode: srgb ? 'sr' : 'ldp',
+    labelMode,
     report: { topology, gaps: report.gaps, warnings: report.warnings },
   };
 }

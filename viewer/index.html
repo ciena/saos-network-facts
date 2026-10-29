@@ -20,6 +20,7 @@
 
         <section>
           <h2>Facts</h2>
+          <select id="lab-select" hidden aria-label="Lab"></select>
           <div class="row">
             <button id="facts-example" type="button" title="The Adaptive-SR-CFM lab bundled with this site">Example lab</button>
             <label class="file" title="A facts file written by saos-network-facts extract (schema 1.x)">Load your facts.json<input id="facts-file" type="file" accept=".json,application/json" /></label>
@@ -38,6 +39,7 @@
           <select id="walk-kind">
             <option value="vpws">VPWS frame over a pseudowire</option>
             <option value="ccm">CFM CCM stream (service MEG)</option>
+            <option value="tp">MPLS-TP tunnel BFD CC</option>
             <option value="isis">IS-IS LSP flood</option>
           </select>
           <div id="walk-params" class="row"></div>

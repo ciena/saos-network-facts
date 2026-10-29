@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// The facts panels: the overview (devices, services, SR policies, BGP), one
+// The facts panels: the overview (devices, services, SR policies, MPLS-TP tunnels, BGP), one
 // device (its facts record, then the engine's tables for it) and one service
 // (its pseudowire ends, transports and MEG). Links between them are hash
 // routes (#device=PE1, #service=...), handled by main.js.
@@ -31,6 +31,7 @@ function transportText(e) {
   if (t.error) return `down: ${t.error}`;
   if (t.kind === 'sr-policy') return `SR policy ${t.policy} [${t.stack.join(' ')}]`;
   if (t.kind === 'sr') return `Prefix-SID ${t.stack.join(' ')}`;
+  if (t.kind === 'mpls-tp') return `MPLS-TP ${t.tunnel}${t.switched ? ` (protecting ${t.configured})` : ''} [${t.stack.join(' ')}]`;
   return t.kind ?? e.underlay;
 }
 
@@ -53,7 +54,7 @@ export function renderOverview(el, imp, net) {
     ['service', 'ends', 'PW id', 'transport', 'state', 'MEG'],
     services.map((s) => {
       const pw = net.vpws.pseudowires.find((p) => p.id === s.pseudowire);
-      const kinds = [...new Set(pw.ends.map((e) => (e.transport.kind === 'sr-policy' ? 'SR policy' : e.transport.kind === 'sr' ? 'Prefix-SID' : e.transport.kind ?? 'down')))];
+      const kinds = [...new Set(pw.ends.map((e) => ({ 'sr-policy': 'SR policy', sr: 'Prefix-SID', 'mpls-tp': 'MPLS-TP' })[e.transport.kind] ?? e.transport.kind ?? 'down'))];
       return [{ html: serviceLink(s) }, { html: s.ends.map((e) => deviceLink(e.node)).join(' – ') }, pw.pwid, kinds.join(' / '), pw.state, s.meg];
     }),
   );
@@ -62,6 +63,13 @@ export function renderOverview(el, imp, net) {
     ['policy', 'headend', 'color', 'endpoint', 'segment list', 'path'],
     net.sr.policies.map((p) => [p.name, { html: deviceLink(p.headend) }, p.color, p.endpointNode ?? p.endpoint, p.segmentList.sids.join(' '), p.valid ? p.path.join(' > ') : p.reason]),
   );
+  if (net.tp.tunnels.length) {
+    html += '<h2>MPLS-TP tunnels</h2>';
+    html += table(
+      ['tunnel', 'role', 'path', 'OAM', 'state'],
+      net.tp.tunnels.map((t) => [t.id, t.role === 'backup' ? `backup of ${t.protects ?? '?'}` : t.role, t.path.join(' > '), t.oam ? `${t.oam.kind.toUpperCase()}${t.oam.intervalMs ? ` ${t.oam.intervalMs} ms` : ''}` : null, `${t.state}${t.reasons.length ? ` (${t.reasons.join('; ')})` : ''}`]),
+    );
+  }
   html += '<h2>BGP sessions</h2>';
   html += table(
     ['a', 'b', 'RR client', 'state'],
@@ -102,6 +110,20 @@ export function renderDevice(el, imp, net, id) {
       ['system id', isis.system_id],
       ['segment routing', isis.sr_enabled === null || isis.sr_enabled === undefined ? null : isis.sr_enabled ? 'enabled' : 'disabled'],
     ]);
+  }
+  const ospf = (f.ospf?.instances ?? [])[0];
+  if (ospf) {
+    html += '<h2>OSPF</h2>';
+    html += kv([
+      ['instance', ospf.name],
+      ['router id', ospf.router_id],
+      ['VRF', ospf.vrf],
+      ['areas', ospf.areas.map((a) => `${a.area}${a.type ? ` (${a.type})` : ''}`).join(', ')],
+    ]);
+    html += table(
+      ['interface', 'area', 'type', 'metric', 'passive', 'BFD'],
+      (f.ospf.interfaces ?? []).filter((i) => i.instance === ospf.name).map((i) => [i.interface, i.area, i.type, i.metric, i.passive ? 'yes' : 'no', i.bfd ? 'yes' : 'no']),
+    );
   }
   if (sr && (srgb || sid)) {
     html += '<h2>Segment routing</h2>';
@@ -156,7 +178,9 @@ export function renderService(el, imp, net, id, actions) {
     ['end', 'AC', 'PW label in / out', 'transport', 'path'],
     pw.ends.map((e) => [{ html: deviceLink(e.node) }, `${dash(e.ac.name)} (port ${dash(e.ac.port)})`, `${e.localLabel} / ${e.remoteLabel}`, transportText(e), e.transport.path ? e.transport.path.join(' > ') : `${e.node} > … > ${e.peer} (IGP shortest path)`]),
   );
-  html += `<p class="sub">Targeted LDP between the loopbacks: ${esc(pw.tldp)}. PW labels are allocated by the view (the facts carry none for LDP-signalled PWs).</p>`;
+  html += pw.static
+    ? '<p class="sub">Static pseudowire: the PW labels are configured at each end (no targeted LDP).</p>'
+    : `<p class="sub">Targeted LDP between the loopbacks: ${esc(pw.tldp)}. PW labels are allocated by the view (the facts carry none for LDP-signalled PWs).</p>`;
   if (meg) {
     html += '<h2>CFM</h2>';
     html += kv([

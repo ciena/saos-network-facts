@@ -49,8 +49,9 @@ jobs:
           node-version: 22
       - name: Package the release assets
         if: steps.release.outputs.release == 'true'
-        # scripts/package-release.sh <dir> writes the files to attach (a zip, a single-file
-        # build, a wheel, ...) into <dir>. Without it the release carries the notes only.
+        # scripts/package-release.sh <dir> writes the files to attach into <dir>: here the
+        # wheel and sdist, the npm tarball and the built viewer site
+        # (saos-network-facts-viewer-X.Y.Z.tgz). Without it the release carries the notes only.
         run: |
           set -euo pipefail
           if [ -x scripts/package-release.sh ]; then

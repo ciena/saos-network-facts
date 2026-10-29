@@ -119,12 +119,17 @@ def test_platform_map_shorthand_and_configs(tmp_path):
         extract.load_platform_map(tmp_path / "bad.yaml")
 
 
-def test_fixtures_are_synthetic():
-    """Only documentation / private address space in the fixtures (RFC 5737, RFC 1918) and no secrets."""
+def test_fixtures_have_no_secrets():
+    """No secrets in the fixtures. Addresses are checked on every tracked file by
+    scripts/check_addresses.py (tests/test_check_addresses.py)."""
     import re
     for path in FIXTURES.rglob("*"):
         if path.is_file() and path.suffix != ".json":
-            text = path.read_text()
-            for ip in re.findall(r"\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b", text):
-                assert ip.startswith(("192.0.2.", "198.51.100.", "203.0.113.", "10.")), f"{path.name}: {ip}"
-            assert not re.search(r"password|secret|token", text, re.I), path.name
+            assert not re.search(r"password|secret|token", path.read_text(), re.I), path.name
+
+
+def test_leaf_deletes_create_no_port():
+    (pe5,) = run_case("leaf-delete")["devices"]
+    assert pe5["status"] == "ok"
+    assert [i["name"] for i in pe5["facts"]["interfaces"]] == ["lb0", "core1"]
+    assert list(pe5["facts"]["ports"]) == ["1"]

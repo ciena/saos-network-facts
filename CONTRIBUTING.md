@@ -41,6 +41,11 @@ Fixtures are synthetic (written for this repo, documentation address space only:
 [ciena/saos-labs](https://github.com/ciena/saos-labs). Never commit configurations from a real lab
 or customer, or anything derived from them.
 
+Every address in the repository (any tracked file, not only fixtures) must be private or for
+documentation: RFC 1918 (10/8, 172.16/12, 192.168/16), RFC 5737 (192.0.2/24, 198.51.100/24,
+203.0.113/24), 0.0.0.0, and for IPv6 2001:db8::/32, :: and ::1. `scripts/check_addresses.py`
+checks it in CI; run it before you push. Renumber a lab's other addresses into those ranges.
+
 ## Changelog and versioning
 
 Every PR updates `CHANGELOG.md` (or carries the `skip-changelog` label) and cuts a release: rename

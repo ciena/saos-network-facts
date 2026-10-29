@@ -9,3 +9,9 @@ mixed:
   platform_map: labs/mixed/platform-map.yaml
 mixed-detected:
   configs: [labs/mixed]
+ospf-tp:
+  configs: [labs/ospf-tp]
+  platform_map: labs/ospf-tp/platform-map.yaml
+leaf-delete:
+  configs: [labs/leaf-delete]
+  platform_map: labs/leaf-delete/platform-map.yaml
