@@ -326,7 +326,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.0 (recorded)",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "schema_version": "1.0.0"
 }
