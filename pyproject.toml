@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "saos-network-facts"
+version = "0.1.0"
+description = "Extract per-device network facts from SAOS 6/8/10 configurations into a versioned schema."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = [
+  "jsonschema>=4.18",
+  "pyyaml>=6.0",
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Networking",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+saos-network-facts = "saos_network_facts.cli:main"
+
+[project.urls]
+Repository = "https://github.com/ciena/saos-network-facts"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saos_network_facts"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/js/package.json", "/js/schema", "/README.md", "/CHANGELOG.md", "/LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E741"]

@@ -1,0 +1,75 @@
+name: Release
+
+# Every PR cuts its release in CHANGELOG.md (the `changelog` job enforces it with
+# scripts/changelog.py check). When the PR merges, this workflow tags main vX.Y.Z and
+# creates the GitHub Release with that changelog section as the notes. A repo that
+# ships downloads adds scripts/package-release.sh <dir>: whatever it writes into
+# <dir> is attached to the release. A top release that is already tagged is skipped,
+# so re-runs and skip-changelog merges are safe; workflow_dispatch cuts (or re-attempts)
+# the release for the version main is at right now.
+
+on:
+  push:
+    branches: [main]
+    paths: [CHANGELOG.md]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the release from CHANGELOG.md
+        id: release
+        run: |
+          set -euo pipefail
+          version="$(python3 scripts/changelog.py version)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "v$version is already tagged; nothing to release"
+            exit 0
+          fi
+          python3 scripts/changelog.py notes "$version" > "$RUNNER_TEMP/notes.md"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "Cutting v$version"
+      - uses: actions/setup-python@v5
+        if: steps.release.outputs.release == 'true'
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        if: steps.release.outputs.release == 'true'
+        with:
+          node-version: 22
+      - name: Package the release assets
+        if: steps.release.outputs.release == 'true'
+        # scripts/package-release.sh <dir> writes the files to attach (a zip, a single-file
+        # build, a wheel, ...) into <dir>. Without it the release carries the notes only.
+        run: |
+          set -euo pipefail
+          if [ -x scripts/package-release.sh ]; then
+            scripts/package-release.sh release
+            ls -l release/
+          else
+            echo "no scripts/package-release.sh — the release carries notes only"
+          fi
+      - name: Tag and create the GitHub Release
+        if: steps.release.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          assets=()
+          for f in release/*; do [ -f "$f" ] && assets+=("$f"); done
+          gh release create "v$VERSION" "${assets[@]}" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md"
+          echo "::notice::Released v$VERSION: $(gh release view "v$VERSION" --json url --jq .url)"

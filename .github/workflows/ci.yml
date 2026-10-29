@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e '.[dev]'
+      - name: ruff
+        run: ruff check .
+      - name: pytest (no network: SAOS 10 pivots are recorded in tests/fixtures/pivots.json)
+        run: pytest -q
+      - name: validate the fixtures against the schema
+        run: saos-network-facts validate tests/fixtures/expected/*.json
+      - name: extract the SAOS 6 fixtures with the CLI
+        run: |
+          saos-network-facts extract --configs tests/fixtures/labs/mixed --no-saos10 -o "$RUNNER_TEMP/facts.json"
+          saos-network-facts validate "$RUNNER_TEMP/facts.json"
+
+  js:
+    name: js (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    defaults:
+      run:
+        working-directory: js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: js/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: schema copy and generated types are up to date
+        run: npm run check-generated
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm pack --dry-run

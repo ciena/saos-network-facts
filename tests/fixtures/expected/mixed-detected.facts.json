@@ -1,0 +1,332 @@
+{
+  "devices": [
+    {
+      "device": "AGG1",
+      "extractor": "saos6",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": [
+            {
+              "direction": "up",
+              "interface": null,
+              "level": "4",
+              "ma": "MA-200",
+              "md": null,
+              "mep_id": "21",
+              "port": "3",
+              "service": "VS200",
+              "vlan": "200"
+            }
+          ]
+        },
+        "gateway": "203.0.113.254",
+        "hostname": "AGG1",
+        "interfaces": [
+          {
+            "ip": "203.0.113.10/32",
+            "kind": "loopback",
+            "name": "lb0",
+            "vlan": null,
+            "vs": null
+          },
+          {
+            "ip": "198.51.100.10/31",
+            "kind": "ip",
+            "name": "core1",
+            "vlan": "100",
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "area": "49.0002",
+              "area_id": "49.0002",
+              "level": "L2",
+              "name": "CORE",
+              "net": "49.0002.2030.0011.3010.00",
+              "nets": [
+                "49.0002.2030.0011.3010.00"
+              ],
+              "sr_enabled": null,
+              "system_id": "2030.0011.3010"
+            }
+          ],
+          "interfaces": [
+            {
+              "instance": "CORE",
+              "interface": "core1",
+              "level": "L2",
+              "type": null
+            }
+          ]
+        },
+        "lags": [
+          {
+            "members": [
+              "1",
+              "2"
+            ],
+            "name": "LAG1"
+          }
+        ],
+        "lines": 23,
+        "peers": [
+          {
+            "ip": "203.0.113.30",
+            "kind": "mpls-vc",
+            "name": "VC1"
+          }
+        ],
+        "ports": {
+          "1": {
+            "description": "to PE3",
+            "lag": "LAG1",
+            "roles": [],
+            "vlans": []
+          },
+          "2": {
+            "description": "to PE3",
+            "lag": "LAG1",
+            "roles": [],
+            "vlans": []
+          },
+          "3": {
+            "description": "customer A",
+            "lag": null,
+            "roles": [
+              "virtual-switch",
+              "cfm-mep"
+            ],
+            "vlans": [
+              "200"
+            ]
+          },
+          "LAG1": {
+            "description": null,
+            "lag": null,
+            "roles": [],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [
+          {
+            "in_label": "8001",
+            "kind": "static",
+            "mode": null,
+            "name": "VC1",
+            "out_label": "8002",
+            "peer": "203.0.113.30",
+            "pw_id": "201",
+            "service": null,
+            "service_type": null,
+            "tunnel": "TUN1"
+          },
+          {
+            "in_label": null,
+            "kind": "dynamic",
+            "mode": "mesh",
+            "name": "VC2",
+            "out_label": null,
+            "peer": "203.0.113.30",
+            "pw_id": "202",
+            "service": "VS200",
+            "service_type": null,
+            "tunnel": null
+          }
+        ],
+        "recognised": 20,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": []
+        },
+        "sub_ports": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "LAG1"
+            ]
+          },
+          "200": {
+            "ports": [
+              "3"
+            ]
+          }
+        }
+      },
+      "status": "ok",
+      "templates": [
+        "AGG1.cfg"
+      ],
+      "type": null
+    },
+    {
+      "device": "PE3",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": []
+        },
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-CORE"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-CORE",
+            "logical_port": "1",
+            "name": "FP-CORE"
+          }
+        ],
+        "gateway": null,
+        "hostname": "PE3",
+        "interfaces": [
+          {
+            "description": null,
+            "fd": null,
+            "ip": "203.0.113.30/32",
+            "ipv4": [
+              "203.0.113.30/32"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "loopback",
+            "mtu": null,
+            "name": "lb0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-CORE",
+            "ip": "198.51.100.11/31",
+            "ipv4": [
+              "198.51.100.11/31"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": null,
+            "name": "core1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "area": "49.0002.2030.0011.3030.00",
+              "area_id": "49.0002",
+              "level": "level-2",
+              "name": "CORE",
+              "net": "49.0002.2030.0011.3030.00",
+              "nets": [
+                "49.0002.2030.0011.3030.00"
+              ],
+              "sr_enabled": true,
+              "system_id": "2030.0011.3030"
+            }
+          ],
+          "interfaces": [
+            {
+              "instance": "CORE",
+              "interface": "core1",
+              "level": "level-2",
+              "type": "point-to-point"
+            },
+            {
+              "instance": "CORE",
+              "interface": "lb0",
+              "level": null,
+              "type": "point-to-point"
+            }
+          ]
+        },
+        "lags": [],
+        "lines": 10,
+        "objects": 10,
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          }
+        },
+        "pseudowires": [],
+        "recognised": 10,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [
+            {
+              "interface": "lb0",
+              "node": true,
+              "prefix": "203.0.113.30/32",
+              "sid": "17030",
+              "value_type": "absolute"
+            }
+          ],
+          "segment_lists": {},
+          "srgb": [
+            {
+              "instance": "CORE",
+              "lower": "17000",
+              "upper": "17999"
+            }
+          ]
+        },
+        "segments": [],
+        "sub_ports": [],
+        "vlans": {},
+        "vrfs": [
+          "CUST-A"
+        ]
+      },
+      "failed_templates": [
+        {
+          "error": "Unknown top-level command: frobnicate",
+          "template": "PE3/03-broken.cfg"
+        }
+      ],
+      "reason": "PE3/03-broken.cfg: Unknown top-level command: frobnicate",
+      "status": "partial",
+      "templates": [
+        "PE3/01-base.cfg",
+        "PE3/02-services.xml",
+        "PE3/03-broken.cfg"
+      ],
+      "type": null
+    }
+  ],
+  "generator": {
+    "name": "saos-network-facts",
+    "translator": "translator 4.2.0 (recorded)",
+    "version": "0.1.0"
+  },
+  "schema_version": "1.0.0"
+}
