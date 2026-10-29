@@ -89,6 +89,26 @@ def test_no_translator_skips_saos10_only():
     assert records[1]["reason"] == "no translator"
 
 
+class NoCalls:
+    """A translator that must not be called."""
+
+    def parse(self, text, fmt, platform=None):
+        raise AssertionError("translator called")
+
+
+def test_saos10_without_a_platform_is_an_error_before_any_call(tmp_path):
+    by = {d.name: extract.device_facts(d, NoCalls()) for d in case_devices("mixed-detected")}
+    assert by["PE3"]["extractor"] == "saos10" and by["PE3"]["status"] == "error" and by["PE3"]["facts"] is None
+    assert "platform" not in by["PE3"]
+    assert by["PE3"]["reason"] == ("no SAOS 10 platform for PE3 (PE3/01-base.cfg, PE3/02-services.xml, PE3/03-broken.cfg): "
+                                   "the translator needs one; set its type (5164-10x) or platform (cn5164) in --platform-map")
+    assert by["AGG1"]["status"] == "ok"
+    (tmp_path / "map.yaml").write_text("devices:\n  PE3:\n    platform: cn5164\n")
+    devices = extract.collect([FIXTURES / "labs/mixed"], platform_map=tmp_path / "map.yaml")
+    pe3 = extract.device_facts(next(d for d in devices if d.name == "PE3"), RecordedTranslator())
+    assert pe3["platform"] == "cn5164" and pe3["status"] == "partial"
+
+
 def test_detect_extractor():
     assert extract.detect_extractor(["<config/>"]) == "saos10"
     assert extract.detect_extractor(["config\nsystem config hostname A\nfds fd X mode vpls\n"]) == "saos10"

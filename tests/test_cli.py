@@ -3,7 +3,7 @@ import json
 import subprocess
 import sys
 
-from recorded import EXPECTED, FIXTURES
+from recorded import EXPECTED, FIXTURES, RecordedTranslator
 
 from saos_network_facts import SCHEMA_VERSION, __version__, cli
 
@@ -17,6 +17,14 @@ def test_extract_saos6_without_translator(tmp_path, capsys):
     assert doc["generator"] == {"name": "saos-network-facts", "version": __version__, "translator": None}
     assert [(r["device"], r["status"], r["recipe"]) for r in doc["devices"]] == [("AGG1", "ok", "mixed"), ("PE3", "skipped", "mixed")]
     assert "devices 2 / ok 1" in capsys.readouterr().err
+    assert cli.main(["validate", str(out)]) == 0
+
+
+def test_extract_saos10_without_a_platform(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(cli, "load_translator", lambda *a: RecordedTranslator())
+    out = tmp_path / "facts.json"
+    assert cli.main(["extract", "--configs", str(FIXTURES / "labs/mixed"), "-o", str(out)]) == 1
+    assert "ERROR   PE3 (None) no SAOS 10 platform for PE3" in capsys.readouterr().err
     assert cli.main(["validate", str(out)]) == 0
 
 
