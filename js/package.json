@@ -1,0 +1,45 @@
+{
+  "name": "@ciena/saos-network-facts",
+  "version": "0.1.0",
+  "description": "Schema, TypeScript types and a reader for saos-network-facts facts files (per-device facts from SAOS 6/8/10 configurations).",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ciena/saos-network-facts.git",
+    "directory": "js"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./schema": "./schema/facts-v1.schema.json"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "check-generated": "node scripts/generate.mjs --check",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "prepack": "cp ../LICENSE ../NOTICE . && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "json-schema-to-typescript": "15.0.4",
+    "typescript": "5.9.3"
+  }
+}

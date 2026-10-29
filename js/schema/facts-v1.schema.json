@@ -1,0 +1,1347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ciena/saos-network-facts/schema/facts-v1.schema.json",
+  "title": "FactsFile",
+  "description": "Per-device network facts extracted from SAOS 6 / 8 / 10 configurations (saos-network-facts). Schema 1.x: minor versions only add optional fields, so a reader must ignore fields it does not know.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\.\\d+\\.\\d+$",
+      "description": "The schema version the file follows (semver; this schema is 1.x)."
+    },
+    "generator": {
+      "$ref": "#/$defs/Generator"
+    },
+    "devices": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DeviceRecord"
+      },
+      "description": "One record per device, in input order."
+    }
+  },
+  "required": [
+    "schema_version",
+    "generator",
+    "devices"
+  ],
+  "$defs": {
+    "Generator": {
+      "title": "Generator",
+      "type": "object",
+      "description": "What wrote the file.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The producing tool (`saos-network-facts`)."
+        },
+        "version": {
+          "type": "string",
+          "description": "The producing tool's version."
+        },
+        "translator": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SAOS 10 translator used, as `translator <version> (<backend>)`; null when none was needed or used."
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "translator"
+      ]
+    },
+    "FailedTemplate": {
+      "title": "FailedTemplate",
+      "type": "object",
+      "description": "A configuration file the SAOS 10 translator could not parse.",
+      "properties": {
+        "template": {
+          "type": "string",
+          "description": "The file, as in `templates`."
+        },
+        "error": {
+          "type": "string",
+          "description": "The translator's message (first line)."
+        }
+      },
+      "required": [
+        "template",
+        "error"
+      ]
+    },
+    "DeviceRecord": {
+      "title": "DeviceRecord",
+      "type": "object",
+      "description": "One device: where its facts came from, whether extraction worked, and the facts.",
+      "properties": {
+        "recipe": {
+          "type": "string",
+          "description": "Optional label for the lab / recipe / design the device belongs to (`extract --recipe`)."
+        },
+        "device": {
+          "type": "string",
+          "description": "The device name: the containerlab node, the platform-map key, or the configuration file name up to its first dot."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The device type as given by the inputs (`5164-10x`, `3930-6x`, a containerlab `type` such as `5164`); null when unknown."
+        },
+        "platform": {
+          "type": "string",
+          "description": "SAOS 10 only: the translator platform the files were parsed for (`cn5164`)."
+        },
+        "extractor": {
+          "enum": [
+            "saos6",
+            "saos10",
+            null
+          ],
+          "description": "`saos6` (SAOS 6 and SAOS 8 CLI, parsed directly), `saos10` (CLI or NETCONF XML through the translator's pivot JSON), or null when no extractor applies."
+        },
+        "templates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The device's configuration files, in the order they were applied (relative to the configs directory or the clab file)."
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "partial",
+            "error",
+            "skipped"
+          ],
+          "description": "`ok`: every file was read. `partial`: some SAOS 10 files failed (see `failed_templates`); `facts` holds the rest. `error`: nothing could be read. `skipped`: no extractor, no configuration, or no translator (`--no-saos10`); see `reason`."
+        },
+        "facts": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Facts"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The device's facts; null when `status` is `error` or `skipped`."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why the status is not `ok`."
+        },
+        "failed_templates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FailedTemplate"
+          },
+          "description": "`partial` / `error` SAOS 10 devices: the files the translator refused."
+        }
+      },
+      "required": [
+        "device",
+        "type",
+        "extractor",
+        "templates",
+        "status",
+        "facts"
+      ]
+    },
+    "Interface": {
+      "title": "Interface",
+      "type": "object",
+      "description": "A layer-3 interface: loopback, IP interface, management interface (SAOS 6), or any SAOS 10 openconfig interface that is not a physical port.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The interface name (`remote` / `local` for the SAOS 6 management interfaces)."
+        },
+        "kind": {
+          "type": "string",
+          "description": "SAOS 6: `loopback`, `ip` or `management`. SAOS 10: the interface type as configured (`loopback`, `ip`, `lag`, `point-to-point`, ...)."
+        },
+        "ip": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The (first IPv4) address with its prefix length, as written (`192.0.2.1/32`)."
+        },
+        "vlan": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 6: the VLAN the IP interface sits on. Null on SAOS 10 (see `fd`)."
+        },
+        "vs": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 6: the virtual switch the IP interface sits on."
+        },
+        "ipv4": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SAOS 10: every IPv4 address, `ip/len`."
+        },
+        "ipv6": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SAOS 10: every IPv6 address, `ip/len`."
+        },
+        "fd": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 10: the forwarding domain the interface is bound to (underlay binding); a flow point on the same fd ties it to a port."
+        },
+        "vrf": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 10: the VRF the interface is in."
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 10: the interface description."
+        },
+        "mtu": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 10: the MTU as written."
+        },
+        "isis": {
+          "type": "string",
+          "description": "SAOS 10: the IS-IS instance the interface is attached to."
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "ip",
+        "vlan",
+        "vs"
+      ]
+    },
+    "Transmitter": {
+      "title": "Transmitter",
+      "type": "object",
+      "description": "SAOS 10: the optical transmitter configured on a port (`ptps`).",
+      "properties": {
+        "frequency": {
+          "type": "string",
+          "description": "Frequency in GHz, as written."
+        },
+        "state": {
+          "type": "string",
+          "description": "Transmitter state."
+        },
+        "power": {
+          "type": "string",
+          "description": "Transmit power, as written."
+        }
+      },
+      "required": []
+    },
+    "Port": {
+      "title": "Port",
+      "type": "object",
+      "description": "A physical port, LAG or SAOS 10 logical port, keyed by its name.",
+      "properties": {
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The port description."
+        },
+        "vlans": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "VLANs the port carries: SAOS 6 VLAN membership; SAOS 10 the VLANs of the classifiers on the flow points that use the port."
+        },
+        "lag": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The LAG the port is a member of."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What uses the port: `aggregation`, `sub-port`, `virtual-switch`, `ring`, `cfm-mep` (SAOS 6), `fp`, `cfm-mep` (SAOS 10)."
+        },
+        "binding": {
+          "type": "string",
+          "description": "SAOS 10: the logical port's binding."
+        },
+        "ptp_id": {
+          "type": "string",
+          "description": "SAOS 10: the ettp interface's PTP id."
+        },
+        "port_speed": {
+          "type": "string",
+          "description": "SAOS 10: the ettp interface's port speed."
+        },
+        "auto_negotiation": {
+          "type": "string",
+          "description": "SAOS 10: the ettp interface's auto-negotiation setting."
+        },
+        "tx": {
+          "$ref": "#/$defs/Transmitter"
+        },
+        "xcvr_mode": {
+          "type": "string",
+          "description": "SAOS 10: the pluggable's mode (`400GZR+`, ...)."
+        }
+      },
+      "required": [
+        "description",
+        "vlans",
+        "lag",
+        "roles"
+      ]
+    },
+    "Vlan": {
+      "title": "Vlan",
+      "type": "object",
+      "description": "A VLAN and the ports that carry it.",
+      "properties": {
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ports (or LAGs) in the VLAN."
+        }
+      },
+      "required": [
+        "ports"
+      ]
+    },
+    "Lag": {
+      "title": "Lag",
+      "type": "object",
+      "description": "A link aggregation group.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The LAG name."
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Member ports."
+        }
+      },
+      "required": [
+        "name",
+        "members"
+      ]
+    },
+    "SubPort": {
+      "title": "SubPort",
+      "type": "object",
+      "description": "SAOS 6 sub-port.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Sub-port name."
+        },
+        "parent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Parent port."
+        }
+      },
+      "required": [
+        "name",
+        "parent"
+      ]
+    },
+    "Ring": {
+      "title": "Ring",
+      "type": "object",
+      "description": "SAOS 6 G.8032 logical ring.",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Ring name."
+        },
+        "west": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "West port."
+        },
+        "east": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "East port."
+        }
+      },
+      "required": [
+        "name",
+        "west",
+        "east"
+      ]
+    },
+    "Peer": {
+      "title": "Peer",
+      "type": "object",
+      "description": "A remote end the device is configured to talk to.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "`mpls-vc` (SAOS 6 static VC), `tp-tunnel` (SAOS 6 MPLS-TP tunnel end) or `bgp` (SAOS 10 BGP neighbour)."
+        },
+        "name": {
+          "type": "string",
+          "description": "The VC or tunnel name; for `bgp` the local AS as `as<N>`."
+        },
+        "ip": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The peer address."
+        },
+        "role": {
+          "type": "string",
+          "description": "`tp-tunnel`: `dest-ip` or `src-ip`."
+        },
+        "remote_as": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`bgp`: the neighbour's AS."
+        },
+        "route_reflector_client": {
+          "type": "boolean",
+          "description": "`bgp`: the neighbour is a route-reflector client of this device in at least one address family."
+        },
+        "address_families": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "`bgp`: the neighbour's address families, `<afi> <safi>` (`vpnv4 unicast`, `l2vpn evpn`)."
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "ip"
+      ]
+    },
+    "IsisInstance": {
+      "title": "IsisInstance",
+      "type": "object",
+      "description": "An IS-IS instance.",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The instance tag / name."
+        },
+        "level": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The level as written: SAOS 6 `L1` / `L2` / `L1L2`, SAOS 10 `level-1` / `level-2` / `level-1-2`."
+        },
+        "area": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Kept for compatibility, as written: SAOS 6 the area (`49.0011`), SAOS 10 the first NET. Use `area_id` and `net`."
+        },
+        "nets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every NET configured on the instance."
+        },
+        "net": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The first NET (`49.0001.1920.0000.2001.00`)."
+        },
+        "area_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The area: the NET without its system id and NSEL (`49.0001`); SAOS 6 the configured area when no NET is set."
+        },
+        "system_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The system id part of the NET (`1920.0000.2001`)."
+        },
+        "sr_enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "SAOS 10: segment routing is enabled on the instance; null when not configured."
+        }
+      },
+      "required": [
+        "name",
+        "level",
+        "area",
+        "nets",
+        "net",
+        "area_id",
+        "system_id",
+        "sr_enabled"
+      ]
+    },
+    "IsisInterface": {
+      "title": "IsisInterface",
+      "type": "object",
+      "description": "An interface attached to an IS-IS instance.",
+      "properties": {
+        "interface": {
+          "type": "string",
+          "description": "The interface name (see `interfaces`)."
+        },
+        "instance": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The IS-IS instance."
+        },
+        "level": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The interface's level, as written; null when it follows the instance."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The interface type (`point-to-point`, `broadcast`); null when not configured."
+        }
+      },
+      "required": [
+        "interface",
+        "instance",
+        "level",
+        "type"
+      ]
+    },
+    "Isis": {
+      "title": "Isis",
+      "type": "object",
+      "description": "IS-IS instances and their interfaces.",
+      "properties": {
+        "instances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IsisInstance"
+          },
+          "description": "IS-IS instances."
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IsisInterface"
+          },
+          "description": "Interface attachments."
+        }
+      },
+      "required": [
+        "instances",
+        "interfaces"
+      ]
+    },
+    "Srgb": {
+      "title": "LabelBlock",
+      "type": "object",
+      "description": "A segment-routing label block (SRGB).",
+      "properties": {
+        "instance": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The IS-IS instance that sets it."
+        },
+        "lower": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Lowest label."
+        },
+        "upper": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Highest label."
+        }
+      },
+      "required": [
+        "instance",
+        "lower",
+        "upper"
+      ]
+    },
+    "PrefixSid": {
+      "title": "PrefixSid",
+      "type": "object",
+      "description": "A prefix SID (SAOS 10 connected-prefix-sid-map).",
+      "properties": {
+        "prefix": {
+          "type": "string",
+          "description": "The prefix (`192.0.2.1/32`)."
+        },
+        "interface": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The interface the prefix is on."
+        },
+        "sid": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SID value, as written: an index into the SRGB or an absolute label, per `value_type`."
+        },
+        "value_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`index` or `absolute`."
+        },
+        "node": {
+          "type": "boolean",
+          "description": "A node SID: a host prefix (/32, /128) on a loopback."
+        }
+      },
+      "required": [
+        "prefix",
+        "interface",
+        "sid",
+        "value_type",
+        "node"
+      ]
+    },
+    "CandidatePath": {
+      "title": "CandidatePath",
+      "type": "object",
+      "description": "A candidate path of an SR policy.",
+      "properties": {
+        "origin": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Protocol origin (`local`, ...)."
+        },
+        "originator": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Originator address."
+        },
+        "discriminator": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Discriminator."
+        },
+        "preference": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Preference; the highest valid path is active."
+        },
+        "flex_algorithm": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Flex-algorithm, for a dynamic path."
+        },
+        "segment_lists": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names of the explicit segment lists (see `segment_lists`)."
+        }
+      },
+      "required": [
+        "origin",
+        "originator",
+        "discriminator",
+        "preference",
+        "flex_algorithm",
+        "segment_lists"
+      ]
+    },
+    "SrPolicy": {
+      "title": "SrPolicy",
+      "type": "object",
+      "description": "An SR-TE policy, keyed by color and endpoint.",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Policy name."
+        },
+        "color": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Color."
+        },
+        "endpoint": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Endpoint address."
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Source address."
+        },
+        "candidate_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CandidatePath"
+          },
+          "description": "Candidate paths."
+        }
+      },
+      "required": [
+        "name",
+        "color",
+        "endpoint",
+        "source",
+        "candidate_paths"
+      ]
+    },
+    "SegmentRouting": {
+      "title": "SegmentRouting",
+      "type": "object",
+      "description": "Segment routing (SR-MPLS / SRv6). SAOS 10 only; empty on SAOS 6 / 8.",
+      "properties": {
+        "srgb": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Srgb"
+          },
+          "description": "SRGBs, one per IS-IS instance that sets one."
+        },
+        "prefix_sids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PrefixSid"
+          },
+          "description": "Prefix and node SIDs."
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SrPolicy"
+          },
+          "description": "SR-TE policies."
+        },
+        "segment_lists": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "SIDs in order."
+          },
+          "description": "Explicit segment lists by name: the SIDs (labels or SRv6 SIDs) in order."
+        }
+      },
+      "required": [
+        "srgb",
+        "prefix_sids",
+        "policies",
+        "segment_lists"
+      ]
+    },
+    "BgpInstance": {
+      "title": "BgpInstance",
+      "type": "object",
+      "description": "A BGP instance (SAOS 10).",
+      "properties": {
+        "as": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The local AS."
+        },
+        "router_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Router id."
+        },
+        "cluster_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Route-reflector cluster id; null when not set."
+        },
+        "route_reflector": {
+          "type": "boolean",
+          "description": "The device reflects routes: at least one neighbour of the instance is a route-reflector client."
+        }
+      },
+      "required": [
+        "as",
+        "router_id",
+        "cluster_id",
+        "route_reflector"
+      ]
+    },
+    "Bgp": {
+      "title": "Bgp",
+      "type": "object",
+      "description": "BGP instances; the neighbours are `peers` of kind `bgp`.",
+      "properties": {
+        "instances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BgpInstance"
+          },
+          "description": "BGP instances."
+        }
+      },
+      "required": [
+        "instances"
+      ]
+    },
+    "Pseudowire": {
+      "title": "Pseudowire",
+      "type": "object",
+      "description": "A pseudowire (VPWS / VPLS spoke or mesh PW).",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The pseudowire / VC name."
+        },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 6: `static` or `dynamic` (LDP) VC. SAOS 10: `configured` (ietf-pseudowires)."
+        },
+        "peer": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The far-end PE address."
+        },
+        "pw_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The PW / VC id."
+        },
+        "in_label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Static PW: receive label."
+        },
+        "out_label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Static PW: transmit label."
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`mesh` or `spoke`, as configured."
+        },
+        "tunnel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The tunnel the PW rides on, when configured (MPLS-TP tunnel name)."
+        },
+        "service": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The service carrying the PW: SAOS 6 the virtual switch it is attached to, SAOS 10 the l2vpn service."
+        },
+        "service_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 10: `vpws` or `vpls`, from the mode of the service's forwarding domain; null when unknown."
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "peer",
+        "pw_id",
+        "in_label",
+        "out_label",
+        "mode",
+        "tunnel",
+        "service",
+        "service_type"
+      ]
+    },
+    "Mep": {
+      "title": "Mep",
+      "type": "object",
+      "description": "A CFM maintenance-association end point on this device.",
+      "properties": {
+        "md": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Maintenance domain (SAOS 10 MD id; null on SAOS 6, where the MA carries the level)."
+        },
+        "ma": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Maintenance association (SAOS 10 MA id, SAOS 6 CFM service name)."
+        },
+        "mep_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The MEP id."
+        },
+        "level": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The MD level."
+        },
+        "direction": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`up` or `down`."
+        },
+        "interface": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 10: the flow point the MEP sits on; SAOS 6: the sub-port, when it is on one."
+        },
+        "port": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The port the MEP sits on (SAOS 10: the flow point's logical port)."
+        },
+        "vlan": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The VLAN of the MEP (SAOS 10: from the flow point's classifier)."
+        },
+        "service": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 10: the MA's forwarding domain; SAOS 6: the CFM service's virtual switch."
+        }
+      },
+      "required": [
+        "md",
+        "ma",
+        "mep_id",
+        "level",
+        "direction",
+        "interface",
+        "port",
+        "vlan",
+        "service"
+      ]
+    },
+    "Cfm": {
+      "title": "Cfm",
+      "type": "object",
+      "description": "Ethernet CFM (802.1ag / Y.1731).",
+      "properties": {
+        "meps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Mep"
+          },
+          "description": "Local MEPs."
+        }
+      },
+      "required": [
+        "meps"
+      ]
+    },
+    "Fd": {
+      "title": "ForwardingDomain",
+      "type": "object",
+      "description": "SAOS 10 forwarding domain.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name."
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`vpls`, `vpws`, `vlan`, ..."
+        }
+      },
+      "required": [
+        "name",
+        "mode"
+      ]
+    },
+    "Fp": {
+      "title": "FlowPoint",
+      "type": "object",
+      "description": "SAOS 10 flow point: a logical port's attachment to a forwarding domain.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name."
+        },
+        "fd": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Forwarding domain."
+        },
+        "logical_port": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Logical port (see `ports`)."
+        },
+        "classifiers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Classifiers that select the flow point's frames (see `classifiers`)."
+        }
+      },
+      "required": [
+        "name",
+        "fd",
+        "logical_port",
+        "classifiers"
+      ]
+    },
+    "Segment": {
+      "title": "EthernetSegment",
+      "type": "object",
+      "description": "SAOS 10 EVPN ethernet segment (multihoming / EVLAG).",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name."
+        },
+        "port": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Logical port (a LAG or a port)."
+        },
+        "evlag": {
+          "type": "boolean",
+          "description": "The segment is an EVLAG."
+        },
+        "esi": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The ESI as `<type> <value>` (`mac 02:00:00:00:00:01`)."
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Redundancy mode (`all-active`, `single-active`)."
+        },
+        "preference": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "DF-election preference."
+        }
+      },
+      "required": [
+        "name",
+        "port",
+        "evlag",
+        "esi",
+        "mode",
+        "preference"
+      ]
+    },
+    "Facts": {
+      "title": "DeviceFacts",
+      "type": "object",
+      "description": "What the device's configuration says. Every value read from a configuration is text, as written; flags derived by the extractor are booleans. The SAOS 10 fields are absent on SAOS 6 / 8 devices.",
+      "properties": {
+        "hostname": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The configured hostname."
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Interface"
+          },
+          "description": "Layer-3 interfaces, in configuration order."
+        },
+        "gateway": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SAOS 6: the default gateway."
+        },
+        "vlans": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Vlan"
+          },
+          "description": "VLANs by id (as text)."
+        },
+        "ports": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Port"
+          },
+          "description": "Ports by name."
+        },
+        "lags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Lag"
+          },
+          "description": "LAGs."
+        },
+        "sub_ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SubPort"
+          },
+          "description": "SAOS 6 sub-ports."
+        },
+        "rings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Ring"
+          },
+          "description": "SAOS 6 logical rings."
+        },
+        "peers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Peer"
+          },
+          "description": "MPLS VCs, MPLS-TP tunnel ends and BGP neighbours."
+        },
+        "isis": {
+          "$ref": "#/$defs/Isis"
+        },
+        "segment_routing": {
+          "$ref": "#/$defs/SegmentRouting"
+        },
+        "bgp": {
+          "$ref": "#/$defs/Bgp"
+        },
+        "pseudowires": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Pseudowire"
+          },
+          "description": "Pseudowires."
+        },
+        "cfm": {
+          "$ref": "#/$defs/Cfm"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "SAOS 6: command lines seen. SAOS 10: top-level YANG objects seen (same as `objects`)."
+        },
+        "recognised": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lines (SAOS 6) or top-level objects (SAOS 10) that produced a fact."
+        },
+        "fds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Fd"
+          },
+          "description": "SAOS 10 forwarding domains."
+        },
+        "fps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Fp"
+          },
+          "description": "SAOS 10 flow points."
+        },
+        "classifiers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "VLAN ids."
+          },
+          "description": "SAOS 10 classifiers by name: the VLAN ids they match."
+        },
+        "vrfs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SAOS 10 VRF names."
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Segment"
+          },
+          "description": "SAOS 10 EVPN ethernet segments."
+        },
+        "objects": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "SAOS 10: top-level YANG objects seen across the device's files."
+        }
+      },
+      "required": [
+        "hostname",
+        "interfaces",
+        "gateway",
+        "vlans",
+        "ports",
+        "lags",
+        "sub_ports",
+        "rings",
+        "peers",
+        "isis",
+        "segment_routing",
+        "bgp",
+        "pseudowires",
+        "cfm",
+        "lines",
+        "recognised"
+      ]
+    }
+  }
+}

@@ -1,0 +1,59 @@
+# Enforces the changelog rule: every PR must edit CHANGELOG.md or
+# carry the `skip-changelog` label. On a semver repo the PR must also cut the
+# release (scripts/changelog.py check; release.yml tags it on merge). The job name
+# `changelog` is the stable required-status-check context named by the main
+# ruleset — do not rename it.
+name: changelog
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+env:
+  # continuous: the merge is the release. semver: every PR promotes [Unreleased]
+  # to the next `## [X.Y.Z] - YYYY-MM-DD`.
+  VERSIONING: semver
+
+jobs:
+  changelog:
+    name: changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip for Dependabot
+        id: dependabot
+        # Keyed off the PR author, not github.actor — github.actor becomes the
+        # human who updates/retriggers the branch, which would wrongly un-skip.
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        run: echo "skip=true" >> "$GITHUB_OUTPUT"
+
+      - name: Skip via label
+        id: label
+        if: contains(join(github.event.pull_request.labels.*.name, ','), 'skip-changelog')
+        run: echo "skip=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.dependabot.outputs.skip != 'true' && steps.label.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require CHANGELOG.md change
+        if: steps.dependabot.outputs.skip != 'true' && steps.label.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.base_ref }}"
+          if git diff --name-only "$base"...HEAD | grep -qx 'CHANGELOG.md'; then
+            echo "CHANGELOG.md updated."
+          else
+            echo "::error::No CHANGELOG.md change. Update the changelog or add the 'skip-changelog' label."
+            exit 1
+          fi
+
+      - name: Require the PR to cut a release (semver repos)
+        if: env.VERSIONING == 'semver' && steps.dependabot.outputs.skip != 'true' && steps.label.outputs.skip != 'true'
+        # [Unreleased] empty, top release `## [X.Y.Z] - YYYY-MM-DD` above the base branch's,
+        # version file (package.json / pyproject.toml / VERSION) in agreement.
+        run: python3 scripts/changelog.py check "origin/${{ github.base_ref }}"

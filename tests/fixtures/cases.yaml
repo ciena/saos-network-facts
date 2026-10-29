@@ -1,0 +1,11 @@
+# Extraction cases over the synthetic labs: arguments to extract.collect, relative to this directory.
+# tests/fixtures/expected/<case>.facts.json is each case's facts file (UPDATE_GOLDEN=1 pytest rewrites them);
+# tests/fixtures/pivots.json holds the translator's replies for every SAOS 10 file (scripts/record_pivots.py).
+sr-l2:
+  clab: labs/sr-l2/topo.clab.yml
+  recipe: sr-l2
+mixed:
+  configs: [labs/mixed]
+  platform_map: labs/mixed/platform-map.yaml
+mixed-detected:
+  configs: [labs/mixed]

@@ -1,0 +1,6 @@
+# Device type per device, for a configs directory without a clab.yml.
+devices:
+  AGG1:
+    type: 3930-6x
+  PE3:
+    type: 5164-10x

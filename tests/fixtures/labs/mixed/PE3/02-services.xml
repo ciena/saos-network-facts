@@ -1,0 +1,12 @@
+<!-- Synthetic SAOS 10 NETCONF edit for tests: day 1 removes the temporary flow point and adds a VRF. -->
+<config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <fps xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fp">
+    <fp nc:operation="delete"><name>FP-TEMP</name></fp>
+  </fps>
+  <fds xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fd">
+    <fd nc:operation="delete"><name>FD-TEMP</name></fd>
+  </fds>
+  <vrf xmlns="urn:ciena:params:xml:ns:yang:ciena:ciena-vrf">
+    <vrfName>CUST-A</vrfName>
+  </vrf>
+</config>
