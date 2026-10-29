@@ -23,7 +23,7 @@ jobs:
       - run: python -m pip install -e '.[dev]'
       - name: ruff
         run: ruff check .
-      - name: pytest (no network: SAOS 10 pivots are recorded in tests/fixtures/pivots.json)
+      - name: "pytest (no network: SAOS 10 pivots are recorded in tests/fixtures/pivots.json)"
         run: pytest -q
       - name: validate the fixtures against the schema
         run: saos-network-facts validate tests/fixtures/expected/*.json
