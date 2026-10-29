@@ -673,7 +673,7 @@
             "admin_state": "enable",
             "bfd": {
               "enabled": true,
-              "interval_ms": 10
+              "interval_ms": 3
             },
             "destination": "192.0.2.13",
             "forward_in_label": null,
@@ -685,7 +685,7 @@
             "reverse_in_label": "1002",
             "reverse_out_label": null,
             "reversion": "enable",
-            "reversion_hold_time": "60",
+            "reversion_hold_time": "45",
             "role": "primary",
             "source": "192.0.2.11",
             "type": "static-ingress-corouted"
@@ -694,7 +694,7 @@
             "admin_state": "enable",
             "bfd": {
               "enabled": true,
-              "interval_ms": 10
+              "interval_ms": 3
             },
             "destination": "192.0.2.13",
             "forward_in_label": null,
@@ -972,7 +972,7 @@
             "admin_state": "enable",
             "bfd": {
               "enabled": true,
-              "interval_ms": 10
+              "interval_ms": 3
             },
             "destination": "192.0.2.13",
             "forward_in_label": "1003",
@@ -984,7 +984,7 @@
             "reverse_in_label": null,
             "reverse_out_label": "1004",
             "reversion": "enable",
-            "reversion_hold_time": "60",
+            "reversion_hold_time": "45",
             "role": "primary",
             "source": "192.0.2.11",
             "type": "static-egress-corouted"
@@ -993,7 +993,7 @@
             "admin_state": "enable",
             "bfd": {
               "enabled": true,
-              "interval_ms": 10
+              "interval_ms": 3
             },
             "destination": "192.0.2.13",
             "forward_in_label": "1013",

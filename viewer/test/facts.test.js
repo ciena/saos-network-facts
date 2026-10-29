@@ -45,14 +45,14 @@ describe('the bundled Adaptive-SR-CFM example', () => {
     expect(topo.nodes.filter((n) => n.role === 'ce').map((n) => n.id)).toEqual(['CE1']);
     expect(topo.nodes.filter((n) => n.role === 'p').map((n) => n.id)).toEqual(['P2', 'P7']);
     const pe1 = topo.nodes.find((n) => n.id === 'PE1');
-    expect(pe1).toMatchObject({ loopback: '20.10.10.1', systemId: '0200.1001.0001', sidIndex: 1 });
+    expect(pe1).toMatchObject({ loopback: '10.255.10.1', systemId: '0200.1001.0001', sidIndex: 1 });
   });
 
   test('links come from the interface subnets, with the port each interface rides on', () => {
     expect(topo.links).toHaveLength(14);
     expect(topo.links.filter((l) => l.kind === 'access').map((l) => l.id)).toEqual(['CE1-PE1']);
     const p2p3 = topo.links.find((l) => l.id === 'P2-P3');
-    expect(p2p3).toMatchObject({ subnet: '172.10.10.8/30', a: { node: 'P2', if: 'if2', ip: '172.10.10.9', port: '2' }, b: { node: 'P3', if: 'if2', ip: '172.10.10.10', port: '22' } });
+    expect(p2p3).toMatchObject({ subnet: '172.30.10.8/30', a: { node: 'P2', if: 'if2', ip: '172.30.10.9', port: '2' }, b: { node: 'P3', if: 'if2', ip: '172.30.10.10', port: '22' } });
   });
 
   test('IS-IS adjacencies are up on every core link, at level 1', () => {
@@ -64,7 +64,7 @@ describe('the bundled Adaptive-SR-CFM example', () => {
   test('the SR policies take their segment lists and all resolve', () => {
     expect(topo.srgb).toEqual({ base: 16000, size: 1001 });
     const pe1 = topo.srPolicies.find((p) => p.headend === 'PE1');
-    expect(pe1).toEqual({ name: 'SR1to9color2', headend: 'PE1', color: 2, endpoint: '20.10.10.9', segmentList: { name: 'PE1_PE9', sids: [16003, 16004, 16009] } });
+    expect(pe1).toEqual({ name: 'SR1to9color2', headend: 'PE1', color: 2, endpoint: '10.255.10.9', segmentList: { name: 'PE1_PE9', sids: [16003, 16004, 16009] } });
     expect(net.sr.policies.map((p) => [p.name, p.valid])).toEqual([
       ['SR3to6color2', true], ['SR1to9color2', true], ['SR4to3color2', true], ['SR6to3color2', true], ['SR9to1color2', true],
     ]);
@@ -160,7 +160,7 @@ describe('importing other facts files', () => {
   });
 
   test('ipv4Subnet', () => {
-    expect(ipv4Subnet('172.10.10.26/30')).toEqual({ ip: '172.10.10.26', len: 30, subnet: '172.10.10.24/30' });
+    expect(ipv4Subnet('172.30.10.26/30')).toEqual({ ip: '172.30.10.26', len: 30, subnet: '172.30.10.24/30' });
     expect(ipv4Subnet('2001:db8::1/64')).toBeNull();
     expect(ipv4Subnet(null)).toBeNull();
   });

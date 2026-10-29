@@ -116,9 +116,9 @@
             <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
                 <addresses>
                     <address>
-                        <ip>20.10.10.2</ip>
+                        <ip>10.255.10.2</ip>
                         <config>
-                            <ip>20.10.10.2</ip>
+                            <ip>10.255.10.2</ip>
                             <prefix-length>32</prefix-length>
                         </config>
                     </address>
@@ -142,9 +142,9 @@
             <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
                 <addresses>
                     <address>
-                        <ip>172.10.10.2</ip>
+                        <ip>172.30.10.2</ip>
                         <config>
-                            <ip>172.10.10.2</ip>
+                            <ip>172.30.10.2</ip>
                             <prefix-length>30</prefix-length>
                         </config>
                     </address>
@@ -168,9 +168,9 @@
             <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
                 <addresses>
                     <address>
-                        <ip>172.10.10.9</ip>
+                        <ip>172.30.10.9</ip>
                         <config>
-                            <ip>172.10.10.9</ip>
+                            <ip>172.30.10.9</ip>
                             <prefix-length>30</prefix-length>
                         </config>
                     </address>
@@ -194,9 +194,9 @@
             <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
                 <addresses>
                     <address>
-                        <ip>172.10.10.13</ip>
+                        <ip>172.30.10.13</ip>
                         <config>
-                            <ip>172.10.10.13</ip>
+                            <ip>172.30.10.13</ip>
                             <prefix-length>30</prefix-length>
                         </config>
                     </address>
@@ -220,9 +220,9 @@
             <ipv4 xmlns="http://ciena.com/ns/yang/ciena-openconfig-if-ip">
                 <addresses>
                     <address>
-                        <ip>172.10.10.21</ip>
+                        <ip>172.30.10.21</ip>
                         <config>
-                            <ip>172.10.10.21</ip>
+                            <ip>172.30.10.21</ip>
                             <prefix-length>30</prefix-length>
                         </config>
                     </address>
@@ -273,7 +273,7 @@
                 </interface>
             </interfaces>
             <mpls-te>
-                <router-id>20.10.10.2</router-id>
+                <router-id>10.255.10.2</router-id>
                 <level-type>level-1</level-type>
             </mpls-te>
             <segment-routing>
@@ -309,7 +309,7 @@
     <segment-routing xmlns="http://ciena.com/ns/yang/ciena-sr">
 
         <connected-prefix-sid-map>
-            <prefix>20.10.10.2/32</prefix>
+            <prefix>10.255.10.2/32</prefix>
             <interface>lb1</interface>
             <value-type>index</value-type>
             <start-sid>2</start-sid>
@@ -320,7 +320,7 @@
     <ldp xmlns="http://ciena.com/ns/yang/ciena/ciena-ldp">
     <instance>
     <tag>default</tag>
-    <lsr-id>20.10.10.2</lsr-id>
+    <lsr-id>10.255.10.2</lsr-id>
     <interfaces>
             
                 <interface>

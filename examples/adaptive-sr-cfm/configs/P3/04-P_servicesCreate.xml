@@ -38,18 +38,18 @@
             <name>testsat</name>
             <mode xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">spoke</mode>
             <configured-pw>
-                <peer-ip>20.10.10.4</peer-ip>
+                <peer-ip>10.255.10.4</peer-ip>
                 <pw-id>200</pw-id>
             </configured-pw>
         </pseudowire>
         <pseudowire>
             <name>testcfm</name>
             <mode xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">spoke</mode>
-            <tunnel-destination-ip xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">20.10.10.6</tunnel-destination-ip>
+            <tunnel-destination-ip xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">10.255.10.6</tunnel-destination-ip>
             <tunnel-type xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">sr-policy</tunnel-type>
             <tunnel-color xmlns="http://ciena.com/ns/yang/ciena-ietf-pseudowires">2</tunnel-color>
             <configured-pw>
-                <peer-ip>20.10.10.6</peer-ip>
+                <peer-ip>10.255.10.6</peer-ip>
                 <pw-id>100</pw-id>
             </configured-pw>
         </pseudowire>
@@ -61,13 +61,13 @@
     <target-ldp>
     
     <peers>
-        <address>20.10.10.4</address>
+        <address>10.255.10.4</address>
         <hello-interval>10</hello-interval>
     </peers>
     
     
     <peers>
-        <address>20.10.10.6</address>
+        <address>10.255.10.6</address>
         <hello-interval>10</hello-interval>
     </peers>
     

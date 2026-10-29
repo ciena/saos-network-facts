@@ -39,8 +39,8 @@ describe('OSPF and MPLS-TP from the facts', () => {
 
   test('tunnel segments are stitched from the ingress; the backup protects the primary', () => {
     expect(topo.tpTunnels.map((t) => [t.id, t.src, t.dst, t.role, t.protects, t.links, t.oam])).toEqual([
-      ['TP-1', 'PE1', 'PE2', 'primary', undefined, ['P1-PE1', 'P1-PE2'], { kind: 'bfd', intervalMs: 10 }],
-      ['TP-1-B', 'PE1', 'PE2', 'backup', 'TP-1', ['P2-PE1', 'P2-PE2'], { kind: 'bfd', intervalMs: 10 }],
+      ['TP-1', 'PE1', 'PE2', 'primary', undefined, ['P1-PE1', 'P1-PE2'], { kind: 'bfd', intervalMs: 3 }],
+      ['TP-1-B', 'PE1', 'PE2', 'backup', 'TP-1', ['P2-PE1', 'P2-PE2'], { kind: 'bfd', intervalMs: 3 }],
     ]);
     expect(topo.tpTunnels[0].hops.map((h) => [h.node, h.fwdIn, h.fwdOut, h.revIn, h.revOut])).toEqual([
       ['PE1', null, 1001, 1002, null],

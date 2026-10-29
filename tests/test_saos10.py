@@ -132,12 +132,12 @@ def test_ospf_areas_interfaces_and_merge():
         "areas": {"area": [{"id": "0.0.0.0", "network": [{"prefix": "198.51.100.0/31"}, {"prefix": "192.0.2.1/32"}]}]}}]}}
     later = {"ciena-ospf:ospf": {"instance": [{"tag": 1, "interfaces": {"interface": [
         {"name": "core", "hello-interval": 5, "dead-interval": 20, "bfd": {"enable": True}}, {"name": "other", "passive": True}]},
-        "areas": {"area": [{"id": "0.0.0.1", "type": {"stub": {}}}]}}]}}
+        "areas": {"area": [{"id": 1, "type": {"stub": {}}}]}}]}}
     f = run(IFACES, first, later)
     (instance,) = f["ospf"]["instances"]
     assert instance == {"name": "1", "router_id": "192.0.2.1", "vrf": None, "areas": [
         {"area": "0.0.0.0", "type": None, "networks": ["198.51.100.0/31", "192.0.2.1/32"]},
-        {"area": "0.0.0.1", "type": "stub", "networks": []}]}
+        {"area": "1", "type": "stub", "networks": []}]}
     core, lb0, other = f["ospf"]["interfaces"]
     assert core == {"instance": "1", "interface": "core", "area": "0.0.0.0", "type": "point-to-point", "metric": "20",
                     "hello_interval": "5", "dead_interval": "20", "priority": None, "passive": False, "bfd": True}

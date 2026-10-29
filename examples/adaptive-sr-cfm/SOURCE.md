@@ -7,8 +7,8 @@ policies, one over the peer's Prefix-SID), a CFM up-MEP pair with delay measurem
 and iBGP with PE6 as route reflector. CE1 hangs off PE1.
 
 The configurations are the recipe's startup configurations as the lab renders them to boot the
-devices; `facts.json` was extracted from them with saos-network-facts 0.2.0 and translator 4.2.1
-(the hosted translator).
+devices, with the addresses outside RFC 1918 renumbered (below); `facts.json` was extracted from
+them with saos-network-facts 0.3.0 and translator 4.2.1 (the hosted translator).
 
 ## Files
 
@@ -16,7 +16,7 @@ devices; `facts.json` was extracted from them with saos-network-facts 0.2.0 and 
 |---|---|
 | `configs/<DEVICE>/<NN>-<template>.xml` | each device's startup configuration (NETCONF XML), one file per template, `NN` = the order the lab applies them |
 | `devices.yaml` | the platform map: each device's type, which the files do not say |
-| `facts.json` | `saos-network-facts extract` of the above (schema 1.1) |
+| `facts.json` | `saos-network-facts extract` of the above (schema 1.2) |
 
 ## Regenerate
 
@@ -41,6 +41,8 @@ Expect `devices 10 / ok 10 / partial 0 / errors 0 / skipped 0`.
   XML comments were stripped; this render had none.
 - The SAT sessions name their peer by MAC address; the two MACs of real lab units are replaced by
   locally administered ones (`02:00:00:00:00:01`, `02:00:00:00:00:02`).
-- Kept as rendered: the lab's data-plane addresses (loopbacks 20.10.10.0/24, core links in
-  172.10.10.0/24, the CE link 172.20.10.0/30, the CE's 10.40.40.0/24 and its static next hop
-  172.20.20.1), device names, types and YANG namespaces.
+- Lab addresses outside RFC 1918 renumbered into RFC 1918: the loopbacks are now in
+  10.255.10.0/24 and the core links in 172.30.10.0/24, each keeping its last octet. The IS-IS NETs
+  (system ids) are kept as rendered.
+- Kept as rendered: the other data-plane addresses (the CE link 172.20.10.0/30, the CE's
+  10.40.40.0/24 and its static next hop 172.20.20.1), device names, types and YANG namespaces.

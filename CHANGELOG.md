@@ -37,6 +37,17 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   default) and `?lab=<id>` open facts served beside the site. Releases attach the built site as
   `saos-network-facts-viewer-X.Y.Z.tgz`; the README's "Use the viewer in your repo" shows how to
   stage it with your own facts in CI.
+- **Address check on every tracked file** — `scripts/check_addresses.py` (run in CI, tested) fails
+  on any IPv4 / IPv6 address outside RFC 1918, RFC 5737, 2001:db8::/32, 0.0.0.0, :: and ::1. It
+  replaces the fixtures-only address test. The npm lockfiles are the only files it skips; the
+  OSPF AllSPFRouters group (224.0.0.5) is its one named protocol constant.
+
+### Changed
+
+- **Example renumbered into RFC 1918** — the Adaptive-SR-CFM example's loopbacks are now
+  10.255.10.0/24 and its core links 172.30.10.0/24 (last octets kept); its other addresses were
+  already private. `facts.json` is regenerated (10/10 ok, identical apart from the addresses and
+  the schema 1.2 keys), and `docs/example.png` is rebuilt from the site.
 
 ### Fixed
 

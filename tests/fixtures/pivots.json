@@ -572,6 +572,302 @@
     }
    }
   },
+  "3de614e3b056fcebbabbdecd": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-l2vpn:l2vpn-services": {
+      "l2vpn": [
+       {
+        "forwarding-domain": "FD-VPWS-200",
+        "mtu": 1500,
+        "name": "VPWS-200",
+        "pseudowire": [
+         "PW-200"
+        ],
+        "signaling-type": "static"
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       },
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 200
+           }
+          ]
+         }
+        ],
+        "name": "VLAN200"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-CORE-1"
+       },
+       {
+        "mode": "vpls",
+        "name": "FD-CORE-2"
+       },
+       {
+        "mode": "vpws",
+        "name": "FD-VPWS-200"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-CORE-1",
+        "logical-port": "1",
+        "name": "FP-CORE-1"
+       },
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-CORE-2",
+        "logical-port": "2",
+        "name": "FP-CORE-2"
+       },
+       {
+        "classifier-list": [
+         "VLAN200"
+        ],
+        "fd-name": "FD-VPWS-200",
+        "logical-port": "3",
+        "name": "FP-AC-200"
+       }
+      ]
+     },
+     "ciena-mpls-tp-corouted:tp-corouted-tunnels": {
+      "tunnel": [
+       {
+        "ciena-bfd-mpls-tp:bfd-cfg-parms": {
+         "accelerate": false,
+         "admin-down": false,
+         "desired-min-tx-interval": "3300",
+         "required-min-rx-interval": "3300"
+        },
+        "destination-ip": "192.0.2.13",
+        "forward-out-segment": {
+         "forward-out-label": 1001,
+         "next-hop-ip": "198.51.100.2"
+        },
+        "name": "TP-1",
+        "reverse-in-segment": {
+         "reverse-in-label": 1002
+        },
+        "reversion-hold-time": 45,
+        "source-ip": "192.0.2.11",
+        "tunnel-role-type": "primary",
+        "tunnel-type": "static-ingress-corouted"
+       },
+       {
+        "ciena-bfd-mpls-tp:bfd-cfg-parms": {
+         "accelerate": false,
+         "admin-down": false,
+         "desired-min-tx-interval": "3300",
+         "required-min-rx-interval": "3300"
+        },
+        "destination-ip": "192.0.2.13",
+        "forward-out-segment": {
+         "forward-out-label": 1011,
+         "next-hop-ip": "198.51.100.10"
+        },
+        "name": "TP-1-B",
+        "primary-tunnel-configuration": {
+         "primary-tunnel-name": "TP-1",
+         "primary-tunnel-type": "static-ingress-corouted"
+        },
+        "reverse-in-segment": {
+         "reverse-in-label": 1012
+        },
+        "source-ip": "192.0.2.11",
+        "tunnel-role-type": "backup",
+        "tunnel-type": "static-ingress-corouted"
+       }
+      ]
+     },
+     "ciena-mpls:mpls": {
+      "interfaces": {
+       "interface": [
+        {
+         "label-switching": true,
+         "name": "PE1-P1"
+        },
+        {
+         "label-switching": true,
+         "name": "PE1-P2"
+        }
+       ]
+      }
+     },
+     "ciena-ospf:ospf": {
+      "instance": [
+       {
+        "areas": {
+         "area": [
+          {
+           "id": "0.0.0.0",
+           "network": [
+            {
+             "prefix": "198.51.100.0/30"
+            },
+            {
+             "prefix": "198.51.100.8/30"
+            },
+            {
+             "prefix": "192.0.2.11/32"
+            }
+           ]
+          }
+         ]
+        },
+        "interfaces": {
+         "interface": [
+          {
+           "name": "PE1-P1",
+           "type": "point-to-point"
+          },
+          {
+           "metric": 20,
+           "name": "PE1-P2",
+           "type": "point-to-point"
+          },
+          {
+           "name": "lb0"
+          }
+         ]
+        },
+        "router-id": "192.0.2.11",
+        "tag": 1
+       }
+      ]
+     },
+     "ietf-pseudowires:pseudowires": {
+      "pseudowire": [
+       {
+        "ciena-ietf-pseudowires:mode": "spoke",
+        "ciena-ietf-pseudowires:tunnel-destination-ip": "192.0.2.13",
+        "ciena-ietf-pseudowires:tunnel-name": "TP-1",
+        "ciena-ietf-pseudowires:tunnel-source-ip": "192.0.2.11",
+        "ciena-ietf-pseudowires:tunnel-type": "static-ingress-corouted",
+        "configured-pw": {
+         "ciena-ietf-pseudowires:pw-status": true,
+         "peer-ip": "192.0.2.13",
+         "pw-id": 200,
+         "receive-label": 2001,
+         "transmit-label": 2001
+        },
+        "mtu": 1500,
+        "name": "PW-200"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.11",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.11"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "name": "lb0"
+        },
+        "name": "lb0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.1",
+             "prefix-length": 30
+            },
+            "ip": "198.51.100.1"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-CORE-1"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE1-P1"
+        },
+        "name": "PE1-P1"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.9",
+             "prefix-length": 30
+            },
+            "ip": "198.51.100.9"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-CORE-2"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE1-P2"
+        },
+        "name": "PE1-P2"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "PE1"
+      }
+     }
+    }
+   }
+  },
   "47708ef50057fbaacd9050e0": {
    "pivot": {
     "yuma-netconf:config": {
@@ -938,6 +1234,302 @@
     }
    }
   },
+  "8dda0d0d8626812c48ce98cc": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-l2vpn:l2vpn-services": {
+      "l2vpn": [
+       {
+        "forwarding-domain": "FD-VPWS-200",
+        "mtu": 1500,
+        "name": "VPWS-200",
+        "pseudowire": [
+         "PW-200"
+        ],
+        "signaling-type": "static"
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       },
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 200
+           }
+          ]
+         }
+        ],
+        "name": "VLAN200"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-CORE-1"
+       },
+       {
+        "mode": "vpls",
+        "name": "FD-CORE-2"
+       },
+       {
+        "mode": "vpws",
+        "name": "FD-VPWS-200"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-CORE-1",
+        "logical-port": "1",
+        "name": "FP-CORE-1"
+       },
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-CORE-2",
+        "logical-port": "2",
+        "name": "FP-CORE-2"
+       },
+       {
+        "classifier-list": [
+         "VLAN200"
+        ],
+        "fd-name": "FD-VPWS-200",
+        "logical-port": "3",
+        "name": "FP-AC-200"
+       }
+      ]
+     },
+     "ciena-mpls-tp-corouted:tp-corouted-tunnels": {
+      "tunnel": [
+       {
+        "ciena-bfd-mpls-tp:bfd-cfg-parms": {
+         "accelerate": false,
+         "admin-down": false,
+         "desired-min-tx-interval": "3300",
+         "required-min-rx-interval": "3300"
+        },
+        "destination-ip": "192.0.2.13",
+        "forward-in-segment": {
+         "forward-in-label": 1003
+        },
+        "name": "TP-1",
+        "reverse-out-segment": {
+         "prev-hop-ip": "198.51.100.5",
+         "reverse-out-label": 1004
+        },
+        "reversion-hold-time": 45,
+        "source-ip": "192.0.2.11",
+        "tunnel-role-type": "primary",
+        "tunnel-type": "static-egress-corouted"
+       },
+       {
+        "ciena-bfd-mpls-tp:bfd-cfg-parms": {
+         "accelerate": false,
+         "admin-down": false,
+         "desired-min-tx-interval": "3300",
+         "required-min-rx-interval": "3300"
+        },
+        "destination-ip": "192.0.2.13",
+        "forward-in-segment": {
+         "forward-in-label": 1013
+        },
+        "name": "TP-1-B",
+        "primary-tunnel-configuration": {
+         "primary-tunnel-name": "TP-1",
+         "primary-tunnel-type": "static-egress-corouted"
+        },
+        "reverse-out-segment": {
+         "prev-hop-ip": "198.51.100.13",
+         "reverse-out-label": 1014
+        },
+        "source-ip": "192.0.2.11",
+        "tunnel-role-type": "backup",
+        "tunnel-type": "static-egress-corouted"
+       }
+      ]
+     },
+     "ciena-mpls:mpls": {
+      "interfaces": {
+       "interface": [
+        {
+         "label-switching": true,
+         "name": "PE2-P1"
+        },
+        {
+         "label-switching": true,
+         "name": "PE2-P2"
+        }
+       ]
+      }
+     },
+     "ciena-ospf:ospf": {
+      "instance": [
+       {
+        "areas": {
+         "area": [
+          {
+           "id": "0.0.0.0",
+           "network": [
+            {
+             "prefix": "198.51.100.4/30"
+            },
+            {
+             "prefix": "198.51.100.12/30"
+            },
+            {
+             "prefix": "192.0.2.13/32"
+            }
+           ]
+          }
+         ]
+        },
+        "interfaces": {
+         "interface": [
+          {
+           "name": "PE2-P1",
+           "type": "point-to-point"
+          },
+          {
+           "metric": 20,
+           "name": "PE2-P2",
+           "type": "point-to-point"
+          },
+          {
+           "name": "lb0"
+          }
+         ]
+        },
+        "router-id": "192.0.2.13",
+        "tag": 1
+       }
+      ]
+     },
+     "ietf-pseudowires:pseudowires": {
+      "pseudowire": [
+       {
+        "ciena-ietf-pseudowires:mode": "spoke",
+        "ciena-ietf-pseudowires:tunnel-destination-ip": "192.0.2.13",
+        "ciena-ietf-pseudowires:tunnel-name": "TP-1",
+        "ciena-ietf-pseudowires:tunnel-source-ip": "192.0.2.11",
+        "ciena-ietf-pseudowires:tunnel-type": "static-egress-corouted",
+        "configured-pw": {
+         "ciena-ietf-pseudowires:pw-status": true,
+         "peer-ip": "192.0.2.11",
+         "pw-id": 200,
+         "receive-label": 2001,
+         "transmit-label": 2001
+        },
+        "mtu": 1500,
+        "name": "PW-200"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.13",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.13"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "name": "lb0"
+        },
+        "name": "lb0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.6",
+             "prefix-length": 30
+            },
+            "ip": "198.51.100.6"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-CORE-1"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE2-P1"
+        },
+        "name": "PE2-P1"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.14",
+             "prefix-length": 30
+            },
+            "ip": "198.51.100.14"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-CORE-2"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE2-P2"
+        },
+        "name": "PE2-P2"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "PE2"
+      }
+     }
+    }
+   }
+  },
   "90fb576f365c92d1daaaf40f": {
    "pivot": {
     "yuma-netconf:config": {
@@ -1156,302 +1748,6 @@
      "openconfig-system:system": {
       "config": {
        "hostname": "PE2"
-      }
-     }
-    }
-   }
-  },
-  "c24df5c967da939fbe96a284": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-l2vpn:l2vpn-services": {
-      "l2vpn": [
-       {
-        "forwarding-domain": "FD-VPWS-200",
-        "mtu": 1500,
-        "name": "VPWS-200",
-        "pseudowire": [
-         "PW-200"
-        ],
-        "signaling-type": "static"
-       }
-      ]
-     },
-     "ciena-mef-classifier:classifiers": {
-      "classifier": [
-       {
-        "filter-entry": [
-         {
-          "filter-parameter": "ciena-mef-classifier:vtag-stack",
-          "untagged-exclude-priority-tagged": false
-         }
-        ],
-        "name": "UNTAGGED"
-       },
-       {
-        "filter-entry": [
-         {
-          "filter-parameter": "ciena-mef-classifier:vtag-stack",
-          "vtags": [
-           {
-            "tag": 1,
-            "vlan-id": 200
-           }
-          ]
-         }
-        ],
-        "name": "VLAN200"
-       }
-      ]
-     },
-     "ciena-mef-fd:fds": {
-      "fd": [
-       {
-        "mode": "vpls",
-        "name": "FD-CORE-1"
-       },
-       {
-        "mode": "vpls",
-        "name": "FD-CORE-2"
-       },
-       {
-        "mode": "vpws",
-        "name": "FD-VPWS-200"
-       }
-      ]
-     },
-     "ciena-mef-fp:fps": {
-      "fp": [
-       {
-        "classifier-list": [
-         "UNTAGGED"
-        ],
-        "fd-name": "FD-CORE-1",
-        "logical-port": "1",
-        "name": "FP-CORE-1"
-       },
-       {
-        "classifier-list": [
-         "UNTAGGED"
-        ],
-        "fd-name": "FD-CORE-2",
-        "logical-port": "2",
-        "name": "FP-CORE-2"
-       },
-       {
-        "classifier-list": [
-         "VLAN200"
-        ],
-        "fd-name": "FD-VPWS-200",
-        "logical-port": "3",
-        "name": "FP-AC-200"
-       }
-      ]
-     },
-     "ciena-mpls-tp-corouted:tp-corouted-tunnels": {
-      "tunnel": [
-       {
-        "ciena-bfd-mpls-tp:bfd-cfg-parms": {
-         "accelerate": true,
-         "admin-down": false,
-         "desired-min-tx-interval": "10000",
-         "required-min-rx-interval": "10000"
-        },
-        "destination-ip": "192.0.2.13",
-        "forward-out-segment": {
-         "forward-out-label": 1001,
-         "next-hop-ip": "198.51.100.2"
-        },
-        "name": "TP-1",
-        "reverse-in-segment": {
-         "reverse-in-label": 1002
-        },
-        "reversion-hold-time": 60,
-        "source-ip": "192.0.2.11",
-        "tunnel-role-type": "primary",
-        "tunnel-type": "static-ingress-corouted"
-       },
-       {
-        "ciena-bfd-mpls-tp:bfd-cfg-parms": {
-         "accelerate": true,
-         "admin-down": false,
-         "desired-min-tx-interval": "10000",
-         "required-min-rx-interval": "10000"
-        },
-        "destination-ip": "192.0.2.13",
-        "forward-out-segment": {
-         "forward-out-label": 1011,
-         "next-hop-ip": "198.51.100.10"
-        },
-        "name": "TP-1-B",
-        "primary-tunnel-configuration": {
-         "primary-tunnel-name": "TP-1",
-         "primary-tunnel-type": "static-ingress-corouted"
-        },
-        "reverse-in-segment": {
-         "reverse-in-label": 1012
-        },
-        "source-ip": "192.0.2.11",
-        "tunnel-role-type": "backup",
-        "tunnel-type": "static-ingress-corouted"
-       }
-      ]
-     },
-     "ciena-mpls:mpls": {
-      "interfaces": {
-       "interface": [
-        {
-         "label-switching": true,
-         "name": "PE1-P1"
-        },
-        {
-         "label-switching": true,
-         "name": "PE1-P2"
-        }
-       ]
-      }
-     },
-     "ciena-ospf:ospf": {
-      "instance": [
-       {
-        "areas": {
-         "area": [
-          {
-           "id": "0.0.0.0",
-           "network": [
-            {
-             "prefix": "198.51.100.0/30"
-            },
-            {
-             "prefix": "198.51.100.8/30"
-            },
-            {
-             "prefix": "192.0.2.11/32"
-            }
-           ]
-          }
-         ]
-        },
-        "interfaces": {
-         "interface": [
-          {
-           "name": "PE1-P1",
-           "type": "point-to-point"
-          },
-          {
-           "metric": 20,
-           "name": "PE1-P2",
-           "type": "point-to-point"
-          },
-          {
-           "name": "lb0"
-          }
-         ]
-        },
-        "router-id": "192.0.2.11",
-        "tag": 1
-       }
-      ]
-     },
-     "ietf-pseudowires:pseudowires": {
-      "pseudowire": [
-       {
-        "ciena-ietf-pseudowires:mode": "spoke",
-        "ciena-ietf-pseudowires:tunnel-destination-ip": "192.0.2.13",
-        "ciena-ietf-pseudowires:tunnel-name": "TP-1",
-        "ciena-ietf-pseudowires:tunnel-source-ip": "192.0.2.11",
-        "ciena-ietf-pseudowires:tunnel-type": "static-ingress-corouted",
-        "configured-pw": {
-         "ciena-ietf-pseudowires:pw-status": true,
-         "peer-ip": "192.0.2.13",
-         "pw-id": 200,
-         "receive-label": 2001,
-         "transmit-label": 2001
-        },
-        "mtu": 1500,
-        "name": "PW-200"
-       }
-      ]
-     },
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "192.0.2.11",
-             "prefix-length": 32
-            },
-            "ip": "192.0.2.11"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "loopback",
-         "name": "lb0"
-        },
-        "name": "lb0"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "198.51.100.1",
-             "prefix-length": 30
-            },
-            "ip": "198.51.100.1"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-CORE-1"
-          }
-         },
-         "mtu": 9000,
-         "name": "PE1-P1"
-        },
-        "name": "PE1-P1"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "198.51.100.9",
-             "prefix-length": 30
-            },
-            "ip": "198.51.100.9"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-CORE-2"
-          }
-         },
-         "mtu": 9000,
-         "name": "PE1-P2"
-        },
-        "name": "PE1-P2"
-       }
-      ]
-     },
-     "openconfig-system:system": {
-      "config": {
-       "hostname": "PE1"
       }
      }
     }
@@ -1757,302 +2053,6 @@
      "openconfig-system:system": {
       "config": {
        "hostname": "PE1"
-      }
-     }
-    }
-   }
-  },
-  "cfbb318dc9ad564d47a94060": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-l2vpn:l2vpn-services": {
-      "l2vpn": [
-       {
-        "forwarding-domain": "FD-VPWS-200",
-        "mtu": 1500,
-        "name": "VPWS-200",
-        "pseudowire": [
-         "PW-200"
-        ],
-        "signaling-type": "static"
-       }
-      ]
-     },
-     "ciena-mef-classifier:classifiers": {
-      "classifier": [
-       {
-        "filter-entry": [
-         {
-          "filter-parameter": "ciena-mef-classifier:vtag-stack",
-          "untagged-exclude-priority-tagged": false
-         }
-        ],
-        "name": "UNTAGGED"
-       },
-       {
-        "filter-entry": [
-         {
-          "filter-parameter": "ciena-mef-classifier:vtag-stack",
-          "vtags": [
-           {
-            "tag": 1,
-            "vlan-id": 200
-           }
-          ]
-         }
-        ],
-        "name": "VLAN200"
-       }
-      ]
-     },
-     "ciena-mef-fd:fds": {
-      "fd": [
-       {
-        "mode": "vpls",
-        "name": "FD-CORE-1"
-       },
-       {
-        "mode": "vpls",
-        "name": "FD-CORE-2"
-       },
-       {
-        "mode": "vpws",
-        "name": "FD-VPWS-200"
-       }
-      ]
-     },
-     "ciena-mef-fp:fps": {
-      "fp": [
-       {
-        "classifier-list": [
-         "UNTAGGED"
-        ],
-        "fd-name": "FD-CORE-1",
-        "logical-port": "1",
-        "name": "FP-CORE-1"
-       },
-       {
-        "classifier-list": [
-         "UNTAGGED"
-        ],
-        "fd-name": "FD-CORE-2",
-        "logical-port": "2",
-        "name": "FP-CORE-2"
-       },
-       {
-        "classifier-list": [
-         "VLAN200"
-        ],
-        "fd-name": "FD-VPWS-200",
-        "logical-port": "3",
-        "name": "FP-AC-200"
-       }
-      ]
-     },
-     "ciena-mpls-tp-corouted:tp-corouted-tunnels": {
-      "tunnel": [
-       {
-        "ciena-bfd-mpls-tp:bfd-cfg-parms": {
-         "accelerate": true,
-         "admin-down": false,
-         "desired-min-tx-interval": "10000",
-         "required-min-rx-interval": "10000"
-        },
-        "destination-ip": "192.0.2.13",
-        "forward-in-segment": {
-         "forward-in-label": 1003
-        },
-        "name": "TP-1",
-        "reverse-out-segment": {
-         "prev-hop-ip": "198.51.100.5",
-         "reverse-out-label": 1004
-        },
-        "reversion-hold-time": 60,
-        "source-ip": "192.0.2.11",
-        "tunnel-role-type": "primary",
-        "tunnel-type": "static-egress-corouted"
-       },
-       {
-        "ciena-bfd-mpls-tp:bfd-cfg-parms": {
-         "accelerate": true,
-         "admin-down": false,
-         "desired-min-tx-interval": "10000",
-         "required-min-rx-interval": "10000"
-        },
-        "destination-ip": "192.0.2.13",
-        "forward-in-segment": {
-         "forward-in-label": 1013
-        },
-        "name": "TP-1-B",
-        "primary-tunnel-configuration": {
-         "primary-tunnel-name": "TP-1",
-         "primary-tunnel-type": "static-egress-corouted"
-        },
-        "reverse-out-segment": {
-         "prev-hop-ip": "198.51.100.13",
-         "reverse-out-label": 1014
-        },
-        "source-ip": "192.0.2.11",
-        "tunnel-role-type": "backup",
-        "tunnel-type": "static-egress-corouted"
-       }
-      ]
-     },
-     "ciena-mpls:mpls": {
-      "interfaces": {
-       "interface": [
-        {
-         "label-switching": true,
-         "name": "PE2-P1"
-        },
-        {
-         "label-switching": true,
-         "name": "PE2-P2"
-        }
-       ]
-      }
-     },
-     "ciena-ospf:ospf": {
-      "instance": [
-       {
-        "areas": {
-         "area": [
-          {
-           "id": "0.0.0.0",
-           "network": [
-            {
-             "prefix": "198.51.100.4/30"
-            },
-            {
-             "prefix": "198.51.100.12/30"
-            },
-            {
-             "prefix": "192.0.2.13/32"
-            }
-           ]
-          }
-         ]
-        },
-        "interfaces": {
-         "interface": [
-          {
-           "name": "PE2-P1",
-           "type": "point-to-point"
-          },
-          {
-           "metric": 20,
-           "name": "PE2-P2",
-           "type": "point-to-point"
-          },
-          {
-           "name": "lb0"
-          }
-         ]
-        },
-        "router-id": "192.0.2.13",
-        "tag": 1
-       }
-      ]
-     },
-     "ietf-pseudowires:pseudowires": {
-      "pseudowire": [
-       {
-        "ciena-ietf-pseudowires:mode": "spoke",
-        "ciena-ietf-pseudowires:tunnel-destination-ip": "192.0.2.13",
-        "ciena-ietf-pseudowires:tunnel-name": "TP-1",
-        "ciena-ietf-pseudowires:tunnel-source-ip": "192.0.2.11",
-        "ciena-ietf-pseudowires:tunnel-type": "static-egress-corouted",
-        "configured-pw": {
-         "ciena-ietf-pseudowires:pw-status": true,
-         "peer-ip": "192.0.2.11",
-         "pw-id": 200,
-         "receive-label": 2001,
-         "transmit-label": 2001
-        },
-        "mtu": 1500,
-        "name": "PW-200"
-       }
-      ]
-     },
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "192.0.2.13",
-             "prefix-length": 32
-            },
-            "ip": "192.0.2.13"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "loopback",
-         "name": "lb0"
-        },
-        "name": "lb0"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "198.51.100.6",
-             "prefix-length": 30
-            },
-            "ip": "198.51.100.6"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-CORE-1"
-          }
-         },
-         "mtu": 9000,
-         "name": "PE2-P1"
-        },
-        "name": "PE2-P1"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "198.51.100.14",
-             "prefix-length": 30
-            },
-            "ip": "198.51.100.14"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-CORE-2"
-          }
-         },
-         "mtu": 9000,
-         "name": "PE2-P2"
-        },
-        "name": "PE2-P2"
-       }
-      ]
-     },
-     "openconfig-system:system": {
-      "config": {
-       "hostname": "PE2"
       }
      }
     }
