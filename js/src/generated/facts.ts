@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Generated from schema/facts-v1.schema.json by scripts/generate.mjs; do not edit.
 /* eslint-disable */
 

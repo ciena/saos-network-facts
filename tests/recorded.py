@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The test cases (tests/fixtures/cases.yaml) and a translator that answers from recorded pivots."""
 
 import hashlib

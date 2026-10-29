@@ -27,6 +27,12 @@ The schema lives in `src/saos_network_facts/schema/facts-v1.schema.json`. After 
 A new optional field is a minor schema version; removing or changing a field is a major one (a new
 `facts-v2.schema.json`). Bump `SCHEMA_VERSION` in `src/saos_network_facts/__init__.py` with it.
 
+## Licence headers
+
+The project is Apache-2.0 (`LICENSE`, `NOTICE`). Every source file (`.py`, `.ts`, `.mjs`, `.sh`)
+starts with `SPDX-License-Identifier: Apache-2.0` as a comment (after the shebang line, if any);
+`tests/test_repo.py` checks it.
+
 ## Fixtures
 
 Fixtures are synthetic (written for this repo, documentation address space only: 192.0.2.0/24,

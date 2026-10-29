@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """``saos-network-facts``: extract per-device facts from configurations, or validate a facts file."""
 
 import argparse

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Changelog tooling for a semver repo. No dependencies.
 
   scripts/changelog.py check [BASE_REF]   the PR cuts a release: [Unreleased] is empty, the top release heading

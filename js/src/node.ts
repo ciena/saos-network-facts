@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // The Node entry point: everything from the main entry, plus reading a facts file from disk.
 
 import fs from "node:fs";

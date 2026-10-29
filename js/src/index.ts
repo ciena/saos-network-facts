@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Reader for saos-network-facts facts files, and the helpers every consumer needs: which IP
 // interfaces ride a port (SAOS 10: flow point -> forwarding domain -> interface; SAOS 6: the VLANs
 // the port carries), loopbacks, BGP neighbours, and the parts of an IS-IS NET. Pure functions, no

@@ -35,3 +35,6 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   a reader: `parseFacts`, `readFacts` (Node), `interfacesOnPort` (flow point -> forwarding domain ->
   interface on SAOS 10, VLAN -> interface on SAOS 6), `loopbacks`, `bgpPeers`, `isisAreaId`,
   `isisSystemId`, `isisArea`.
+- **Licence** — Apache-2.0 (`LICENSE`), `NOTICE` (Copyright 2026 Ciena Corporation), and an
+  `SPDX-License-Identifier: Apache-2.0` header on every source file; both files ship in the wheel,
+  sdist and npm package.

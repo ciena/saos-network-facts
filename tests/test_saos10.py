@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from saos_network_facts import saos10
 
 

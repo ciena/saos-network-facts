@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Things that must agree across the repo: versions, and the npm package's copy of the schema."""
 
 import json
@@ -17,3 +18,12 @@ def test_versions_agree():
 
 def test_npm_schema_is_the_python_schema():
     assert json.loads((ROOT / "js/schema/facts-v1.schema.json").read_text()) == schema.load_schema()
+
+
+def test_source_files_carry_the_spdx_header():
+    import subprocess
+
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()
+    missing = [f for f in tracked if f.endswith((".py", ".ts", ".mjs", ".sh"))
+               and "SPDX-License-Identifier: Apache-2.0" not in "".join((ROOT / f).read_text().splitlines(True)[:2])]
+    assert missing == []

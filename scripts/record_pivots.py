@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Record the translator's pivot JSON for every SAOS 10 file of the test cases into tests/fixtures/pivots.json,
 so the tests run without a translator or the network.
 

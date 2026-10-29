@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The SAOS 10 translator, which turns a CLI or NETCONF XML configuration into pivot JSON.
 
 SAOS 10 configurations are parsed by the translator, not here: its ``convert_cli`` / ``convert_xml``

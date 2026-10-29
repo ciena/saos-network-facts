@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Facts from a SAOS 6 / SAOS 8 CLI configuration.
 
 SAOS 6 (39xx, 51xx on 6.x) and SAOS 8 (5170 / 5171) share one flat command language: every line is a

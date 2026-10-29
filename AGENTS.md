@@ -23,6 +23,8 @@ facts file. Python extractor + CLI in `src/saos_network_facts/`, npm reader in `
   credentials, tokens, internal URLs or repository paths, or anything derived from them (including
   extractor output). Fixtures are synthetic (documentation address ranges) or from the public
   ciena/saos-labs. `tests/test_extract.py::test_fixtures_are_synthetic` guards addresses and secrets.
+- Licence: Apache-2.0, Copyright 2026 Ciena Corporation (`NOTICE`). New source files start with an
+  `SPDX-License-Identifier: Apache-2.0` comment (after any shebang); a test checks it.
 - No translator code here: SAOS 10 parsing goes through the translator's MCP tools only.
 - Tests must not use the network. A changed SAOS 10 fixture needs `scripts/record_pivots.py`
   (run by someone with a translator), then `UPDATE_GOLDEN=1 pytest -q`; review the golden diff.

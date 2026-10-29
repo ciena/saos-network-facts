@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The facts file's JSON Schema (``schema/facts-v1.schema.json``) and validation against it."""
 
 import json

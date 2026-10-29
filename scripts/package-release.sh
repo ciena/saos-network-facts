@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 # Writes the release downloads into $1: the Python wheel and sdist, and the npm package tarball.
 # release.yml attaches whatever lands there to the GitHub Release.
 set -euo pipefail

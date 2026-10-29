@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Extract per-device network facts from SAOS 6/8/10 configurations into a versioned schema."
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
 dependencies = [
   "jsonschema>=4.18",
@@ -35,7 +35,7 @@ Repository = "https://github.com/ciena/saos-network-facts"
 packages = ["src/saos_network_facts"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/js/package.json", "/js/schema", "/README.md", "/CHANGELOG.md", "/LICENSE"]
+include = ["/src", "/tests", "/js/package.json", "/js/schema", "/README.md", "/CHANGELOG.md", "/LICENSE", "/NOTICE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

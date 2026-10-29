@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Facts for a set of devices: which configuration files belong to which device, which extractor reads
 them, and the device records of the facts file.
 

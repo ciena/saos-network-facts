@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Copies the schema from the Python package (the single source) into schema/ and generates
 // src/generated/facts.ts from it. `--check` fails when either is out of date instead of writing.
 import fs from "node:fs";
@@ -11,7 +12,7 @@ const schemaOut = path.join(js, "schema", "facts-v1.schema.json");
 const typesOut = path.join(js, "src", "generated", "facts.ts");
 
 const schemaText = fs.readFileSync(source, "utf8");
-const banner = "// Generated from schema/facts-v1.schema.json by scripts/generate.mjs; do not edit.\n/* eslint-disable */\n";
+const banner = "// SPDX-License-Identifier: Apache-2.0\n// Generated from schema/facts-v1.schema.json by scripts/generate.mjs; do not edit.\n/* eslint-disable */\n";
 const types = await compile(JSON.parse(schemaText), "FactsFile", {
   bannerComment: banner,
   additionalProperties: false,

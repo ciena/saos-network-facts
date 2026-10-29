@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Facts from the SAOS 10 translator's pivot JSON of a configuration.
 
 The translator turns a CLI or XML configuration into one JSON document keyed by YANG module
