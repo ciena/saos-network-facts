@@ -47,3 +47,34 @@ describe('failure replay', () => {
     expect(titles(r)).toContain('t=90 s: iBGP PE1-PE2 HoldTimer expires');
   });
 });
+
+describe('failure detection: silent failure vs loss of signal', () => {
+  // Without link MEGs (as in an imported facts file) only BFD, LACP or the IGP hellos find a silent failure.
+  const bare = { ...topo, cfm: { ...topo.cfm, linkMegs: false } };
+  const igpDown = (r) => r.replay.steps.filter((s) => /adjacency on P1-P2 Down/.test(s.title)).map((s) => s.t);
+
+  test('loss of signal: both ends see the interface down at once', () => {
+    const r = replayFailure(bare, 'P1-P2', { detection: 'los' });
+    expect(titles(r)).toContain('t=0 ms: Loss of signal at both ends');
+    expect(igpDown(r)).toEqual([0, 0]);
+  });
+
+  test('silent, no MEG or BFD: the IS-IS holding time (3 x 10 s) expires first', () => {
+    const r = replayFailure(bare, 'P1-P2', { detection: 'ccm' });
+    expect(titles(r)).toContain('t=30 s: P1: IS-IS hold timer on P1-P2 expires');
+    expect(igpDown(r)).toEqual([30000, 30000]);
+    expect(titles(r)).toContain('t=30.05 s: P1 originates 0000.0000.0002.00-00 seq 2');
+    expect(r.walkAfter.steps.map((s) => s.node)).toEqual(['CE1', 'PE1', 'P1', 'PE2', 'CE2']);
+  });
+
+  test('silent, LAG member: LACP short timeout (3 x 1 s) removes it; loss of signal at once', () => {
+    const t = (d) => replayFailure(topo, 'PE1-P1/2', { detection: d }).replay.steps.find((s) => /LACP removes/.test(s.title)).t;
+    expect(t('ccm')).toBe(3000);
+    expect(t('los')).toBe(0);
+  });
+
+  test('silent, whole LAG without a MEG: its members expire after the LACP timeout', () => {
+    const r = replayFailure(bare, 'PE1-P1', { detection: 'ccm' });
+    expect(titles(r)).toContain('t=3 s: PE1: PE1-P1 members expire, LAG down');
+  });
+});

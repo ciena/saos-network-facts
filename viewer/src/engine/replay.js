@@ -47,6 +47,9 @@ export function replayFailure(topo, failure, { labelMode = 'ldp', vendor, detect
     steps.push({ t, layer, node: extra.node ?? link.a.node, title: `t=${fmtMs(t)}: ${title}`, actions, headers: [], moves: extra.moves ?? [], status: extra.status ?? 'forward', highlight: extra.highlight ?? { links: [link.id] } });
 
   step(0, 'physical', `${failure} fails`, [`${link.lag && failure !== link.id ? 'LAG member' : 'link'} ${failure} stops carrying frames`], { status: 'dropped' });
+  // 802.1AX §6.4.4: a silent member failure is found when no LACPDU arrives for 3 x the periodic time.
+  const lacpTimeoutMs = (v.lacp.shortTimeout ? 1 : 30) * 3 * 1000;
+  const lacpTimeout = `no LACPDU for 3 x ${v.lacp.shortTimeout ? '1 s (short timeout)' : '30 s (long timeout)'}: partner info expired (802.1AX §6.4.12)`;
 
   const afterLinks = buildNetwork(topo, { ...opts, failures: [failure] }).links;
   if (afterLinks[link.id].up) {
@@ -54,17 +57,20 @@ export function replayFailure(topo, failure, { labelMode = 'ldp', vendor, detect
     const after = buildNetwork(topo, { ...opts, failures: [failure] });
     const m0 = before.links[link.id].members.find((m) => m.id === failure);
     const m1 = after.links[link.id].members.find((m) => m.id === failure);
-    step(0, 'physical', `LACP removes ${failure} from ${link.a.if}`, [
+    const tLacp = detection === 'los' ? 0 : lacpTimeoutMs;
+    if (detection !== 'los') step(0, 'physical', `${failure}: frames lost until LACP notices`, ['silent failure: the member stays up at both ends, flows hashed onto it are dropped'], { status: 'dropped' });
+    step(tLacp, 'physical', `LACP removes ${failure} from ${link.a.if}`, [
+      ...(detection === 'los' ? ['loss of signal: the port goes down at once'] : [lacpTimeout]),
       `port disabled: Selected -> UNSELECTED, Mux leaves COLLECTING_DISTRIBUTING (802.1AX §6.4.14-15)`,
       `actor state 0x${m0.actorState.toString(16)} [${describeLacpState(m0.actorState).join(',')}] -> 0x${m1.actorState.toString(16)} [${describeLacpState(m1.actorState).join(',')}]`,
       `distributing members: ${before.links[link.id].distributing.join(', ')} -> ${after.links[link.id].distributing.join(', ')}`,
     ]);
-    step(0, 'cfm', `CCMs on MEG-${link.id} keep flowing`, ['MEPs sit on the aggregated interface; no loss of continuity']);
-    step(0, 'isis', `${before.igpName === 'ospf' ? 'OSPF neighbour stays Full' : 'IS-IS adjacency stays Up'}`, ['LAG still up (min-links 1): no LSP/LSA change, no SPF']);
+    step(tLacp, 'cfm', `CCMs on MEG-${link.id} keep flowing`, ['MEPs sit on the aggregated interface; no loss of continuity']);
+    step(tLacp, 'isis', `${before.igpName === 'ospf' ? 'OSPF neighbour stays Full' : 'IS-IS adjacency stays Up'}`, ['LAG still up (min-links 1): no LSP/LSA change, no SPF']);
     const walkAfter = walkOf(after);
     if (walkAfter) {
       const hop = (w) => w.steps.flatMap((s) => s.moves).find((m) => m.link === link.id)?.member;
-      step(0, 'physical', 'Flows rehash onto the surviving members', [`${host ? `${host.from}->${host.dst}` : `${src}->${dst}`} flow: member ${hop(walkBefore) ?? '-'} -> ${hop(walkAfter) ?? '-'}`], { status: 'delivered' });
+      step(tLacp, 'physical', 'Flows rehash onto the surviving members', [`${host ? `${host.from}->${host.dst}` : `${src}->${dst}`} flow: member ${hop(walkBefore) ?? '-'} -> ${hop(walkAfter) ?? '-'}`], { status: 'delivered' });
     }
     return { before, after, walkBefore, walkAfter, replay: { kind: 'replay', layer: 'physical', title: `Failure replay: ${failure}`, steps } };
   }
@@ -72,6 +78,9 @@ export function replayFailure(topo, failure, { labelMode = 'ldp', vendor, detect
   // The link (or the whole bundle) is down.
   const ends = [link.a.node, link.b.node];
   const detectAt = {};
+  const ospf = before.igpName === 'ospf';
+  // Only a link the IGP runs on changes the LSDB (not a PE-CE or host link).
+  const igpLink = before.igp.adjacencies.some((a) => a.link === link.id);
   const meg = before.cfm.megs.find((m) => m.link === link.id);
   if (detection === 'ccm' && meg) {
     const failAtMs = 2 * meg.intervalMs;
@@ -90,14 +99,29 @@ export function replayFailure(topo, failure, { labelMode = 'ldp', vendor, detect
       detectAt[n] = t;
       step(t, 'physical', `${n}: BFD session on ${link.id} Down`, [`no BFD Control packet for ${v.bfd.detectMult} x ${fmtMs(v.bfd.intervalMs)} -> Down (Control Detection Time Expired)`, 'clients (the IGP) told the neighbour is gone'], { node: n, status: 'dropped' });
     }
+  } else if (detection === 'ccm' && link.lag) {
+    // No CC on the bundle: every member's LACP partner times out, the aggregator goes down.
+    for (const n of ends) {
+      detectAt[n] = lacpTimeoutMs;
+      step(lacpTimeoutMs, 'physical', `${n}: ${link.id} members expire, LAG down`, [lacpTimeout, 'no member distributing: the aggregated interface goes down'], { node: n, status: 'dropped' });
+    }
+  } else if (detection === 'ccm' && igpLink) {
+    // No CC on the link: only the IGP hellos stop. ISO 10589 holding time / RFC 2328 RouterDeadInterval.
+    const t = ospf ? v.ospf.deadIntervalS * 1000 : v.isis.holdMultiplier * v.isis.helloIntervalS * 1000;
+    const why = ospf ? `no Hello for RouterDeadInterval ${fmtMs(t)} (RFC 2328 §10.3 InactivityTimer)` : `no IIH for the holding time ${v.isis.holdMultiplier} x ${fmtMs(v.isis.helloIntervalS * 1000)} (ISO 10589)`;
+    step(0, 'physical', 'Silent failure: no CFM MEG or BFD on the link', ['both interfaces stay up; traffic onto the link is dropped until the IGP notices'], { status: 'dropped' });
+    for (const n of ends) {
+      detectAt[n] = t;
+      step(t, 'isis', `${n}: ${ospf ? 'OSPF' : 'IS-IS'} hold timer on ${link.id} expires`, [why], { node: n, status: 'dropped' });
+    }
+  } else if (detection === 'ccm') {
+    for (const n of ends) detectAt[n] = 0;
+    step(0, 'physical', 'Silent failure: nothing watches the link', ['no CFM MEG, BFD, LACP or IGP adjacency on it: both interfaces stay up and traffic onto it is dropped'], { status: 'dropped' });
   } else {
     for (const n of ends) detectAt[n] = 0;
     step(0, 'physical', 'Loss of signal at both ends', ends.map((n) => `${n}: interface down`), { status: 'dropped' });
   }
 
-  const ospf = before.igpName === 'ospf';
-  // Only a link the IGP runs on changes the LSDB (not a PE-CE or host link).
-  const igpLink = before.igp.adjacencies.some((a) => a.link === link.id);
   const routers = igpLink ? ends.filter((n) => (ospf ? before.ospf.lsas[n] : before.isis.lsps[n])) : [];
   const area = ospf ? before.ospf.adjacencies.find((a) => a.link === link.id)?.area : null;
   const seqs = ospf

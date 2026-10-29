@@ -6,7 +6,7 @@
 // #device=NAME, #service=ID, #topology (panels hidden); anything else is the overview.
 
 import exampleFacts from '../../examples/adaptive-sr-cfm/facts.json?raw';
-import { buildNetwork, ccmWalk, isisFloodWalk, ospfFloodWalk, replayFailure, tpTunnelWalk, vpwsWalk } from './engine/index.js';
+import { buildNetwork, ccmWalk, isisFloodWalk, ospfFloodAreas, ospfFloodWalk, replayFailure, tpTunnelWalk, vpwsWalk } from './engine/index.js';
 import { importFacts } from './import/facts.js';
 import { labParams, loadFromParams, loadLab } from './labs.js';
 import { renderDevice, renderOverview, renderService } from './panels.js';
@@ -172,7 +172,14 @@ function fillWalkParams() {
   } else if (kind === 'ccm') {
     add('wp-a', net.cfm.megs.map((m) => ({ value: m.id, label: `MEG ${m.id}` })));
   } else {
-    add('wp-a', net.igp.routers.map((r) => ({ value: r, label: `origin ${r}` })));
+    const origin = add('wp-a', net.igp.routers.map((r) => ({ value: r, label: `origin ${r}` })));
+    // OSPF floods a Router-LSA per area: with more than one area, the area of the origin's to flood in.
+    if (net.igpName === 'ospf' && net.igp.routers.some((r) => ospfFloodAreas(net, r).length)) {
+      const area = add('wp-b', []);
+      const areas = () => options(area, ospfFloodAreas(net, origin.value).map((a) => ({ value: a, label: `area ${a}` })));
+      origin.addEventListener('change', areas);
+      areas();
+    }
   }
   $('walk-run').disabled = !box.querySelector('select')?.options.length;
 }
@@ -183,7 +190,10 @@ function fillSelects() {
   for (const o of $('walk-kind').options) o.disabled = !has[o.value];
   if (!has[$('walk-kind').value]) $('walk-kind').value = Object.keys(has).find((k) => has[k]) ?? 'vpws';
   fillWalkParams();
-  options($('fail-target'), state.imp.topology.links.map((l) => ({ value: l.id, label: `${l.id} (${l.kind})` })));
+  options($('fail-target'), state.imp.topology.links.flatMap((l) => [
+    { value: l.id, label: `${l.id} (${l.kind}${l.lag ? ', LAG' : ''})` },
+    ...(l.lag ? l.members.map((m) => ({ value: m.id, label: `\u2003member ${m.id} (${m.a}\u2013${m.b})` })) : []),
+  ]));
 }
 
 $('walk-kind').addEventListener('change', fillWalkParams);
@@ -212,7 +222,7 @@ $('walk-run').addEventListener('click', () => {
   if (kind === 'vpws') walkActions.walkPw(a, b);
   else if (kind === 'ccm') walkActions.walkCcm(a);
   else if (kind === 'tp') runWalk(() => tpTunnelWalk(state.net, a));
-  else runWalk(() => (state.net.igpName === 'ospf' ? ospfFloodWalk(state.net, a) : isisFloodWalk(state.net, a)));
+  else runWalk(() => (state.net.igpName === 'ospf' ? ospfFloodWalk(state.net, a, b ?? null) : isisFloodWalk(state.net, a)));
 });
 
 function setWalk(walk) {
@@ -249,7 +259,8 @@ function goStep(i) {
 $('fail-run').addEventListener('click', () => {
   const link = $('fail-target').value;
   if (!link) return;
-  const { before, after, replay } = replayFailure(state.imp.topology, link, { labelMode: state.imp.labelMode });
+  const detection = $('fail-detection').value;
+  const { before, after, replay } = replayFailure(state.imp.topology, link, { labelMode: state.imp.labelMode, detection });
   state.failures = [link];
   state.replay = { before, after };
   setWalk(replay);

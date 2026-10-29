@@ -3,7 +3,7 @@
 export { builtinTopology, validateTopology } from './topology.js';
 export { importClab } from './clab.js';
 export { buildNetwork } from './network.js';
-export { dataWalk, hostWalk, hostTargets, isisFloodWalk, ospfFloodWalk, bgpUpdateWalk, ccmWalk, vpwsWalk, tpTunnelWalk } from './walk.js';
+export { dataWalk, hostWalk, hostTargets, isisFloodWalk, ospfFloodWalk, ospfFloodAreas, bgpUpdateWalk, ccmWalk, vpwsWalk, tpTunnelWalk } from './walk.js';
 export { computeOspf } from './ospf.js';
 export { computeMplsTp } from './mplstp.js';
 export { replayFailure } from './replay.js';

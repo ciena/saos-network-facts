@@ -680,6 +680,14 @@ function serviceCcmWalk(net, meg) {
 // Control plane: `origin` refreshes its Router-LSA in `area` (seq + 1) and
 // floods it (RFC 2328 §13): LS Update to AllSPFRouters on each Full
 // neighbour, installed if newer, acknowledged, flooded on.
+// The areas an OSPF flood walk from `origin` can run in: the origin's areas when the
+// network has more than one area (a flood is area-scoped, §13), else [] (no choice to make).
+export function ospfFloodAreas(net, origin) {
+  const o = net.ospf;
+  if (!o || new Set(Object.values(o.areas).flat()).size < 2) return [];
+  return o.areas[origin] ?? [];
+}
+
 export function ospfFloodWalk(net, origin = null, area = null) {
   const o = net.ospf;
   const from = origin ?? o.routers[0];
