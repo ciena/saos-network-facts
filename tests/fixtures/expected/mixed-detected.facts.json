@@ -60,6 +60,13 @@
               "instance": "CORE",
               "interface": "core1",
               "level": "L2",
+              "metrics": [
+                {
+                  "level": "L2",
+                  "metric": null,
+                  "wide_metric": "50"
+                }
+              ],
               "type": null
             }
           ]
@@ -73,7 +80,7 @@
             "name": "LAG1"
           }
         ],
-        "lines": 23,
+        "lines": 24,
         "peers": [
           {
             "ip": "203.0.113.30",
@@ -144,7 +151,7 @@
             "tunnel_type": null
           }
         ],
-        "recognised": 20,
+        "recognised": 21,
         "rings": [],
         "segment_routing": {
           "policies": [],
@@ -257,12 +264,14 @@
               "instance": "CORE",
               "interface": "core1",
               "level": "level-2",
+              "metrics": [],
               "type": "point-to-point"
             },
             {
               "instance": "CORE",
               "interface": "lb0",
               "level": null,
+              "metrics": [],
               "type": "point-to-point"
             }
           ]
@@ -335,8 +344,8 @@
   ],
   "generator": {
     "name": "saos-network-facts",
-    "translator": "translator 4.2.0 (recorded)",
-    "version": "0.3.1"
+    "translator": "translator 4.2.1 (recorded)",
+    "version": "0.4.0"
   },
-  "schema_version": "1.2.0"
+  "schema_version": "1.3.0"
 }

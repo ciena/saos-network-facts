@@ -1530,230 +1530,7 @@
     }
    }
   },
-  "90fb576f365c92d1daaaf40f": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-bgp:bgp": {
-      "instance": [
-       {
-        "as": 65000,
-        "peer": [
-         {
-          "address": "192.0.2.1",
-          "address-family": [
-           {
-            "activate": true,
-            "afi": "l2vpn",
-            "safi": "evpn"
-           }
-          ],
-          "remote-as": 65000
-         }
-        ],
-        "router-id": "192.0.2.2"
-       }
-      ]
-     },
-     "ciena-isis:isis": {
-      "instance": [
-       {
-        "interfaces": {
-         "interface": [
-          {
-           "interface-type": "point-to-point",
-           "name": "lb0"
-          },
-          {
-           "interface-type": "point-to-point",
-           "level-type": "level-2",
-           "name": "PE2-PE1"
-          }
-         ]
-        },
-        "level-type": "level-2",
-        "net": [
-         "49.0001.1920.0000.2002.00"
-        ],
-        "segment-routing": {
-         "enabled": true,
-         "srgb": [
-          {
-           "lower-bound": 16000,
-           "upper-bound": 23999
-          }
-         ]
-        },
-        "tag": "CORE"
-       }
-      ]
-     },
-     "ciena-l2vpn:l2vpn-services": {
-      "l2vpn": [
-       {
-        "forwarding-domain": "FD-VPWS-100",
-        "name": "VPWS-100",
-        "pseudowire": [
-         "PW-100"
-        ]
-       }
-      ]
-     },
-     "ciena-mef-classifier:classifiers": {
-      "classifier": [
-       {
-        "filter-entry": [
-         {
-          "filter-parameter": "ciena-mef-classifier:vtag-stack",
-          "vtags": [
-           {
-            "tag": 1,
-            "vlan-id": 100
-           }
-          ]
-         }
-        ],
-        "name": "VLAN100"
-       }
-      ]
-     },
-     "ciena-mef-fd:fds": {
-      "fd": [
-       {
-        "mode": "vpls",
-        "name": "FD-CORE-1"
-       },
-       {
-        "mode": "vpws",
-        "name": "FD-VPWS-100"
-       }
-      ]
-     },
-     "ciena-mef-fp:fps": {
-      "fp": [
-       {
-        "fd-name": "FD-CORE-1",
-        "logical-port": "1",
-        "name": "FP-CORE-1"
-       },
-       {
-        "classifier-list": [
-         "VLAN100"
-        ],
-        "fd-name": "FD-VPWS-100",
-        "logical-port": "3",
-        "name": "FP-AC-100"
-       }
-      ]
-     },
-     "ciena-sr:segment-routing": {
-      "connected-prefix-sid-map": [
-       {
-        "interface": "lb0",
-        "prefix": "192.0.2.2/32",
-        "start-sid": 2,
-        "value-type": "index"
-       }
-      ]
-     },
-     "ietf-pseudowires:pseudowires": {
-      "pseudowire": [
-       {
-        "ciena-ietf-pseudowires:mode": "spoke",
-        "configured-pw": {
-         "peer-ip": "192.0.2.1",
-         "pw-id": 100
-        },
-        "name": "PW-100"
-       }
-      ]
-     },
-     "mef-cfm:maintenance-domain": [
-      {
-       "id": "MD5",
-       "maintenance-association": [
-        {
-         "component-list": [
-          {
-           "ciena-cfm:fd-name": "FD-VPWS-100",
-           "component-id": 1
-          }
-         ],
-         "id": "MA-100",
-         "maintenance-association-end-point": [
-          {
-           "direction": "up",
-           "interface": "FP-AC-100",
-           "mep-identifier": 12
-          }
-         ],
-         "name": "MA-100",
-         "name-type": "character-string"
-        }
-       ],
-       "md-level": 5,
-       "name": "MD5",
-       "name-type": "character-string"
-      }
-     ],
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "192.0.2.2",
-             "prefix-length": 32
-            },
-            "ip": "192.0.2.2"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "loopback",
-         "name": "lb0"
-        },
-        "name": "lb0"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "198.51.100.1",
-             "prefix-length": 31
-            },
-            "ip": "198.51.100.1"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-CORE-1"
-          }
-         },
-         "mtu": 9000,
-         "name": "PE2-PE1"
-        },
-        "name": "PE2-PE1"
-       }
-      ]
-     },
-     "openconfig-system:system": {
-      "config": {
-       "hostname": "PE2"
-      }
-     }
-    }
-   }
-  },
-  "c3bb1596b2492b38ed76aa8d": {
+  "965dc80fddafd10c7c1d7353": {
    "pivot": {
     "yuma-netconf:config": {
      "ciena-bgp:bgp": {
@@ -1796,6 +1573,9 @@
           },
           {
            "interface-type": "point-to-point",
+           "level-2": {
+            "wide-metric": 100
+           },
            "level-type": "level-2",
            "name": "PE1-PE2"
           }
@@ -2058,10 +1838,237 @@
     }
    }
   },
+  "eead4dc8f4d090349434bc60": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-bgp:bgp": {
+      "instance": [
+       {
+        "as": 65000,
+        "peer": [
+         {
+          "address": "192.0.2.1",
+          "address-family": [
+           {
+            "activate": true,
+            "afi": "l2vpn",
+            "safi": "evpn"
+           }
+          ],
+          "remote-as": 65000
+         }
+        ],
+        "router-id": "192.0.2.2"
+       }
+      ]
+     },
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "interface-type": "point-to-point",
+           "name": "lb0"
+          },
+          {
+           "interface-type": "point-to-point",
+           "level-2": {
+            "metric": 30,
+            "wide-metric": 100
+           },
+           "level-type": "level-2",
+           "name": "PE2-PE1"
+          }
+         ]
+        },
+        "level-type": "level-2",
+        "net": [
+         "49.0001.1920.0000.2002.00"
+        ],
+        "segment-routing": {
+         "enabled": true,
+         "srgb": [
+          {
+           "lower-bound": 16000,
+           "upper-bound": 23999
+          }
+         ]
+        },
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-l2vpn:l2vpn-services": {
+      "l2vpn": [
+       {
+        "forwarding-domain": "FD-VPWS-100",
+        "name": "VPWS-100",
+        "pseudowire": [
+         "PW-100"
+        ]
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "VLAN100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-CORE-1"
+       },
+       {
+        "mode": "vpws",
+        "name": "FD-VPWS-100"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "fd-name": "FD-CORE-1",
+        "logical-port": "1",
+        "name": "FP-CORE-1"
+       },
+       {
+        "classifier-list": [
+         "VLAN100"
+        ],
+        "fd-name": "FD-VPWS-100",
+        "logical-port": "3",
+        "name": "FP-AC-100"
+       }
+      ]
+     },
+     "ciena-sr:segment-routing": {
+      "connected-prefix-sid-map": [
+       {
+        "interface": "lb0",
+        "prefix": "192.0.2.2/32",
+        "start-sid": 2,
+        "value-type": "index"
+       }
+      ]
+     },
+     "ietf-pseudowires:pseudowires": {
+      "pseudowire": [
+       {
+        "ciena-ietf-pseudowires:mode": "spoke",
+        "configured-pw": {
+         "peer-ip": "192.0.2.1",
+         "pw-id": 100
+        },
+        "name": "PW-100"
+       }
+      ]
+     },
+     "mef-cfm:maintenance-domain": [
+      {
+       "id": "MD5",
+       "maintenance-association": [
+        {
+         "component-list": [
+          {
+           "ciena-cfm:fd-name": "FD-VPWS-100",
+           "component-id": 1
+          }
+         ],
+         "id": "MA-100",
+         "maintenance-association-end-point": [
+          {
+           "direction": "up",
+           "interface": "FP-AC-100",
+           "mep-identifier": 12
+          }
+         ],
+         "name": "MA-100",
+         "name-type": "character-string"
+        }
+       ],
+       "md-level": 5,
+       "name": "MD5",
+       "name-type": "character-string"
+      }
+     ],
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.2",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.2"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "name": "lb0"
+        },
+        "name": "lb0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.1",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.1"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-CORE-1"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE2-PE1"
+        },
+        "name": "PE2-PE1"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "PE2"
+      }
+     }
+    }
+   }
+  },
   "f2078f741d308c8be1f57755": {
    "error": "Unknown top-level command: frobnicate"
   }
  },
  "saos_version": "10_12_00_0228",
- "translator": "4.2.0"
+ "translator": "4.2.1"
 }

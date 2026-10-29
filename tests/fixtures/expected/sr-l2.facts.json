@@ -119,12 +119,20 @@
               "instance": "CORE",
               "interface": "lb0",
               "level": null,
+              "metrics": [],
               "type": "point-to-point"
             },
             {
               "instance": "CORE",
               "interface": "PE1-PE2",
               "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "100"
+                }
+              ],
               "type": "point-to-point"
             }
           ]
@@ -378,12 +386,20 @@
               "instance": "CORE",
               "interface": "lb0",
               "level": null,
+              "metrics": [],
               "type": "point-to-point"
             },
             {
               "instance": "CORE",
               "interface": "PE2-PE1",
               "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": "30",
+                  "wide_metric": "100"
+                }
+              ],
               "type": "point-to-point"
             }
           ]
@@ -510,8 +526,8 @@
   ],
   "generator": {
     "name": "saos-network-facts",
-    "translator": "translator 4.2.0 (recorded)",
-    "version": "0.3.1"
+    "translator": "translator 4.2.1 (recorded)",
+    "version": "0.4.0"
   },
-  "schema_version": "1.2.0"
+  "schema_version": "1.3.0"
 }

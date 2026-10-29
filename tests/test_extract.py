@@ -133,3 +133,15 @@ def test_leaf_deletes_create_no_port():
     assert pe5["status"] == "ok"
     assert [i["name"] for i in pe5["facts"]["interfaces"]] == ["lb0", "core1"]
     assert list(pe5["facts"]["ports"]) == ["1"]
+
+
+def test_isis_metrics_are_optional():
+    # a schema 1.2 file (no `metrics` on the IS-IS interfaces) still validates against 1.3
+    doc = json.loads((EXPECTED / "sr-l2.facts.json").read_text())
+    for record in doc["devices"]:
+        for item in ((record.get("facts") or {}).get("isis") or {}).get("interfaces", []):
+            item.pop("metrics")
+    doc["schema_version"] = "1.2.0"
+    assert schema.errors(doc) == []
+    doc["devices"][0]["facts"]["isis"]["interfaces"][0]["metrics"] = [{"level": "level-2", "metric": 10}]
+    assert schema.errors(doc)  # an entry needs level, metric and wide_metric

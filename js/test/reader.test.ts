@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import {
-  bgpPeers, devicesByName, FactsFormatError, interfacesOnPort, isisArea, isisAreaId, isisSystemId, loopbacks, parseFacts, readFacts,
+  bgpPeers, devicesByName, FactsFormatError, interfacesOnPort, isisArea, isisAreaId, isisMetric, isisSystemId, loopbacks, parseFacts, readFacts,
 } from "../src/node.ts";
 import type { DeviceFacts } from "../src/generated/facts.ts";
 
@@ -63,4 +63,18 @@ test("IS-IS NET parsing", () => {
   assert.equal(isisArea(devicesByName(srl2).get("PE2")!.isis.instances[0]!), "49.0001");
   assert.equal(isisArea({ area: "49.0002.2030.0011.3030.00" }), "49.0002");
   assert.equal(isisArea({ area: "49.0011" }), "49.0011");
+});
+
+test("IS-IS interface metrics: wide, else narrow, per level; null when not set", () => {
+  const pe1 = devicesByName(srl2).get("PE1")!;
+  const pe2 = devicesByName(srl2).get("PE2")!;
+  assert.equal(isisMetric(pe1, "PE1-PE2", 2), 100);
+  assert.equal(isisMetric(pe2, "PE2-PE1", "level-2"), 100); // wide 100 over narrow 30
+  assert.equal(isisMetric(pe1, "PE1-PE2", 1), null);
+  assert.equal(isisMetric(pe1, "lb0", 2), null);
+  assert.equal(isisMetric(devicesByName(mixed).get("AGG1")!, "core1", "L2"), 50);
+  const narrow = { isis: { instances: [], interfaces: [{ interface: "x", instance: "I", level: null, type: null, metrics: [{ level: "level-1", metric: "7", wide_metric: null }] }] } } as unknown as DeviceFacts;
+  assert.equal(isisMetric(narrow, "x", "L1"), 7);
+  const old = { isis: { instances: [], interfaces: [{ interface: "x", instance: "I", level: null, type: null }] } } as unknown as DeviceFacts;
+  assert.equal(isisMetric(old, "x", 2), null);
 });

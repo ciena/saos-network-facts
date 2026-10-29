@@ -50,10 +50,24 @@ def test_isis_net_sr_and_merge_across_files():
     (instance,) = f["isis"]["instances"]
     assert instance["level"] == "level-2" and instance["sr_enabled"] is True
     assert (instance["net"], instance["area_id"]) == ("49.0001.1920.0000.2001.00", "49.0001")
-    assert f["isis"]["interfaces"] == [{"interface": "core", "instance": "CORE", "level": "level-2", "type": "point-to-point"},
-                                       {"interface": "lb0", "instance": "CORE", "level": None, "type": None}]
+    assert f["isis"]["interfaces"] == [{"interface": "core", "instance": "CORE", "level": "level-2", "type": "point-to-point",
+                                        "metrics": []},
+                                       {"interface": "lb0", "instance": "CORE", "level": None, "type": None, "metrics": []}]
     assert f["segment_routing"]["srgb"] == [{"instance": "CORE", "lower": "16000", "upper": "23999"}]
     assert f["interfaces"][1]["isis"] == "CORE"
+
+
+def test_isis_interface_metrics_per_level_in_configuration_order():
+    # level-2 set first, its wide metric in a later file; level-1 only a narrow metric
+    first = {"ciena-isis:isis": {"instance": [{"tag": "CORE", "interfaces": {"interface": [
+        {"name": "core", "level-2": {"metric": 20}}, {"name": "lb0"}]}}]}}
+    later = {"ciena-isis:isis": {"instance": [{"tag": "CORE", "interfaces": {"interface": [
+        {"name": "core", "level-2": {"wide-metric": 100}, "level-1": {"metric": 11}}]}}]}}
+    f = run(IFACES, first, later)
+    core, lb0 = f["isis"]["interfaces"]
+    assert core["metrics"] == [{"level": "level-2", "metric": "20", "wide_metric": "100"},
+                               {"level": "level-1", "metric": "11", "wide_metric": None}]
+    assert lb0["metrics"] == []
 
 
 def test_prefix_sids_and_node_flag():

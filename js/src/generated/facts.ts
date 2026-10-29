@@ -486,6 +486,30 @@ export interface IsisInterface {
    * The interface type (`point-to-point`, `broadcast`); null when not configured.
    */
   type: string | null;
+  /**
+   * The metrics configured on the interface, one entry per level in configuration order (SAOS 10 `level-1` / `level-2` `metric` and `wide-metric`; SAOS 6 / 8 `isis interface-level set ... level L1|L2 wide-metric`). An empty list when the configuration sets no metric (the interface advertises its default). Optional: absent in files before schema 1.3. Since schema 1.3.
+   */
+  metrics?: IsisMetric[];
+}
+/**
+ * The metric an IS-IS interface advertises at one level. Values are text, as written. Since schema 1.3.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "IsisMetric".
+ */
+export interface IsisMetric {
+  /**
+   * The level, in the configuration's own spelling: SAOS 10 `level-1` / `level-2`, SAOS 6 / 8 `L1` / `L2`.
+   */
+  level: string;
+  /**
+   * SAOS 10: the narrow (ISO 10589, 6-bit) metric of the level; null when not configured, and always null on SAOS 6 / 8, which have no narrow metric.
+   */
+  metric: string | null;
+  /**
+   * The wide (RFC 5305, 24-bit) metric of the level; null when not configured.
+   */
+  wide_metric: string | null;
 }
 /**
  * Segment routing (SR-MPLS / SRv6). SAOS 10 only; empty on SAOS 6 / 8.
