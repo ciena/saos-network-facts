@@ -7,8 +7,9 @@ file git tracks is scanned (binary files are skipped) and each IPv4 / IPv6 addre
 in one of:
 
     IPv4  10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 (RFC 1918),
-          192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 (RFC 5737), and 0.0.0.0
-          (the unspecified address, also the OSPF backbone area id)
+          192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 (RFC 5737), and 0.0.0.0/8
+          ("this network", RFC 1122 §3.2.1.3: never a host's address; OSPF area ids such as
+          0.0.0.0 and 0.0.0.1 are written in it)
     IPv6  2001:db8::/32 (RFC 3849), and :: / ::1
 
 A dotted quad or colon group that is not a valid address (``1.2.3.4.5``, ``10.12.00.0228``, a MAC
@@ -31,9 +32,10 @@ ROOT = Path(__file__).resolve().parent.parent
 ALLOWED = [ipaddress.ip_network(n) for n in (
     "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
     "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24",
+    "0.0.0.0/8",
     "2001:db8::/32",
 )]
-ALLOWED_HOSTS = {ipaddress.ip_address(a) for a in ("0.0.0.0", "::", "::1")}
+ALLOWED_HOSTS = {ipaddress.ip_address(a) for a in ("::", "::1")}
 # Protocol constants, not lab or customer addresses: each with where it is defined.
 PROTOCOL_ADDRESSES = {
     ipaddress.ip_address("224.0.0.5"): "OSPF AllSPFRouters (RFC 2328 §A.1)",

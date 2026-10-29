@@ -14,7 +14,7 @@ carries the built site as `saos-network-facts-viewer-X.Y.Z.tgz`.
 ```bash
 npm ci
 npm run dev       # http://localhost:5173
-npm test          # vitest: the facts importer and the URL loading
+npm test          # vitest: the engine (one file per protocol), the facts importer, the URL loading
 npm run build     # static site in dist/ (relative paths: serve it from any directory)
 ```
 

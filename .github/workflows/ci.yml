@@ -72,6 +72,6 @@ jobs:
           cache: npm
           cache-dependency-path: viewer/package-lock.json
       - run: npm ci --no-audit --no-fund
-      - name: "vitest (the facts importer, on the bundled example and synthetic files)"
+      - name: "vitest (the engine, and the facts importer on the bundled example and synthetic files)"
         run: npm test
       - run: npm run build

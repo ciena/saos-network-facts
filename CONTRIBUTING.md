@@ -43,8 +43,8 @@ or customer, or anything derived from them.
 
 Every address in the repository (any tracked file, not only fixtures) must be private or for
 documentation: RFC 1918 (10/8, 172.16/12, 192.168/16), RFC 5737 (192.0.2/24, 198.51.100/24,
-203.0.113/24), 0.0.0.0, and for IPv6 2001:db8::/32, :: and ::1. `scripts/check_addresses.py`
-checks it in CI; run it before you push. Renumber a lab's other addresses into those ranges.
+203.0.113/24), 0.0.0.0/8 ("this network", where OSPF area ids are written), and for IPv6
+2001:db8::/32, :: and ::1. `scripts/check_addresses.py` checks it in CI; run it before you push. Renumber a lab's other addresses into those ranges.
 
 ## Changelog and versioning
 
