@@ -17,6 +17,14 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-29
+
+### Fixed
+
+- **Translator refusals say why** — when `convert_cli` / `convert_xml` answers `ok: false` with the
+  reason only in `validation.message` (schema errors such as an unknown element in NETCONF XML),
+  the device's `failed_templates` / `reason` now carry that message instead of `convert failed`.
+
 ## [0.1.0] - 2026-10-29
 
 ### Added

@@ -69,6 +69,17 @@ def test_refused_configuration(endpoint):
         t.parse("frobnicate\n", "cli")
 
 
+def test_refused_xml_reports_the_validation_message(endpoint):
+    _, replies = endpoint
+    message = "unknown element {urn:example:frob}frob at /config/frob"
+    replies["convert_xml"] = {"ok": False, "data": None,
+                              "validation": {"valid": False, "message": message,
+                                             "details": [{"code": "xml-unknown-element", "message": message}]}}
+    t = translator.HttpTranslator("https://translator.example")
+    with pytest.raises(translator.TranslatorError, match="unknown element .*frob"):
+        t.parse("<config><frob xmlns='urn:example:frob'/></config>", "xml")
+
+
 def test_401_names_the_token_variable(endpoint):
     _, replies = endpoint
     replies["convert_cli"] = urllib.error.HTTPError("u", 401, "Unauthorized", {}, io.BytesIO(b'{"error":"invalid_token"}'))

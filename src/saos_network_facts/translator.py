@@ -178,8 +178,14 @@ class HttpTranslator:
             arguments["platform"] = platform
         reply = self._tool(f"convert_{fmt}", arguments)
         if not reply.get("ok"):
-            raise TranslatorError(reply.get("message") or reply.get("error") or "convert failed")
+            raise TranslatorError(failure_message(reply, "convert failed"))
         return reply.get("data")
+
+
+def failure_message(reply, default):
+    """Why a tool said ``ok: false``: its message, else its error code, else the validation message
+    (where the translator puts schema errors such as an unknown element in XML)."""
+    return reply.get("message") or reply.get("error") or (reply.get("validation") or {}).get("message") or default
 
 
 def retryable(status):
