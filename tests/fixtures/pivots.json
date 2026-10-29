@@ -572,8 +572,163 @@
     }
    }
   },
+  "47708ef50057fbaacd9050e0": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-mef-logical-port:logical-ports": {
+      "__operation__": "none",
+      "logical-port": [
+       {
+        "__operation__": "none",
+        "__remove__": {
+         "description": []
+        },
+        "name": "9"
+       }
+      ]
+     },
+     "ciena-packet-ptp:ptps": {
+      "__operation__": "none",
+      "ptp": [
+       {
+        "__operation__": "none",
+        "properties": {
+         "__operation__": "none",
+         "transmitter": {
+          "__operation__": "none",
+          "__remove__": {
+           "state": []
+          }
+         }
+        },
+        "ptp-id": "9"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "__operation__": "none",
+      "interface": [
+       {
+        "__operation__": "none",
+        "config": {
+         "__operation__": "none",
+         "__remove__": {
+          "ciena-openconfig-if-ethernet-port:ptp-id": []
+         }
+        },
+        "name": "9"
+       }
+      ]
+     }
+    }
+   }
+  },
   "49845396897f5215abc88635": {
    "error": "Unknown top-level command: frobnicate"
+  },
+  "5b74c582b5396d2d3e80e2f7": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-CORE-1"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-CORE-1",
+        "logical-port": "1",
+        "name": "FP-CORE-1"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.5",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.5"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "name": "lb0"
+        },
+        "name": "lb0"
+       },
+       {
+        "config": {
+         "ciena-openconfig-if-ethernet-port:ptp-id": "1",
+         "ciena-openconfig-interfaces:type": "ettp",
+         "description": "uplink",
+         "name": "1"
+        },
+        "name": "1"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.20",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.20"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-CORE-1"
+          }
+         },
+         "description": "to-core",
+         "mtu": 9000,
+         "name": "core1"
+        },
+        "name": "core1"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "PE5"
+      }
+     }
+    }
+   }
   },
   "5d1c3fe837d4ccb41aa2186a": {
    "pivot": {

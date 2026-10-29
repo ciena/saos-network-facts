@@ -129,3 +129,10 @@ def test_fixtures_are_synthetic():
             for ip in re.findall(r"\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b", text):
                 assert ip == "0.0.0.0" or ip.startswith(("192.0.2.", "198.51.100.", "203.0.113.", "10.")), f"{path.name}: {ip}"
             assert not re.search(r"password|secret|token", text, re.I), path.name
+
+
+def test_leaf_deletes_create_no_port():
+    (pe5,) = run_case("leaf-delete")["devices"]
+    assert pe5["status"] == "ok"
+    assert [i["name"] for i in pe5["facts"]["interfaces"]] == ["lb0", "core1"]
+    assert list(pe5["facts"]["ports"]) == ["1"]

@@ -1,0 +1,120 @@
+{
+  "devices": [
+    {
+      "device": "PE5",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": []
+        },
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-CORE-1"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-CORE-1",
+            "logical_port": "1",
+            "name": "FP-CORE-1"
+          }
+        ],
+        "gateway": null,
+        "hostname": "PE5",
+        "interfaces": [
+          {
+            "description": null,
+            "fd": null,
+            "ip": "192.0.2.5/32",
+            "ipv4": [
+              "192.0.2.5/32"
+            ],
+            "ipv6": [],
+            "kind": "loopback",
+            "mtu": null,
+            "name": "lb0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": "to-core",
+            "fd": "FD-CORE-1",
+            "ip": "198.51.100.20/31",
+            "ipv4": [
+              "198.51.100.20/31"
+            ],
+            "ipv6": [],
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "core1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 8,
+        "objects": 8,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": "uplink",
+            "lag": null,
+            "ptp_id": "1",
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          }
+        },
+        "pseudowires": [],
+        "recognised": 8,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": []
+        },
+        "segments": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {},
+        "vrfs": []
+      },
+      "platform": "cn5164",
+      "status": "ok",
+      "templates": [
+        "PE5/01-base.cfg",
+        "PE5/02-cleanup.cfg"
+      ],
+      "type": "5164-10x"
+    }
+  ],
+  "generator": {
+    "name": "saos-network-facts",
+    "translator": "translator 4.2.0 (recorded)",
+    "version": "0.3.0"
+  },
+  "schema_version": "1.2.0"
+}

@@ -1,0 +1,3 @@
+# Device type for the synthetic leaf-delete lab.
+devices:
+  PE5: 5164-10x

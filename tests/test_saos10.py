@@ -192,3 +192,27 @@ def test_l2vpn_service_removed():
                                                      "pseudowire": ["PW1", "PW2"]}, {"name": "B"}]}}
     f = run(svc, {"ciena-l2vpn:l2vpn-services": {"l2vpn": [{"name": "B", "__operation__": "remove"}]}})
     assert f["l2vpn_services"] == [{"name": "A", "fd": "FD-A", "pseudowires": ["PW1", "PW2"], "mtu": "1500", "signaling_type": "static"}]
+
+
+def test_a_leaf_delete_creates_nothing():
+    """``no oc-if:interfaces interface 9 config ptp-id`` (translator 4.2.1): the entry carries only its
+    key and ``__remove__``; it is the path to the deleted leaf, not a new interface or port."""
+    f = run(IFACES, {
+        "openconfig-interfaces:interfaces": {"__operation__": "none", "interface": [
+            {"name": "9", "__operation__": "none",
+             "config": {"__operation__": "none", "__remove__": {"ciena-openconfig-if-ethernet-port:ptp-id": []}}}]},
+        "ciena-mef-logical-port:logical-ports": {"logical-port": [
+            {"name": "9", "__operation__": "none", "__remove__": {"description": []}}]},
+        "ciena-packet-ptp:ptps": {"ptp": [{"ptp-id": "9", "properties": {"transmitter": {"__remove__": {"state": []}}}}]},
+        "ciena-mpls-tp-corouted:tp-corouted-tunnels": {"tunnel": [dict(TUNNEL, **{"__remove__": {"reversion-hold-time": []}})]},
+        "ciena-ospf:ospf": {"instance": [{"tag": 1, "interfaces": {"interface": [{"name": "core", "__remove__": {"metric": []}}]}}]},
+    })
+    assert [i["name"] for i in f["interfaces"]] == ["lb0", "core"]
+    assert f["ports"] == {}
+    assert f["tp_corouted_tunnels"] == [] and f["ospf"] == {"instances": [], "interfaces": []}
+
+
+def test_a_leaf_delete_beside_a_set_is_an_edit():
+    f = run({"openconfig-interfaces:interfaces": {"interface": [
+        {"name": "x", "config": {"name": "x", "type": "ip", "__remove__": {"description": []}}}]}})
+    assert [(i["name"], i["kind"]) for i in f["interfaces"]] == [("x", "ip")]

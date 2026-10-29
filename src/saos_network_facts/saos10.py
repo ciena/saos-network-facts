@@ -15,8 +15,9 @@ Two translator quirks are handled here:
   (``ciena-openconfig-interfaces:type``); lookups go by local name;
 * edits: a CLI ``no`` and an XML ``nc:operation="remove"`` / ``"delete"`` put ``__operation__:
   "remove"`` on the entry (``"replace"`` for a remove-then-recreate), and an entry that exists only
-  as the path to a leaf reset carries ``__edit_path__``; both are honoured here: a removed object
-  leaves the facts, a path-only entry is not a create. Translators before 1.13.0 drop the XML
+  as the path to a leaf reset carries ``__edit_path__``, or (translator 4.2.1) only its keys and a
+  ``__remove__`` naming the deleted leaves (``no oc-if:interfaces interface 9 config ptp-id``); all
+  are honoured here: a removed object leaves the facts, a path-only entry is not a create. Translators before 1.13.0 drop the XML
   operation, so ``removed_objects(xml_text)`` still reads it from the XML and ``apply_removals``
   drops those objects.
 """
@@ -47,13 +48,17 @@ def local(key):
 
 OPERATION = "__operation__"
 EDIT_PATH = "__edit_path__"
+REMOVE = "__remove__"
+# List keys (and the leaves naming an entry) that a leaf delete repeats on its path.
+KEYS = {"name", "tag", "id", "ptp-id", "xcvr-id", "source-ip", "destination-ip", "vrfName", "prefix", "address",
+        "as", "color", "endpoint", "mep-identifier"}
 
 
 def clean(obj):
-    """The pivot without the translator's ``__*`` bookkeeping keys, except the two edit markers
-    this module acts on (``__operation__``, ``__edit_path__``)."""
+    """The pivot without the translator's ``__*`` bookkeeping keys, except the edit markers this
+    module acts on (``__operation__``, ``__edit_path__``, ``__remove__``)."""
     if isinstance(obj, dict):
-        return {k: clean(v) for k, v in obj.items() if not k.startswith("__") or k in (OPERATION, EDIT_PATH)}
+        return {k: clean(v) for k, v in obj.items() if not k.startswith("__") or k in (OPERATION, EDIT_PATH, REMOVE)}
     if isinstance(obj, list):
         return [clean(v) for v in obj]
     return obj
@@ -64,9 +69,33 @@ def removed(obj):
     return isinstance(obj, dict) and obj.get(OPERATION) in ("remove", "delete")
 
 
+def _deletes_leaf(obj):
+    if isinstance(obj, list):
+        return any(_deletes_leaf(v) for v in obj)
+    return isinstance(obj, dict) and (REMOVE in obj or any(_deletes_leaf(v) for v in obj.values()))
+
+
+def _sets_leaf(obj, top=True):
+    """True when the entry sets a leaf other than its keys (a nested container or list counts by its leaves)."""
+    if not isinstance(obj, dict):
+        return False
+    for key, value in obj.items():
+        if key.startswith("__") or (top and local(key) in KEYS):
+            continue
+        if isinstance(value, list) and value and all(isinstance(v, dict) for v in value):
+            if any(_sets_leaf(v) for v in value):  # entries of a nested list, each with its own keys
+                return True
+        elif not isinstance(value, dict) or _sets_leaf(value, top=False):
+            return True
+    return False
+
+
 def path_only(obj):
-    """True when this entry exists in the pivot only as the path to a leaf edit."""
-    return isinstance(obj, dict) and obj.get(EDIT_PATH) is not None and not removed(obj)
+    """True when this entry exists in the pivot only as the path to a leaf edit: marked with
+    ``__edit_path__``, or a leaf delete (``__remove__``) that sets nothing besides its keys."""
+    if not isinstance(obj, dict) or removed(obj):
+        return False
+    return obj.get(EDIT_PATH) is not None or (_deletes_leaf(obj) and not _sets_leaf(obj))
 
 
 def get(obj, name, default=None):
@@ -581,7 +610,7 @@ def _ospf(facts, container):
             kind = get(area, "type")
             if kind is not None:
                 # a YANG choice: {"stub": {}} / {"nssa": {...}}, or plain text
-                entry["type"] = next((local(k) for k in kind), None) if isinstance(kind, dict) else text(kind)
+                entry["type"] = next((local(k) for k in kind if not k.startswith("__")), None) if isinstance(kind, dict) else text(kind)
             for network in entries(area, "network"):
                 prefix = text(get(network, "prefix"))
                 if prefix and not removed(network):
@@ -593,6 +622,8 @@ def _ospf(facts, container):
                 ospf["interfaces"] = [i for i in ospf["interfaces"] if i is not item]
                 continue
             if item is None:
+                if path_only(interface):
+                    continue
                 item = {"instance": tag, "interface": name, "area": None, "type": None, "metric": None,
                         "hello_interval": None, "dead_interval": None, "priority": None, "passive": False, "bfd": False}
                 ospf["interfaces"].append(item)

@@ -38,6 +38,14 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   `saos-network-facts-viewer-X.Y.Z.tgz`; the README's "Use the viewer in your repo" shows how to
   stage it with your own facts in CI.
 
+### Fixed
+
+- **A SAOS 10 leaf delete no longer creates the object** — `no oc-if:interfaces interface 9 config
+  ptp-id` (and the like on logical ports, PTPs, OSPF and MPLS-TP tunnels) reaches the extractor as
+  an entry with only its keys and `__remove__` (translator 4.2.1); it was taken for a new interface
+  (kind `unknown`, no address) or port. Such an entry is now the path to the deleted leaf, as
+  `__edit_path__` already was. Synthetic fixture `tests/fixtures/labs/leaf-delete/`.
+
 ## [0.2.0] - 2026-10-29
 
 ### Added

@@ -13,5 +13,8 @@ documentation ranges) and services are made up.
   OSPF area 0, an MPLS-TP co-routed tunnel PE1 - P1 - PE2 with a 1:1 backup over P2 (LSP BFD on
   both) and a static VPWS pseudowire on it; `platform-map.yaml` gives the device types. Its pivots
   were recorded with translator 4.2.1, the others with 4.2.0.
+- `labs/leaf-delete/`: one SAOS 10 device in two files, the second deleting leaves of a port it
+  does not configure (`no oc-if:interfaces interface 9 config ptp-id`, ...): no interface or port 9
+  may appear. Recorded with translator 4.2.1.
 - `cases.yaml`: the extraction cases the tests run; `expected/`: their facts files.
 - `pivots.json`: the translator's recorded replies for every SAOS 10 file (`scripts/record_pivots.py`).
