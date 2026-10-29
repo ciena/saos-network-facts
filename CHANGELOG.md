@@ -45,6 +45,10 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   an entry with only its keys and `__remove__` (translator 4.2.1); it was taken for a new interface
   (kind `unknown`, no address) or port. Such an entry is now the path to the deleted leaf, as
   `__edit_path__` already was. Synthetic fixture `tests/fixtures/labs/leaf-delete/`.
+- **npm reader: an unknown route-reflector-client flag stays unknown** — `bgpPeers()` returned
+  `routeReflectorClient: false` for a peer whose record has no `route_reflector_client` (SAOS 6
+  peers, pre-schema files); it is now `null`, so a caller can fall back to another source. An
+  explicit `true` / `false` is unchanged. The type is `boolean | null`.
 
 ## [0.2.0] - 2026-10-29
 

@@ -5,6 +5,7 @@ import { test } from "node:test";
 import {
   bgpPeers, devicesByName, FactsFormatError, interfacesOnPort, isisArea, isisAreaId, isisSystemId, loopbacks, parseFacts, readFacts,
 } from "../src/node.ts";
+import type { DeviceFacts } from "../src/generated/facts.ts";
 
 const expected = path.resolve(import.meta.dirname, "..", "..", "tests", "fixtures", "expected");
 const srl2 = readFacts(path.join(expected, "sr-l2.facts.json"));
@@ -39,6 +40,17 @@ test("loopbacks and BGP peers", () => {
   const pe1 = devicesByName(srl2).get("PE1")!;
   assert.deepEqual(loopbacks(pe1), [{ name: "lb0", ip: "192.0.2.1/32", isis: "CORE" }]);
   assert.deepEqual(bgpPeers(pe1), [{ ip: "192.0.2.2", remoteAs: 65000, routeReflectorClient: true }]);
+});
+
+test("BGP peers: a missing route-reflector-client flag stays unknown", () => {
+  const peers = [
+    { kind: "bgp", name: "as65000", ip: "192.0.2.3", remote_as: "65000" },
+    { kind: "bgp", name: "as65000", ip: "192.0.2.4", remote_as: null, route_reflector_client: false },
+  ];
+  assert.deepEqual(bgpPeers({ peers } as unknown as DeviceFacts), [
+    { ip: "192.0.2.3", remoteAs: 65000, routeReflectorClient: null },
+    { ip: "192.0.2.4", remoteAs: null, routeReflectorClient: false },
+  ]);
 });
 
 test("IS-IS NET parsing", () => {
