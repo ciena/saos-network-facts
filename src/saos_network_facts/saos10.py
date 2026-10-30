@@ -4,9 +4,9 @@
 The translator turns a CLI or XML configuration into one JSON document keyed by YANG module
 (``openconfig-interfaces:interfaces``, ``ciena-mef-fp:fps``, ...). This module walks that document
 for the facts and returns the same dict shape as ``saos6`` (hostname, interfaces, loopbacks, VLANs,
-ports, LAGs, peers, IS-IS, segment routing, BGP, pseudowires, CFM), extended with the SAOS 10 objects
-that carry the same information: forwarding domains, flow points, classifiers, VRFs, EVPN segments,
-OSPF, MPLS-TP co-routed tunnels and L2VPN services.
+ports, LAGs, peers, IS-IS, segment routing, BGP, pseudowires, CFM, G.8032 rings), extended with the
+SAOS 10 objects that carry the same information: forwarding domains, flow points, classifiers, VRFs,
+EVPN segments, OSPF, MPLS-TP co-routed tunnels and L2VPN services.
 
 Two translator quirks are handled here:
 
@@ -25,12 +25,12 @@ Two translator quirks are handled here:
 import ipaddress
 import xml.etree.ElementTree as ET
 
-from .saos6 import finish_isis, new_pseudowire, set_isis_metric
+from .saos6 import finish_isis, finish_rings, new_pseudowire, new_ring, new_ring_instance, ring_port, set_isis_metric, set_rpl
 from .saos6 import new_facts as _base_facts
 
 NETCONF_NS = "urn:ietf:params:xml:ns:netconf:base:1.0"
 REMOVAL_KINDS = {"interface": "interfaces", "fp": "fps", "fd": "fds", "logical-port": "ports", "classifier": "classifiers",
-                 "vrf": "vrfs", "ethernet-segment": "segments", "pseudowire": "pseudowires"}
+                 "vrf": "vrfs", "ethernet-segment": "segments", "pseudowire": "pseudowires", "g8032-ring": "rings"}
 
 
 def new_facts():
@@ -51,7 +51,7 @@ EDIT_PATH = "__edit_path__"
 REMOVE = "__remove__"
 # List keys (and the leaves naming an entry) that a leaf delete repeats on its path.
 KEYS = {"name", "tag", "id", "ptp-id", "xcvr-id", "source-ip", "destination-ip", "vrfName", "prefix", "address",
-        "as", "color", "endpoint", "mep-identifier"}
+        "as", "color", "endpoint", "mep-identifier", "ring-name", "instance-name", "port-id"}
 
 
 def clean(obj):
@@ -716,6 +716,80 @@ def _cfm(facts, container):
                              "port": None, "vlan": None, "service": fd, "ccm_interval": text(get(ma, "ccm-interval"))})
 
 
+def _ring_instance(facts, ring, instance):
+    """One ``erp-instance`` of a ring: R-APS VID and level, construct (major ring / sub-ring with or
+    without a virtual channel), the forwarding domains it protects, its timers (wtr-timer in minutes,
+    guard-timer and hold-off-time in milliseconds), reversion, and the RPL role of each ring port."""
+    name = text(get(instance, "instance-name"))
+    current = next((i for i in ring["instances"] if i["name"] == name), None)
+    if removed(instance):
+        ring["instances"] = [i for i in ring["instances"] if i is not current]
+        return
+    if current is None:
+        if path_only(instance):
+            return
+        current = new_ring_instance(name)
+        ring["instances"].append(current)
+    for key, leaf in (("raps_vid", "raps-vid"), ("raps_level", "raps-level")):
+        if get(instance, leaf) is not None:
+            current[key] = text(get(instance, leaf))
+    construct = text(get(instance, "erp-instance-construct"))
+    if construct is not None:
+        construct = local(construct)
+        current["type"] = "major" if construct == "major-ring" else "sub" if construct.startswith("sub-ring") else None
+        current["virtual_channel"] = None if current["type"] != "sub" else construct == "sub-ring-virtual-channel"
+    for member in as_list(get(instance, "data-members") or None):
+        _add(current["members"], text(member))
+    for key, leaf in (("wtr", "wtr-timer"), ("guard", "guard-timer"), ("hold_off", "hold-off-time")):
+        if get(instance, leaf) is not None:
+            current["timers"][key] = text(get(instance, leaf))
+    if get(instance, "reversion") is not None:
+        current["revertive"] = local(text(get(instance, "reversion"))) == "revertive"
+    for port in entries(get(instance, "ports"), "port"):
+        port_id = text(get(port, "port-id"))
+        if removed(port):
+            set_rpl(current, port_id, None)
+        elif get(port, "rpl") is not None:
+            set_rpl(current, port_id, local(text(get(port, "rpl"))))
+
+
+def _g8032_rings(facts, container):
+    """``ciena-itut-g8032-draft:g8032-rings``: each G.8032 ring with its two ring ports (``port0`` is
+    reported as ``west``, ``port1`` as ``east``, so SAOS 6 and SAOS 10 rings read alike), its ring id
+    and its ERP instances. A ring port's interface gets the ``ring`` role."""
+    if removed(container):
+        facts["rings"] = []
+        return
+    for item in entries(container, "g8032-ring"):
+        name = text(get(item, "ring-name"))
+        if not name:
+            continue
+        current = next((r for r in facts["rings"] if r["name"] == name), None)
+        if removed(item):
+            facts["rings"] = [r for r in facts["rings"] if r is not current]
+            continue
+        if current is None:
+            if path_only(item):
+                continue
+            current = new_ring(name)
+            facts["rings"].append(current)
+        if get(item, "ring-id") is not None:
+            current["ring_id"] = text(get(item, "ring-id"))
+        for port in entries(get(item, "ring-ports"), "ring-port"):
+            port_id = text(get(port, "port-id"))
+            if not port_id or removed(port):
+                continue
+            entry = ring_port(current, port_id)
+            interface = text(get(port, "interface"))
+            if interface is not None:
+                entry["interface"] = interface
+                _add(_port(facts, interface)["roles"], "ring")
+                if port_id in ("port0", "port1"):
+                    current["west" if port_id == "port0" else "east"] = interface
+        for instance in entries(get(item, "erp-instances"), "erp-instance"):
+            _ring_instance(facts, current, instance)
+
+
 def _system(facts, container):
     """The hostname; a removed ``system`` clears it, one without a hostname keeps the earlier one."""
     facts["hostname"] = None if removed(container) else (text(get(get(container, "config"), "hostname")) or facts["hostname"])
@@ -742,6 +816,7 @@ HANDLERS = {
     "ospf": _ospf,
     "tp-corouted-tunnels": _tp_tunnels,
     "maintenance-domain": _cfm,
+    "g8032-rings": _g8032_rings,
 }
 
 
@@ -767,7 +842,8 @@ def _host_prefix(prefix):
 def finish(facts):
     """Derived views once every file is in: VLANs per port from flow points and classifiers, the
     ``fp`` role on every logical port a flow point uses, the IS-IS instance on each interface, the
-    node SIDs, the service of each pseudowire and the port and VLAN of each CFM MEP."""
+    node SIDs, the service of each pseudowire, the port and VLAN of each CFM MEP, and the ring a
+    sub-ring instance is attached to."""
     for fp in facts["fps"]:
         port_name = fp["logical_port"]
         if not port_name:
@@ -805,6 +881,7 @@ def finish(facts):
             mep["vlan"] = vlans[0] if vlans else None
             if mep["port"]:
                 _add(_port(facts, mep["port"])["roles"], "cfm-mep")
+    finish_rings(facts)
     return finish_isis(facts)
 
 
@@ -852,7 +929,8 @@ def removed_objects(xml_text):
             continue
         kind = element.tag.rsplit("}", 1)[-1]
         children = list(element)
-        if kind in REMOVAL_KINDS and len(children) == 1 and children[0].tag.rsplit("}", 1)[-1] == "name":
+        key = "ring-name" if kind == "g8032-ring" else "name"
+        if kind in REMOVAL_KINDS and len(children) == 1 and children[0].tag.rsplit("}", 1)[-1] == key:
             out.add((kind, (children[0].text or "").strip()))
     return out
 
@@ -876,6 +954,8 @@ def apply_removals(facts, objects):
             facts["segments"] = [s for s in facts.get("segments", []) if s["name"] != name]
         elif kind == "pseudowire":
             facts["pseudowires"] = [p for p in facts["pseudowires"] if p["name"] != name]
+        elif kind == "g8032-ring":
+            facts["rings"] = [r for r in facts["rings"] if r["name"] != name]
     return facts
 
 

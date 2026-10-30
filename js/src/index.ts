@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Reader for saos-network-facts facts files, and the helpers every consumer needs: which IP
 // interfaces ride a port (SAOS 10: flow point -> forwarding domain -> interface; SAOS 6: the VLANs
-// the port carries), loopbacks, BGP neighbours, the parts of an IS-IS NET, IS-IS interface metrics
-// and CCM intervals. Pure functions, no Node APIs, so this entry point works in a browser too;
-// `@ciena/saos-network-facts/node` adds `readFacts(file)`.
+// the port carries), loopbacks, BGP neighbours, the parts of an IS-IS NET, IS-IS interface metrics,
+// CCM intervals, G.8032 rings and the devices on a ring. Pure functions, no Node APIs, so this entry
+// point works in a browser too; `@ciena/saos-network-facts/node` adds `readFacts(file)`.
 
-import type { DeviceFacts, DeviceRecord, FactsFile, Interface, IsisInstance, Mep } from "./generated/facts.ts";
+import type { DeviceFacts, DeviceRecord, FactsFile, Interface, IsisInstance, Mep, Ring, RingInstance, RingPort } from "./generated/facts.ts";
 
 export type * from "./generated/facts.ts";
 
@@ -183,4 +183,36 @@ export function ccmIntervalMs(mep: Pick<Mep, "ccm_interval"> | string | null | u
   const unit = m[2];
   if (unit === "ms") return Math.abs(value - 3.3) < 0.1 ? 10 / 3 : value;
   return unit === "min" ? value * 60000 : value * 1000;
+}
+
+/** The G.8032 rings a device configures (SAOS 6 / 8 logical rings, SAOS 10 `g8032-ring`s), in facts
+ * order, each with `ports` and `instances` (empty lists for a file before schema 1.5, where a ring
+ * has only `name`, `west` and `east`). Takes a device's facts or its record; empty when the device
+ * has no rings or no facts. */
+export type RingFacts = Ring & { ports: RingPort[]; instances: RingInstance[] };
+
+export function ringsOf(device: DeviceFacts | DeviceRecord | null | undefined): RingFacts[] {
+  const facts = device && "facts" in device && !("rings" in device) ? device.facts : (device as DeviceFacts | null | undefined);
+  return (facts?.rings ?? []).map((r) => ({ ...r, ports: r.ports ?? [], instances: r.instances ?? [] }));
+}
+
+export type RingMember = {
+  /** the device name, as in `devices[].device` */
+  device: string;
+  /** that device's ring with the ring id */
+  ring: RingFacts;
+};
+
+/** Every device of the file that configures a ring with this ring id (`ring_id`, as written in the
+ * configurations: `1` and `"1"` match), with its ring, in file order. Rings without a ring id (a
+ * file before schema 1.5, a ring whose configuration sets none) are never members. */
+export function ringMembers(file: FactsFile, ringId: string | number): RingMember[] {
+  const want = String(ringId);
+  const out: RingMember[] = [];
+  for (const [device, facts] of devicesByName(file)) {
+    for (const ring of ringsOf(facts)) {
+      if (ring.ring_id != null && String(ring.ring_id) === want) out.push({ device, ring });
+    }
+  }
+  return out;
 }

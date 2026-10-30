@@ -4,13 +4,15 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   bgpPeers, ccmIntervalMs, devicesByName, FactsFormatError, interfacesOnPort, isisArea, isisAreaId, isisMetric, isisSystemId, isRouted, loopbacks,
-  parseFacts, readFacts,
+  parseFacts, readFacts, ringMembers, ringsOf,
 } from "../src/node.ts";
 import type { DeviceFacts, Interface } from "../src/generated/facts.ts";
 
 const expected = path.resolve(import.meta.dirname, "..", "..", "tests", "fixtures", "expected");
 const srl2 = readFacts(path.join(expected, "sr-l2.facts.json"));
 const mixed = readFacts(path.join(expected, "mixed.facts.json"));
+const g8032 = readFacts(path.join(expected, "g8032-two-ring.facts.json"));
+const g8032saos6 = readFacts(path.join(expected, "g8032-saos6.facts.json"));
 
 test("readFacts reads schema 1.x and keeps devices with facts", () => {
   assert.equal(srl2.schema_version.split(".")[0], "1");
@@ -95,4 +97,35 @@ test("ccmIntervalMs: SAOS 10 and SAOS 6 spellings, 802.1Q indexes; null when uns
   assert.deepEqual(["3.3ms", "10ms", "100ms", "1s", "10s", "1min", "10min"].map(ccmIntervalMs), [10 / 3, 10, 100, 1000, 10000, 60000, 600000]);
   assert.deepEqual(["3.33ms", "1sec", "10sec", "1min", "4", "7"].map(ccmIntervalMs), [10 / 3, 1000, 10000, 60000, 1000, 600000]);
   assert.deepEqual([null, undefined, "off", "0", "soon", { ccm_interval: null }].map(ccmIntervalMs), [null, null, null, null, null, null]);
+});
+
+test("ringsOf: a device's rings with their instances; empty without rings", () => {
+  const rm1 = ringsOf(devicesByName(g8032).get("RM_1"));
+  assert.deepEqual(rm1.map((r) => [r.name, r.ring_id, r.west, r.east]), [["ring_1", "1", "1", "2"], ["ring_2", "2", "2", "3"]]);
+  const erp1 = rm1[0]!.instances[0]!;
+  assert.equal(erp1.type, "major");
+  assert.deepEqual(erp1.rpl.map((p) => [p.port, p.interface, p.role]), [["port0", "1", "neighbor"], ["port1", "2", "none"]]);
+  const erp2 = rm1[1]!.instances[0]!;
+  assert.deepEqual([erp2.type, erp2.virtual_channel, erp2.sub_ring_of, erp2.members, erp2.timers.wtr], ["sub", false, "ring_1", ["ring_1-fd"], "1"]);
+  assert.deepEqual(ringsOf(devicesByName(g8032).get("CE_1")), []);
+  assert.deepEqual(ringsOf(g8032.devices.find((d) => d.device === "RS_1")).map((r) => r.name), ["ring_2"]); // a device record works too
+  assert.deepEqual(ringsOf(g8032.devices.find((d) => d.device === "CE_2")), []);
+  assert.deepEqual(ringsOf(null), []);
+  // a pre-1.5 ring (name / west / east only) gets empty ports and instances
+  const old = { rings: [{ name: "lr1", west: "1", east: "3" }] } as unknown as DeviceFacts;
+  assert.deepEqual(ringsOf(old), [{ name: "lr1", west: "1", east: "3", ports: [], instances: [] }]);
+});
+
+test("ringMembers: the devices on a ring id, with the RPL owner and the interconnection nodes", () => {
+  const major = ringMembers(g8032, 1);
+  assert.deepEqual(major.map((m) => m.device), ["RM_1", "RM_2", "RM_3", "RM_4"]);
+  const owner = major.filter((m) => m.ring.instances.some((i) => i.rpl.some((p) => p.role === "owner")));
+  assert.deepEqual(owner.map((m) => m.device), ["RM_4"]);
+  const sub = ringMembers(g8032, "2");
+  assert.deepEqual(sub.map((m) => m.device), ["RM_1", "RM_4", "RS_1", "RS_2"]);
+  assert.deepEqual(sub.filter((m) => m.ring.instances[0]!.sub_ring_of === "ring_1").map((m) => m.device), ["RM_1", "RM_4"]);
+  assert.deepEqual(ringMembers(g8032, 9), []);
+  assert.deepEqual(ringMembers(g8032saos6, 2).map((m) => [m.device, m.ring.name]), [["A1", "lr2"], ["S1", "lr2"], ["S2", "lr2"]]);
+  assert.deepEqual(ringMembers(srl2, 1), []);
+  assert.equal(g8032.links?.length, 10);
 });

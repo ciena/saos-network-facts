@@ -122,3 +122,50 @@ def test_expand_and_net_parts():
     assert saos6.expand("1-3,7,lag1") == ["1", "2", "3", "7", "lag1"]
     assert saos6.net_parts("49.0001.1720.1600.0001.00") == ("49.0001", "1720.1600.0001")
     assert saos6.net_parts("49.0001") == (None, None)
+
+
+def test_virtual_rings_major_and_sub_ring_on_an_interconnection_node():
+    f = facts(
+        "ring-protection logical-ring create logical-ring-name lr1 ring-id 1 west-port 1 east-port 3 WTR 1",
+        "ring-protection logical-ring set ring lr1 guard-time 1000 west-port-holdoff-time 100",
+        "ring-protection logical-ring create logical-ring-name lr2 ring-id 2 west-port 3 east-port 2",
+        "ring-protection virtual-ring create virtual-ring-name vr1 logical-ring lr1 raps-vid 100 mel 7",
+        "ring-protection virtual-ring add ring vr1 vid 1000-1001",
+        "ring-protection virtual-ring set ring vr1 east-port-rpl owner revertive on",
+        "ring-protection virtual-ring create virtual-ring-name vr2 logical-ring lr2 raps-vid 102 sub-ring east-port-termination",
+        "ring-protection virtual-ring add ring vr2 vid 1000",
+        "ring-protection virtual-ring set ring vr2 mel 7",
+    )
+    lr1, lr2 = f["rings"]
+    assert (lr1["name"], lr1["ring_id"], lr1["west"], lr1["east"]) == ("lr1", "1", "1", "3")
+    assert lr1["ports"] == [{"name": "west", "interface": "1", "hold_off": "100"}, {"name": "east", "interface": "3", "hold_off": None}]
+    (vr1,) = lr1["instances"]
+    assert vr1 == {"name": "vr1", "raps_vid": "100", "raps_level": "7", "type": "major", "virtual_channel": None, "termination": None,
+                   "sub_ring_of": None, "rpl": [{"port": "east", "interface": "3", "role": "owner"}], "members": ["1000", "1001"],
+                   "timers": {"wtr": "1", "guard": "1000", "hold_off": None}, "revertive": True}
+    (vr2,) = lr2["instances"]
+    assert (vr2["type"], vr2["termination"], vr2["sub_ring_of"], vr2["raps_level"]) == ("sub", "east", "lr1", "7")
+    assert vr2["rpl"] == [] and vr2["revertive"] is None
+    assert vr2["timers"] == {"wtr": None, "guard": None, "hold_off": None}  # lr2 configures none
+    assert all("ring" in f["ports"][p]["roles"] for p in ("1", "2", "3"))
+    assert "_ring_timers" not in f and f["recognised"] == 9
+
+
+def test_virtual_ring_pass_through_node_unset_and_saos8_virtual_switch_members():
+    f = facts(
+        "ring-protection logical-ring create logical-ring-name lr2 ring-id 2 west-port 1 east-port 2 guard-time 500",
+        "ring-protection virtual-ring create virtual-ring-name vr2 logical-ring lr2 raps-vid 102 sub-ring no-port-termination",
+        "ring-protection virtual-ring add ring vr2 vs ring-vs-1,ring-vs-2",
+        "ring-protection virtual-ring remove ring vr2 vs ring-vs-2",
+        "ring-protection virtual-ring set ring vr2 east-port-rpl owner revertive off",
+        "ring-protection virtual-ring unset ring vr2 east-port-rpl revertive",
+        "ring-protection virtual-ring set ring vr9 east-port-rpl owner",
+        "ring-protection logical-ring show ring lr2",
+    )
+    (lr2,) = f["rings"]
+    (vr2,) = lr2["instances"]
+    assert (vr2["type"], vr2["termination"], vr2["sub_ring_of"]) == ("sub", "none", None)
+    assert vr2["members"] == ["ring-vs-1"]
+    assert vr2["rpl"] == [] and vr2["revertive"] is None
+    assert vr2["timers"] == {"wtr": None, "guard": "500", "hold_off": None}
+    assert (f["lines"], f["recognised"]) == (8, 6)  # the unknown ring and the show command produce nothing

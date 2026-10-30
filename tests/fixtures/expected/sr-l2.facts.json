@@ -529,7 +529,29 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.4.2"
+    "version": "0.5.0"
   },
-  "schema_version": "1.4.0"
+  "links": [
+    {
+      "a": {
+        "device": "PE1",
+        "port": "1"
+      },
+      "b": {
+        "device": "PE2",
+        "port": "1"
+      }
+    },
+    {
+      "a": {
+        "device": "PE1",
+        "port": "3"
+      },
+      "b": {
+        "device": "CE1",
+        "port": "eth1"
+      }
+    }
+  ],
+  "schema_version": "1.5.0"
 }

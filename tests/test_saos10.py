@@ -239,3 +239,69 @@ def test_a_leaf_delete_beside_a_set_is_an_edit():
     f = run({"openconfig-interfaces:interfaces": {"interface": [
         {"name": "x", "config": {"name": "x", "type": "ip", "__remove__": {"description": []}}}]}})
     assert [(i["name"], i["kind"]) for i in f["interfaces"]] == [("x", "ip")]
+
+
+def ring(name, ring_id, ports, instances):
+    return {"ring-name": name, "ring-id": ring_id,
+            "ring-ports": {"ring-port": [{"port-id": p, "interface": i} for p, i in ports]},
+            "erp-instances": {"erp-instance": instances}}
+
+
+def erp(name, construct, rpl, **leaves):
+    entry = {"instance-name": name, "raps-vid": 4090, "raps-level": 7, "erp-instance-construct": f"ciena-itut-g8032-draft:{construct}",
+             "data-members": ["FD-A"], "ports": {"port": [{"port-id": p, "rpl": r} for p, r in rpl]}}
+    entry.update(leaves)
+    return entry
+
+
+def test_g8032_major_ring_rpl_owner_and_timers():
+    f = run({"ciena-itut-g8032-draft:g8032-rings": {"g8032-ring": [
+        ring("ring_1", 1, [("port0", "1"), ("port1", "2")],
+             [erp("erp_1", "major-ring", [("port0", "none"), ("port1", "owner")],
+                  **{"wtr-timer": 1, "guard-timer": 200, "hold-off-time": 100, "reversion": "non-revertive"})])]}})
+    (r,) = f["rings"]
+    assert (r["name"], r["ring_id"], r["west"], r["east"]) == ("ring_1", "1", "1", "2")
+    assert r["ports"] == [{"name": "port0", "interface": "1", "hold_off": None}, {"name": "port1", "interface": "2", "hold_off": None}]
+    (i,) = r["instances"]
+    assert i == {"name": "erp_1", "raps_vid": "4090", "raps_level": "7", "type": "major", "virtual_channel": None, "termination": None,
+                 "sub_ring_of": None, "members": ["FD-A"], "revertive": False,
+                 "rpl": [{"port": "port0", "interface": "1", "role": "none"}, {"port": "port1", "interface": "2", "role": "owner"}],
+                 "timers": {"wtr": "1", "guard": "200", "hold_off": "100"}}
+    assert f["ports"]["1"]["roles"] == ["ring"] and f["ports"]["2"]["roles"] == ["ring"]
+
+
+def test_g8032_sub_ring_without_virtual_channel_and_the_interconnection_node():
+    major = ring("ring_1", 1, [("port0", "1"), ("port1", "2")], [erp("erp_1", "major-ring", [("port0", "neighbor"), ("port1", "none")])])
+    # the sub-ring's port0 is the major ring's port1: this node is where the sub-ring terminates, so only port1 has an RPL leaf
+    sub = ring("ring_2", 2, [("port0", "2"), ("port1", "3")], [erp("erp_2", "sub-ring-no-virtual-channel", [("port1", "owner")])])
+    f = run({"ciena-itut-g8032-draft:g8032-rings": {"g8032-ring": [major, sub]}})
+    r1, r2 = f["rings"]
+    assert r1["instances"][0]["sub_ring_of"] is None and r1["instances"][0]["virtual_channel"] is None
+    (i,) = r2["instances"]
+    assert (i["type"], i["virtual_channel"], i["sub_ring_of"]) == ("sub", False, "ring_1")
+    assert i["rpl"] == [{"port": "port1", "interface": "3", "role": "owner"}]
+    assert i["timers"] == {"wtr": None, "guard": None, "hold_off": None} and i["revertive"] is None  # nothing configured, no defaults
+    # a pass-through node of the same sub-ring is attached to nothing
+    g = run({"ciena-itut-g8032-draft:g8032-rings": {"g8032-ring": [
+        ring("ring_2", 2, [("port0", "1"), ("port1", "2")],
+             [erp("erp_2", "sub-ring-no-virtual-channel", [("port0", "neighbor"), ("port1", "none")])])]}})
+    assert g["rings"][0]["instances"][0]["sub_ring_of"] is None
+    assert [x["role"] for x in g["rings"][0]["instances"][0]["rpl"]] == ["neighbor", "none"]
+
+
+def test_g8032_merge_across_files_and_removal():
+    first = {"ciena-itut-g8032-draft:g8032-rings": {"g8032-ring": [
+        ring("ring_1", 1, [("port0", "1"), ("port1", "2")], [erp("erp_1", "major-ring", [("port0", "none"), ("port1", "none")])])]}}
+    later = {"ciena-itut-g8032-draft:g8032-rings": {"g8032-ring": [
+        {"ring-name": "ring_1", "erp-instances": {"erp-instance": [
+            {"instance-name": "erp_1", "ports": {"port": [{"port-id": "port1", "rpl": "owner"}]}, "wtr-timer": 3}]}}]}}
+    f = run(first, later)
+    (i,) = f["rings"][0]["instances"]
+    assert [(x["port"], x["role"]) for x in i["rpl"]] == [("port0", "none"), ("port1", "owner")]
+    assert i["timers"]["wtr"] == "3" and i["raps_vid"] == "4090"
+    gone = run(first, {"ciena-itut-g8032-draft:g8032-rings": {"g8032-ring": [{"ring-name": "ring_1", "__operation__": "remove"}]}})
+    assert gone["rings"] == []
+    xml = ('<config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0"><g8032-rings><g8032-ring nc:operation="remove">'
+           '<ring-name>ring_1</ring-name></g8032-ring></g8032-rings></config>')
+    assert saos10.removed_objects(xml) == {("g8032-ring", "ring_1")}
+    assert saos10.apply_removals(run(first), {("g8032-ring", "ring_1")})["rings"] == []

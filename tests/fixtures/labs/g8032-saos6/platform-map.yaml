@@ -1,0 +1,6 @@
+# Device types for the synthetic SAOS 6 / 8 G.8032 lab: A1 - A2 on a major ring, A1 - S1 - S2 on a sub-ring.
+devices:
+  A1: 3930-6x
+  A2: 3930-6x
+  S1: 3930-6x
+  S2: 5170-8x

@@ -5,7 +5,7 @@ The facts-file schema, TypeScript types generated from it, and a reader, for fil
 
 ```ts
 import { readFacts } from "@ciena/saos-network-facts/node";   // Node: read a file
-import { parseFacts, devicesByName, interfacesOnPort, isRouted, loopbacks, bgpPeers, isisArea, isisAreaId, isisSystemId, isisMetric, ccmIntervalMs }
+import { parseFacts, devicesByName, interfacesOnPort, isRouted, loopbacks, bgpPeers, isisArea, isisAreaId, isisSystemId, isisMetric, ccmIntervalMs, ringsOf, ringMembers }
   from "@ciena/saos-network-facts";                          // anywhere: no Node APIs
 import type { FactsFile, DeviceFacts } from "@ciena/saos-network-facts";
 import schema from "@ciena/saos-network-facts/schema" with { type: "json" };
@@ -22,5 +22,7 @@ import schema from "@ciena/saos-network-facts/schema" with { type: "json" };
   `isisMetric(facts, interface, level)`: the wide, else narrow, metric at a level (schema 1.3).
 - `ccmIntervalMs(mep | text)`: a MEP's `ccm_interval` (schema 1.4) in milliseconds, in the SAOS 10
   (`1s`, `3.3ms`) and SAOS 6 (`1sec`, `3.33ms`, an 802.1Q index) spellings; null when not set or off.
+- `ringsOf(device)`: a device's G.8032 rings with their ports and protection instances (schema 1.5;
+  empty lists for older files); `ringMembers(file, ringId)`: every device on a ring id, with its ring.
 
 Types and `schema/` are generated from the Python package's schema (`npm run generate`).

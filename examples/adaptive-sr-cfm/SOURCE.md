@@ -8,7 +8,7 @@ and iBGP with PE6 as route reflector. CE1 hangs off PE1.
 
 The configurations are the recipe's startup configurations as the lab renders them to boot the
 devices, with the addresses outside RFC 1918 renumbered (below); `facts.json` was extracted from
-them with saos-network-facts 0.4.2 and translator 4.2.1 (the hosted translator).
+them with saos-network-facts 0.5.0 and translator 4.2.1 (the hosted translator).
 
 ## Files
 
@@ -16,7 +16,7 @@ them with saos-network-facts 0.4.2 and translator 4.2.1 (the hosted translator).
 |---|---|
 | `configs/<DEVICE>/<NN>-<template>.xml` | each device's startup configuration (NETCONF XML), one file per template, `NN` = the order the lab applies them |
 | `devices.yaml` | the platform map: each device's type, which the files do not say |
-| `facts.json` | `saos-network-facts extract` of the above (schema 1.4) |
+| `facts.json` | `saos-network-facts extract` of the above (schema 1.5) |
 
 ## Regenerate
 

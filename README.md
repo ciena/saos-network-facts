@@ -104,8 +104,8 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 
 ```json
 {
-  "schema_version": "1.3.0",
-  "generator": {"name": "saos-network-facts", "version": "0.4.0", "translator": "translator 4.2.1 (mcp, https://...)"},
+  "schema_version": "1.5.0",
+  "generator": {"name": "saos-network-facts", "version": "0.5.0", "translator": "translator 4.2.1 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -119,9 +119,12 @@ A file the translator rejects is listed in the device's `failed_templates` and t
         "...": "..."
       }
     }
-  ]
+  ],
+  "links": [{"a": {"device": "PE1", "port": "1"}, "b": {"device": "PE2", "port": "1"}}]
 }
 ```
+
+`links` (since schema 1.5) is present only when `--clab` was given: the topology's links, as declared.
 
 The full schema, with a description on every field, is
 [`src/saos_network_facts/schema/facts-v1.schema.json`](src/saos_network_facts/schema/facts-v1.schema.json)
@@ -136,7 +139,8 @@ The full schema, with a description on every field, is
 | `facts` | null unless `ok` / `partial` |
 
 Facts (all devices): `hostname`, `interfaces`, `gateway`, `vlans`, `ports`, `lags`, `sub_ports`,
-`rings`, `peers` (MPLS VCs, MPLS-TP tunnel ends, BGP neighbours with `route_reflector_client`),
+`rings` (G.8032 rings, since schema 1.5 with `ring_id`, `ports` and protection `instances`; see
+[Rings](#rings)), `peers` (MPLS VCs, MPLS-TP tunnel ends, BGP neighbours with `route_reflector_client`),
 `isis` (`instances` with `level`, `nets`, `net`, `area_id`, `system_id`, `sr_enabled`; `interfaces`
 with `level`, `type` and, since schema 1.3, `metrics`: per level the narrow `metric` and
 `wide_metric`), `segment_routing` (`srgb`, `prefix_sids`, `policies`, `segment_lists`),
@@ -157,6 +161,40 @@ are booleans. Segment routing, BGP, OSPF and MPLS-TP tunnels are extracted from 
 
 **Compatibility.** `schema_version` is semver. Within 1.x, new versions only add optional fields, so
 a reader must ignore fields it does not know; a breaking change is schema 2.
+
+### Rings
+
+G.8032 Ethernet ring protection is read from SAOS 10 `g8032-rings` and from SAOS 6 / 8
+`ring-protection logical-ring` / `virtual-ring`, into the same shape, one `rings[]` entry per ring the
+device is on:
+
+```json
+{
+  "name": "ring_2", "ring_id": "2", "west": "2", "east": "3",
+  "ports": [{"name": "port0", "interface": "2", "hold_off": null}, {"name": "port1", "interface": "3", "hold_off": null}],
+  "instances": [{
+    "name": "erp_2", "raps_vid": "4089", "raps_level": "7", "type": "sub", "virtual_channel": false,
+    "termination": null, "sub_ring_of": "ring_1",
+    "rpl": [{"port": "port1", "interface": "3", "role": "owner"}],
+    "members": ["ring_1-fd"], "timers": {"wtr": "1", "guard": null, "hold_off": null}, "revertive": null
+  }]
+}
+```
+
+- `west` / `east` are the ring ports: SAOS 6 / 8 `west-port` / `east-port`, SAOS 10 the interfaces of
+  `port0` / `port1`; `ports` lists them under their configured names. Each gets the `ring` role in `ports`.
+- `instances` are the protection instances on the ring (SAOS 10 `erp-instance`, SAOS 6 / 8 virtual
+  ring): the R-APS channel (`raps_vid`, `raps_level`: the MEG / MD level), `type` `major` or `sub`
+  (`virtual_channel` says whether a SAOS 10 sub-ring has one; SAOS 6 / 8 `termination` says which
+  port a sub-ring terminates on, or `none` when it passes through), `rpl` (the RPL role per ring
+  port: `owner`, `neighbor`, `next-neighbor`, or an explicit `none`), `members` (what it protects:
+  SAOS 10 forwarding domains, SAOS 6 VLANs, SAOS 8 virtual switches), `timers` (`wtr` in minutes,
+  `guard` and `hold_off` in milliseconds) and `revertive`.
+- Everything is as configured: nothing is filled in from the device defaults, and null means the
+  configuration does not say. The one derived field is `sub_ring_of`: on an interconnection node, a
+  sub-ring instance whose ring shares a port with another ring of the device is attached to that ring.
+- With `--clab`, the topology's `links` are written at the top level, so a reader can follow a ring
+  from port to port without addresses (ring ports usually have none).
 
 ## Example
 
@@ -235,7 +273,7 @@ page fetches the facts from the same site, so they stay as private as the site t
 
 ```ts
 import { readFacts } from "@ciena/saos-network-facts/node";
-import { ccmIntervalMs, devicesByName, interfacesOnPort, isisArea, isisMetric } from "@ciena/saos-network-facts";
+import { ccmIntervalMs, devicesByName, interfacesOnPort, isisArea, isisMetric, ringsOf, ringMembers } from "@ciena/saos-network-facts";
 
 const facts = readFacts("facts.json");          // schema 1.x (or a pre-schema bare list)
 const pe1 = devicesByName(facts).get("PE1")!;
@@ -243,6 +281,8 @@ interfacesOnPort(pe1, "1");                     // [{ name: "PE1-PE2", ip: "198.
 isisArea(pe1.isis.instances[0]!);               // "49.0001"
 isisMetric(pe1, "PE1-PE2", 2);                  // 100: the level-2 wide metric, else the narrow one, else null
 ccmIntervalMs(pe1.cfm.meps[0]!);                // 10: the MA's CCM interval ("10ms", "1s", "1sec", "3.3ms", an 802.1Q index) in ms, else null
+ringsOf(pe1);                                   // the device's G.8032 rings with their ports and instances ([] here)
+ringMembers(facts, 1);                          // [{ device, ring }] for every device on ring id 1
 ```
 
 The main entry point has no Node dependencies (`parseFacts(json)` for browsers); see [`js/`](js/).
