@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// The facts panels: the overview (devices, services, SR policies, MPLS-TP tunnels, BGP), one
-// device (its facts record, then the engine's tables for it) and one service
+// The facts panels: the overview (devices, services, SR policies, MPLS-TP tunnels, BGP, G.8032
+// rings), one device (its facts record, then the engine's tables for it) and one service
 // (its pseudowire ends, transports and MEG). Links between them are hash
 // routes (#device=PE1, #service=...), handled by main.js.
 
@@ -75,6 +75,23 @@ export function renderOverview(el, imp, net) {
     ['a', 'b', 'RR client', 'state'],
     net.bgp.sessions.map((s) => [{ html: deviceLink(s.a) }, { html: deviceLink(s.b) }, s.client, `${s.state}${s.reason ? ` (${s.reason})` : ''}`]),
   );
+  if (topo.rings?.length) {
+    html += '<h2>G.8032 rings</h2>';
+    html += table(
+      ['ring', 'type', 'R-APS VID', 'nodes', 'RPL', 'protects', 'state'],
+      topo.rings.map((r) => {
+        const st = net.g8032.rings.find((x) => x.id === r.id);
+        const sub = r.type === 'sub' ? `sub-ring${r.subRingOf ? ` of ${topo.rings.find((x) => x.id === r.subRingOf)?.name ?? r.subRingOf}` : ''}` : r.type === 'major' ? 'major ring' : null;
+        return [
+          `${r.name}${r.ringId !== null ? ` (${r.ringId})` : ''}`, sub, r.rapsVid,
+          { html: r.path.nodes.map(deviceLink).join(' – ') + (r.path.closed ? ` – ${deviceLink(r.path.nodes[0])}` : '') },
+          r.rpl ? `${r.rpl.link}: owner ${r.rpl.owner}${r.rpl.neighbor ? `, neighbour ${r.rpl.neighbor}` : ''}` : 'no owner',
+          r.members.join(', '),
+          `${st.state}${st.failed.length ? ` (${st.failed.join(', ')} down)` : ''}`,
+        ];
+      }),
+    );
+  }
   el.innerHTML = html;
 }
 
@@ -148,6 +165,23 @@ export function renderDevice(el, imp, net, id) {
         return [p.ip, peer ? { html: deviceLink(peer) } : null, p.remote_as, p.route_reflector_client ? 'yes' : 'no', (p.address_families ?? []).join(', '), s ? `${s.state}${s.reason ? ` (${s.reason})` : ''}` : null];
       }),
     );
+  }
+  const rings = (imp.topology.rings ?? []).filter((r) => r.nodes.some((n) => n.node === id));
+  if (rings.length) {
+    html += '<h2>G.8032 rings</h2>';
+    html += table(['ring', 'type', 'ring ports', 'RPL role', 'R-APS VID / level', 'WTR / guard / hold-off', 'revertive'], rings.map((r) => {
+      const me = r.nodes.find((n) => n.node === id);
+      const st = net.g8032.rings.find((x) => x.id === r.id);
+      const blocked = st.blocked.filter((b) => b.node === id).map((b) => b.link);
+      return [
+        r.name, r.type === 'sub' ? `sub-ring${me.terminates ? ' (terminates here)' : ''}` : r.type,
+        me.ports.map((p) => `${p.name}: port ${dash(p.if)} -> ${p.link ?? 'no link'}${blocked.includes(p.link) ? ' [blocked]' : ''}`).join('; '),
+        me.rpl ? `${me.rpl} (${me.rplPort})` : null,
+        `${dash(r.rapsVid)} / ${dash(r.level)}`,
+        `${r.wtrMin ?? 'default'} min / ${r.guardMs ?? 'default'} ms / ${r.holdOffMs ?? 'default'} ms`,
+        r.revertive === null ? 'default (yes)' : r.revertive ? 'yes' : 'no',
+      ];
+    }));
   }
   const own = imp.services.filter((s) => s.ends.some((e) => e.node === id));
   if (own.length) {

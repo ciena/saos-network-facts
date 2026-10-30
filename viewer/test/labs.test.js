@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { fetchLabIndex, labParams, loadFromParams } from '../src/labs.js';
+import { LABS, labFiles } from '../labs.config.js';
 
 const BASE = 'https://example.test/site/index.html';
 
@@ -74,5 +76,29 @@ describe('the page URL', () => {
     await expect(loadFromParams(labParams('?facts=missing.json'), { base: BASE, fetch: fetchFn })).rejects.toThrow('missing.json: HTTP 404');
     await expect(loadFromParams(labParams('?labs=labs.json&lab=z'), { base: BASE, fetch: fetchFn })).rejects.toThrow('no lab "z"');
     await expect(fetchLabIndex(stub({ 'https://x.test/i.json': { labs: [{ id: 'a' }] } }).fetchFn, 'https://x.test/i.json')).rejects.toThrow('needs an id and a facts URL');
+  });
+});
+
+describe('the labs the site stages', () => {
+  test('labs/index.json lists the example as the default lab and the two-ring fixture, each with its facts file', async () => {
+    const files = labFiles();
+    expect(Object.keys(files)).toEqual(['labs/index.json', 'labs/adaptive-sr-cfm/facts.json', 'labs/g8032-two-ring/facts.json']);
+    expect(JSON.parse(files['labs/index.json'])).toEqual({
+      labs: [
+        { id: 'adaptive-sr-cfm', title: 'Adaptive-SR-CFM (example)', facts: 'adaptive-sr-cfm/facts.json', default: true },
+        { id: 'g8032-two-ring', title: 'G.8032 two-ring lab (fixture, links from --clab)', facts: 'g8032-two-ring/facts.json' },
+      ],
+    });
+    expect(LABS.filter((l) => l.default).map((l) => l.id)).toEqual(['adaptive-sr-cfm']);
+    // the staged files are the repository's own, unchanged
+    for (const lab of LABS) expect(files[`labs/${lab.id}/facts.json`]).toBe(readFileSync(new URL(lab.source, new URL('../labs.config.js', import.meta.url)), 'utf8'));
+    // the index resolves as the page would fetch it: the example opens by default, the two-ring lab by ?lab=
+    const site = Object.fromEntries(Object.entries(files).map(([k, v]) => [`https://example.test/site/${k}`, v]));
+    const { fetchFn } = stub(site);
+    const dflt = await loadFromParams(labParams(''), { base: BASE, fetch: fetchFn });
+    expect(dflt.lab.id).toBe('adaptive-sr-cfm');
+    expect(JSON.parse(dflt.lab.factsText).devices.map((d) => d.device)).toContain('PE1');
+    const ring = await loadFromParams(labParams('?lab=g8032-two-ring'), { base: BASE, fetch: fetchFn });
+    expect(JSON.parse(ring.lab.factsText).links).toHaveLength(10);
   });
 });

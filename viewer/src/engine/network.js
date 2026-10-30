@@ -9,6 +9,7 @@ import { computeMplsTp } from './mplstp.js';
 import { labelProtocols } from './mpls.js';
 import { computeBgp } from './bgp.js';
 import { computeCfm } from './cfm.js';
+import { computeG8032 } from './g8032.js';
 import { computeSrPolicies } from './srpolicy.js';
 import { computeVpws } from './vpws.js';
 import { rfcVendor } from './vendor.js';
@@ -19,7 +20,8 @@ import { validateTopology } from './topology.js';
 // net.isis / net.ospf are always there; net.igp is the one in use.
 const EMPTY_IGP = { routers: [], adjacencies: [], lsps: {}, lsdb: {}, spf: {}, rib: {} };
 
-export function buildNetwork(topo, { failures = [], labelMode = 'ldp', vendor = rfcVendor, isisSeqs = {}, ospfSeqs = {} } = {}) {
+// ringOverrides: per ring id, blocked ports and state in place of the computed ones (engine/g8032.js).
+export function buildNetwork(topo, { failures = [], labelMode = 'ldp', vendor = rfcVendor, isisSeqs = {}, ospfSeqs = {}, ringOverrides = {} } = {}) {
   const errors = validateTopology(topo);
   if (errors.length) throw new Error(`invalid topology: ${errors.join('; ')}`);
   const failed = new Set(failures);
@@ -37,5 +39,6 @@ export function buildNetwork(topo, { failures = [], labelMode = 'ldp', vendor = 
   const tp = computeMplsTp(topo, links, vendor);
   const vpws = computeVpws(topo, igp, mpls, sr, vendor, tp);
   const cfm = computeCfm(topo, links, vendor, vpws);
-  return { topo, vendor, failures: [...failed].sort(), labelMode, links, igpName, igp, isis, ospf, mpls, bgp, sr, tp, vpws, cfm };
+  const g8032 = computeG8032(topo, links, vendor, ringOverrides);
+  return { topo, vendor, failures: [...failed].sort(), labelMode, links, igpName, igp, isis, ospf, mpls, bgp, sr, tp, vpws, cfm, g8032 };
 }

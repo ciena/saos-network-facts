@@ -14,6 +14,7 @@ function packetLabel(step) {
   const names = step.headers.map((h) => h.name);
   if (names.includes('IS-IS')) return 'LSP';
   if (names.includes('CFM CCM')) return 'CCM';
+  if (names.includes('R-APS')) return step.headers.find((h) => h.name === 'R-APS').fields.request.split(' ')[0] === 'SF' ? 'R-APS(SF)' : 'R-APS(NR)';
   if (names.includes('BGP UPDATE')) return 'BGP';
   if (names.includes('IPv4')) return 'IPv4';
   return '';

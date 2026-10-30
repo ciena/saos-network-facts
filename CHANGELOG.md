@@ -17,6 +17,49 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-30
+
+### Added
+
+- **Example: a G.8032 major ring and sub-ring** — `examples/adaptive-sr-cfm` gains one
+  `G8032_ringCreate.xml` template on PE1, P2, P3, PE4, PE5 and PE6, written for the example (not
+  from the recipe) and validated with the hosted translator: major ring `ring-core` PE1 - P2 - PE4 -
+  P3 (ring id 1, R-APS VID 4094, RPL P3 - PE4 with P3 owner and PE4 neighbour, WTR 1 min, guard
+  500 ms, revertive) and sub-ring `ring-access` P2 - PE5 - PE6 - PE4 (ring id 2, VID 4093, no
+  virtual channel, RPL PE6 - PE5, terminating at the interconnection nodes P2 and PE4), both
+  protecting the VPLS forwarding domain `ring-data` (VLAN 100) over the existing core links.
+  `facts.json` regenerated (schema 1.5.0); SOURCE.md says what was added and why.
+- **Viewer: G.8032 ring layer** — a *G.8032 rings* plane between the physical and IGP layers draws
+  each ring on its links (a sub-ring in its own colour, a little above its major ring), with a bar
+  and label where a ring port blocks: the RPL owner and neighbour in the idle state, the failed
+  ports in protection, the recovered ports while the ring waits to revert. The import joins the
+  devices' `rings[]` by ring id, maps ring ports to the links the view already has, finds the RPL
+  from the owner's port and the interconnection nodes from where a sub-ring instance names one
+  port (SAOS 10) or terminates (SAOS 6 / 8), and lists ring timers it defaults (G.8032: WTR 5 min,
+  guard 500 ms, hold-off 0, revertive) in the Import tab. The file's top-level `links[]` (schema 1.5,
+  from `--clab`) are drawn as plain L2 links where no addressed link joins the two ports, so a pure
+  L2 ring (the `g8032-two-ring` fixture) is placed too. The overview gets a *G.8032 rings* table
+  (type, R-APS VID, nodes, RPL, protected domains, state) and the device panel the device's rings,
+  ring ports, RPL role and timers.
+- **Viewer: ring failure replay** — failing a ring link now lays out, on the same timeline as the
+  IGP and MPLS steps, G.8032 (ITU-T) protection switching: Signal Fail at both ends (loss of
+  signal, CFM / BFD on the link, or, with neither, when the port is declared down, which the step
+  says), the failed ports blocked and the FDB flushed, R-APS(SF) frames (Y.1731 OpCode 40, the
+  ring's group MAC and R-APS VID, MEG level) hop by hop around the ring with the RPL owner and
+  neighbour unblocking the RPL, and the protection state with the new data path (a sub-ring's
+  through its interconnection nodes). Then the repair (60 s after the failure, a model value):
+  guard timer, R-APS(NR), wait-to-restore at the RPL owner, R-APS(NR, RB) re-blocking the RPL and
+  unblocking the recovered ports, back to idle; non-revertive rings stay as they are. Each step
+  names the network it belongs to (before, in protection, repaired but not reverted), and the ring
+  layer follows along. A failed RPL and a link on no ring are handled (no port change; no ring
+  steps).
+- **Site: a lab index with the example and the two-ring lab** — the viewer build stages
+  `labs/index.json` beside the page (`viewer/labs.config.js`, a vite plugin; the dev server serves
+  it too) with the Adaptive-SR-CFM example as the default lab and the `g8032-two-ring` fixture lab
+  (its facts, with `links` from the containerlab topology, copied from `tests/fixtures/expected`),
+  so the site and its previews open the example as before and offer the two-ring lab in the lab
+  menu or at `?lab=g8032-two-ring`.
+
 ## [0.6.0] - 2026-10-30
 
 ### Added

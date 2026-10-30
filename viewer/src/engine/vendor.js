@@ -73,6 +73,17 @@ export const rfcVendor = {
     },
   },
 
+  g8032: {
+    // ITU-T G.8032 §10.1.1 defaults: revertive, WTR 5 min, guard 500 ms, hold-off 0.
+    wtrMin: 5,
+    guardMs: 500,
+    holdOffMs: 0,
+    rapsBurstMs: 10 / 3, // §10.1.9: three R-APS frames 3.33 ms apart, then every 5 s
+    rapsPeriodS: 5,
+    rapsHopDelayMs: 10, // transmit + processing per ring hop (model)
+    repairAfterS: 60, // the replay repairs the failed link this long after the failure (model)
+  },
+
   cfm: {
     linkMdLevel: 2, // operator-level link MEGs
     ccmIntervalCode: 2, // 802.1Q Table 21-15: 2 = 10 ms

@@ -7,14 +7,38 @@ policies, one over the peer's Prefix-SID), a CFM up-MEP pair with delay measurem
 and iBGP with PE6 as route reflector. CE1 hangs off PE1.
 
 The configurations are the recipe's startup configurations as the lab renders them to boot the
-devices, with the addresses outside RFC 1918 renumbered (below); `facts.json` was extracted from
-them with saos-network-facts 0.5.0 and translator 4.2.1 (the hosted translator).
+devices, with the addresses outside RFC 1918 renumbered (below), plus one G.8032 template per ring
+device that was written for this example (below); `facts.json` was extracted from them with
+saos-network-facts 0.7.0 and translator 4.2.1 (the hosted translator).
+
+## Added for the example: G.8032 rings
+
+The recipe has no Ethernet ring protection. The `NN-G8032_ringCreate.xml` files (the last template
+of PE1, P2, P3, PE4, PE5 and PE6) add two G.8032 rings over the existing core links, so the facts and
+the viewer have a major ring and a sub-ring to show. They were written for this example against the
+SAOS 10 `ciena-itut-g8032-draft` YANG and validated with the hosted translator (each file with the
+device's earlier templates as prior configuration); they are not from the recipe or from any lab.
+
+- **Major ring `ring-core`** (ring id 1, R-APS VID 4094, level 7, instance `erp-core`): PE1 - P2 -
+  PE4 - P3 - PE1, `port0` / `port1` on the ports that carry those links. The RPL is the P3 - PE4
+  link: P3 `port0` (port 23) is the RPL owner, PE4 `port1` (port 2) the RPL neighbour. WTR 1 min,
+  guard 500 ms, revertive.
+- **Sub-ring `ring-access`** (ring id 2, R-APS VID 4093, instance `erp-access`, no virtual
+  channel): P2 - PE5 - PE6 - PE4, closed through the interconnection nodes P2 and PE4 on the major
+  ring. The RPL is the PE6 - PE5 link: PE6 `port0` (port 2) owner, PE5 `port1` (port 2) neighbour.
+  WTR 1 min. At P2 and PE4 the sub-ring terminates: the YANG needs two `ring-port` entries, so
+  `port0` is the major-ring port the sub-ring's traffic continues on (P2 port 3, PE4 port 2) and
+  `port1` the sub-ring link; the ERP instance lists only `port1`.
+- Both instances protect the VPLS forwarding domain `ring-data` (VLAN 100, classifier
+  `ring-vlan-100`), with a flow point on every ring port beside the untagged routed one. No
+  customer attachment is added; the rings carry no service of the recipe.
+- `ring-system-control enabled` turns G.8032 on in each file.
 
 ## Files
 
 | Path | |
 |---|---|
-| `configs/<DEVICE>/<NN>-<template>.xml` | each device's startup configuration (NETCONF XML), one file per template, `NN` = the order the lab applies them |
+| `configs/<DEVICE>/<NN>-<template>.xml` | each device's startup configuration (NETCONF XML), one file per template, `NN` = the order the lab applies them; `G8032_ringCreate` was added for the example |
 | `devices.yaml` | the platform map: each device's type, which the files do not say |
 | `facts.json` | `saos-network-facts extract` of the above (schema 1.5) |
 

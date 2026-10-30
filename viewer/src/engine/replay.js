@@ -4,7 +4,9 @@
 // LACP member removal, CFM/BFD loss of continuity, IGP adjacency down (IS-IS
 // or OSPF), LSP/LSA regeneration and flooding, SPF, LFIB/FTN updates, BGP
 // next-hop tracking, MPLS-TP tunnel loss of continuity and protection
-// switching, and the pseudowires riding them.
+// switching, the pseudowires riding them, and G.8032 ring protection (R-APS
+// Signal Fail, RPL unblock, and after the repair the guard timer, wait-to-
+// restore and R-APS(NR, RB)) on the rings the link is part of.
 
 import { buildNetwork } from './network.js';
 import { ccmStream, fmtMs } from './cfm.js';
@@ -13,6 +15,7 @@ import { areaView, fmtSeq } from './ospf.js';
 import { describeLacpState } from './lag.js';
 import { dataWalk, hostWalk } from './walk.js';
 import { nodeById } from './topology.js';
+import { RAPS_REQUEST, rapsHeaders, rapsHops, ringDataPath, ringPort } from './g8032.js';
 
 function linkOfFailure(topo, failure) {
   const link = topo.links.find((l) => l.id === failure || l.members.some((m) => m.id === failure));
@@ -43,8 +46,10 @@ export function replayFailure(topo, failure, { labelMode = 'ldp', vendor, detect
   const walkOf = (net) => (host ? hostWalk(net, host.from, host.dst, { vrf: host.vrf ?? null }) : src && dst ? dataWalk(net, src, dst) : null);
   const walkBefore = walkOf(before);
   const steps = [];
+  // extra.network names the network the view shows at the step ('before' | 'after' | one of
+  // `networks`); without it the view shows the network before the failure until the last step.
   const step = (t, layer, title, actions, extra = {}) =>
-    steps.push({ t, layer, node: extra.node ?? link.a.node, title: `t=${fmtMs(t)}: ${title}`, actions, headers: [], moves: extra.moves ?? [], status: extra.status ?? 'forward', highlight: extra.highlight ?? { links: [link.id] } });
+    steps.push({ t, layer, node: extra.node ?? link.a.node, title: `t=${fmtMs(t)}: ${title}`, actions, headers: extra.headers ?? [], moves: extra.moves ?? [], status: extra.status ?? 'forward', highlight: extra.highlight ?? { links: [link.id] }, ...(extra.network ? { network: extra.network } : {}) });
 
   step(0, 'physical', `${failure} fails`, [`${link.lag && failure !== link.id ? 'LAG member' : 'link'} ${failure} stops carrying frames`], { status: 'dropped' });
   // 802.1AX §6.4.4: a silent member failure is found when no LACPDU arrives for 3 x the periodic time.
@@ -214,6 +219,7 @@ export function replayFailure(topo, failure, { labelMode = 'ldp', vendor, detect
   }
   tpSteps(before, after, link, detectAt, step);
   vrfSteps(before, after, link, detectAt, step);
+  const rings = ringSteps(topo, before, after, link, detectAt, detection, step);
   steps.sort((x, y) => x.t - y.t);
   const walkAfter = walkOf(after);
   const tEnd = steps.at(-1).t;
@@ -224,8 +230,145 @@ export function replayFailure(topo, failure, { labelMode = 'ldp', vendor, detect
   const pws = after.vpws.pseudowires.map((p) => `PW ${p.id}: ${p.state}${p.reasons.length ? ` (${p.reasons.join('; ')})` : ''}`);
   const title = walkAfter ? (walkAfter.delivered ? 'Converged: traffic restored' : 'Converged: destination unreachable') : 'Converged';
   const status = walkAfter ? (walkAfter.delivered ? 'delivered' : 'dropped') : after.vpws.pseudowires.some((p) => p.state !== 'Up') ? 'dropped' : 'delivered';
-  step(tEnd, 'physical', title, [...(walkAfter ? [`${host ? `${host.from} -> ${host.dst}` : `${src} -> ${dst}`}: ${walkAfter.steps.flatMap((s) => s.moves).map((m) => m.to).join(' -> ')}`] : []), ...policies, ...tunnels, ...pws], { status });
-  return { before, after, walkBefore, walkAfter, replay: { kind: 'replay', layer: 'physical', title: `Failure replay: ${failure}`, steps } };
+  const ringLines = after.g8032.rings.filter((r) => r.links.includes(link.id)).map((r) => `G.8032 ${r.name}: ${r.state}${r.state === 'protection' ? ` (RPL forwarding, ${link.id} blocked)` : ''}`);
+  step(tEnd, 'physical', title, [...(walkAfter ? [`${host ? `${host.from} -> ${host.dst}` : `${src} -> ${dst}`}: ${walkAfter.steps.flatMap((s) => s.moves).map((m) => m.to).join(' -> ')}`] : []), ...policies, ...tunnels, ...pws, ...ringLines], { status, ...(rings.length ? { network: 'after' } : {}) });
+  const networks = {};
+  if (rings.length) {
+    // After the repair: the link is up, the ring still in protection until R-APS(NR, RB).
+    const overrides = Object.fromEntries(rings.map((r) => [r.ring.id, { blocked: [link.a.node, link.b.node].map((n) => ({ node: n, link: link.id, why: 'recovered' })), state: 'pending' }]));
+    networks.pending = buildNetwork(topo, { ...opts, ringOverrides: overrides });
+    ringRecoverySteps(topo, before, link, rings, tEnd, step);
+    steps.sort((x, y) => x.t - y.t);
+  }
+  return { before, after, walkBefore, walkAfter, networks, replay: { kind: 'replay', layer: 'physical', title: `Failure replay: ${failure}`, steps } };
+}
+
+// G.8032 (ITU-T, §10.1): a node beside the failed link blocks its ring port,
+// flushes its FDB and sends R-APS(SF) around the ring; every node that receives
+// it flushes, the RPL owner and neighbour unblock the RPL. Returns the rings
+// the link is on, with the time their protection state is reached.
+function ringSteps(topo, before, after, link, detectAt, detection, step) {
+  const v = before.vendor;
+  const out = [];
+  const ends = [link.a.node, link.b.node];
+  const meg = before.cfm.megs.find((m) => m.link === link.id);
+  for (const st of before.g8032.rings) {
+    if (!st.links.includes(link.id)) continue;
+    const ring = topo.rings.find((r) => r.id === st.id);
+    const hl = { links: [link.id, ...ring.links] };
+    const members = ring.members.length ? ring.members.join(', ') : 'the ring VLANs';
+    if (!ring.rpl) {
+      step(0, 'ring', `${ring.name}: no RPL owner`, ['the facts configure no RPL owner on this ring: the view cannot replay its protection switch'], { status: 'dropped', highlight: hl });
+      continue;
+    }
+    const isRpl = link.id === ring.rpl.link;
+    let tLast = 0;
+    for (const n of ends) {
+      const port = ringPort(ring, n, link.id);
+      const t0 = (detectAt[n] ?? 0) + st.timers.holdOffMs;
+      const why = detection === 'los'
+        ? `loss of signal on ring port ${port.name} (${port.if}): local Signal Fail`
+        : meg || link.bfd
+          ? `${meg ? 'CFM' : 'BFD'} on the link: loss of continuity -> Signal Fail on ring port ${port.name} (${port.if})`
+          : `no CFM MEP on ring port ${port.name} (${port.if}) in the facts: the port stays up, and G.8032 sees the failure only when the port is declared down at t=${fmtMs(detectAt[n] ?? 0)}; until then frames of ${members} into ${link.id} are dropped`;
+      step(t0, 'ring', `${n}: ${ring.name} Signal Fail on ${link.id}`, [
+        why,
+        ...(st.timers.holdOffMs ? [`hold-off ${st.timers.holdOffMs} ms before acting (§10.1.8)`] : []),
+        isRpl ? `ring port ${port.name} is the RPL port: it was blocked already; flush the FDB` : `block ring port ${port.name}, flush the FDB`,
+        `send R-APS(SF) on both ring ports: 3 frames ${fmtMs(v.g8032.rapsBurstMs)} apart, then every ${v.g8032.rapsPeriodS} s (§10.1.9)`,
+      ], { node: n, status: isRpl ? 'forward' : 'dropped', highlight: hl, network: 'after' });
+      for (const h of rapsHops(topo, ring, n, { avoid: link.id })) {
+        const t = t0 + h.depth * v.g8032.rapsHopDelayMs;
+        tLast = Math.max(tLast, t);
+        const acts = [`R-APS(SF) from ${n} (node id, BPR): flush the FDB (§10.1.10)`];
+        if (h.to === ring.rpl.owner && !isRpl) acts.push(`RPL owner: unblock the RPL port on ${ring.rpl.link}`);
+        if (h.to === ring.rpl.neighbor && !isRpl) acts.push(`RPL neighbour: unblock the RPL port on ${ring.rpl.link}`);
+        if (ends.includes(h.to)) acts.push('in Signal Fail itself: its port on the failed link stays blocked');
+        if (ring.type === 'sub' && ring.interconnect.includes(h.to)) acts.push(`interconnection node: the sub-ring's R-APS channel ends here (no virtual channel), nothing is sent onto the major ring`);
+        step(t, 'ring', `${ring.name} R-APS(SF) ${h.from} -> ${h.to}`, acts, {
+          node: h.to, moves: [{ from: h.from, to: h.to, link: h.link, member: null }], headers: rapsHeaders(ring, n, RAPS_REQUEST.SF, {}, v, topo), highlight: hl, network: 'after',
+        });
+      }
+    }
+    const path = ringDataPath(topo, after.g8032, ring.id, ends[0], ends[1]);
+    step(tLast, 'ring', `${ring.name}: protection state`, [
+      isRpl
+        ? `the failed link is the RPL: it was blocked already, so the ring forwards as before; R-APS(SF) replaces R-APS(NR, RB) on the ring`
+        : `RPL ${ring.rpl.link} forwarding (unblocked by ${ring.rpl.owner}${ring.rpl.neighbor ? ` and ${ring.rpl.neighbor}` : ''}); ${link.id} blocked at ${ends.join(' and ')}`,
+      path ? `${members}: ${ends[0]} -> ${ends[1]} now ${path.nodes.join(' -> ')}${ring.subRingOf ? ' (through the interconnection nodes when it crosses the major ring)' : ''}` : `${members}: ${ends[0]} and ${ends[1]} are no longer joined by the ring`,
+      `R-APS(SF) repeats every ${v.g8032.rapsPeriodS} s while the failure lasts`,
+    ], { node: ring.rpl.owner, status: path ? 'delivered' : 'dropped', highlight: hl, network: 'after' });
+    out.push({ ring, state: st, tProtection: tLast });
+  }
+  return out;
+}
+
+// The repair (G.8032 §10.1.4 / §10.1.5): the nodes beside the repaired link
+// clear SF, keep their ports blocked for the guard time and send R-APS(NR); in
+// revertive mode the RPL owner starts the wait-to-restore timer, blocks the
+// RPL when it expires and sends R-APS(NR, RB), on which the other nodes unblock
+// their recovered ports and flush. Non-revertive: the RPL stays forwarding.
+function ringRecoverySteps(topo, before, link, rings, tEnd, step) {
+  const v = before.vendor;
+  const ends = [link.a.node, link.b.node];
+  const tRepair = Math.max(tEnd + 1000, v.g8032.repairAfterS * 1000);
+  const names = rings.map((r) => r.ring.name).join(', ');
+  step(tRepair, 'physical', `${link.id} repaired`, [
+    `both ends see the link up again (model: the replay repairs it ${v.g8032.repairAfterS} s after the failure)`,
+    `${names}: the ring ports on it stay blocked until R-APS says otherwise`,
+  ], { status: 'forward', highlight: { links: [link.id] }, network: 'pending' });
+  for (const { ring, state: st } of rings) {
+    const hl = { links: [link.id, ...ring.links] };
+    const t = st.timers;
+    const isRpl = ring.rpl && link.id === ring.rpl.link;
+    let tNrOwner = null;
+    for (const n of ends) {
+      const port = ringPort(ring, n, link.id);
+      step(tRepair, 'ring', `${n}: ${ring.name} Signal Fail cleared on ${link.id}`, [
+        `ring port ${port.name} (${port.if}) up: clear SF, keep the port blocked`,
+        `start the guard timer (${t.guardMs} ms, §10.1.5): R-APS received meanwhile is ignored, so stale R-APS(SF) still circulating cannot reopen the failure`,
+        'send R-APS(NR) on both ring ports',
+      ], { node: n, highlight: hl, network: 'pending' });
+      for (const h of rapsHops(topo, ring, n, { avoid: link.id })) {
+        const tt = tRepair + h.depth * v.g8032.rapsHopDelayMs;
+        const acts = [`R-APS(NR) from ${n}: no request pending at ${n}`];
+        if (h.to === ring.rpl.owner) {
+          tNrOwner = tNrOwner === null ? tt : Math.min(tNrOwner, tt); // the first R-APS(NR) to arrive starts it
+          acts.push(t.revertive ? `RPL owner, revertive: start wait-to-restore (${t.wtrMin} min, §10.1.4 c)` : 'RPL owner, non-revertive: no WTR; the RPL keeps forwarding');
+        }
+        step(tt, 'ring', `${ring.name} R-APS(NR) ${h.from} -> ${h.to}`, acts, {
+          node: h.to, moves: [{ from: h.from, to: h.to, link: h.link, member: null }], headers: rapsHeaders(ring, n, RAPS_REQUEST.NR, {}, v, topo), highlight: hl, network: 'pending',
+        });
+      }
+    }
+    step(tRepair + t.guardMs, 'ring', `${ends.join(', ')}: ${ring.name} guard timer expires`, ['R-APS is accepted again on the recovered ports'], { node: ends[0], highlight: hl, network: 'pending' });
+    if (!ring.rpl) continue;
+    if (!t.revertive) {
+      step(tNrOwner ?? tRepair, 'ring', `${ring.name}: non-revertive, stays as it is`, [`RPL ${ring.rpl.link} keeps forwarding; ${link.id} stays blocked at ${ends.join(' and ')} until an operator clears it (§10.1.4)`], { node: ring.rpl.owner, highlight: hl, network: 'pending' });
+      continue;
+    }
+    const tWtr = (tNrOwner ?? tRepair) + t.wtrMin * 60000;
+    step(tWtr, 'ring', `${ring.rpl.owner}: ${ring.name} WTR expires`, [
+      `block the RPL port on ${ring.rpl.link}, flush the FDB`,
+      'send R-APS(NR, RB) on both ring ports (§10.1.4 c)',
+    ], { node: ring.rpl.owner, highlight: hl, network: 'pending' });
+    let tLast = tWtr;
+    for (const h of rapsHops(topo, ring, ring.rpl.owner)) {
+      const tt = tWtr + h.depth * v.g8032.rapsHopDelayMs;
+      tLast = Math.max(tLast, tt);
+      const acts = [`R-APS(NR, RB) from ${ring.rpl.owner}: flush the FDB`];
+      if (ends.includes(h.to) && !isRpl) acts.push(`unblock the recovered ring port on ${link.id}`);
+      if (h.to === ring.rpl.neighbor) acts.push(isRpl ? `RPL neighbour: the recovered port is the RPL, it stays blocked` : `RPL neighbour: block the RPL port on ${ring.rpl.link}`);
+      step(tt, 'ring', `${ring.name} R-APS(NR, RB) ${h.from} -> ${h.to}`, acts, {
+        node: h.to, moves: [{ from: h.from, to: h.to, link: h.link, member: null }], headers: rapsHeaders(ring, ring.rpl.owner, RAPS_REQUEST.NR, { rb: true }, v, topo), highlight: hl, network: 'pending',
+      });
+    }
+    const path = ringDataPath(topo, before.g8032, ring.id, ends[0], ends[1]);
+    step(tLast, 'ring', `${ring.name}: idle state restored`, [
+      `RPL ${ring.rpl.link} blocked by ${ring.rpl.owner}${ring.rpl.neighbor ? ` and ${ring.rpl.neighbor}` : ''}${isRpl ? '' : `; ${link.id} forwarding again`}`,
+      ...(path ? [`${ring.members.join(', ') || 'the ring VLANs'}: ${ends[0]} -> ${ends[1]} again ${path.nodes.join(' -> ')}`] : []),
+    ], { node: ring.rpl.owner, status: 'delivered', highlight: hl, network: 'before' });
+  }
 }
 
 // MPLS-TP: static LSPs have no control plane to reroute them. The end points
