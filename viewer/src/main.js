@@ -246,8 +246,12 @@ function goStep(i) {
     renderStep($('step-detail'), null);
     return;
   }
-  // A replay shows the network before the failure until its last step.
-  if (state.replay) rebuild(state.step === steps.length - 1 ? state.replay.after : state.replay.before);
+  // A replay shows the network before the failure until its last step, unless the step names
+  // the network it belongs to (a ring in protection, the link repaired but not yet reverted).
+  if (state.replay) {
+    const nets = { before: state.replay.before, after: state.replay.after, ...state.replay.networks };
+    rebuild(nets[step.network] ?? (state.step === steps.length - 1 ? state.replay.after : state.replay.before));
+  }
   markStep($('step-list'), state.step);
   renderStep($('step-detail'), step);
   layers.highlight(step.highlight?.links ?? step.moves.map((m) => m.link));
@@ -260,9 +264,9 @@ $('fail-run').addEventListener('click', () => {
   const link = $('fail-target').value;
   if (!link) return;
   const detection = $('fail-detection').value;
-  const { before, after, replay } = replayFailure(state.imp.topology, link, { labelMode: state.imp.labelMode, detection });
+  const { before, after, networks, replay } = replayFailure(state.imp.topology, link, { labelMode: state.imp.labelMode, detection });
   state.failures = [link];
-  state.replay = { before, after };
+  state.replay = { before, after, networks };
   setWalk(replay);
   showTab('walk');
   state.playing = true;

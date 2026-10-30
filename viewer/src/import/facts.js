@@ -19,8 +19,10 @@
 //   BGP          peers of kind bgp, matched to the device owning the address
 //   pseudowires  the two ends that name each other (peer address + PW id); static on an MPLS-TP tunnel
 //   CFM          MEPs of one MD / MA on two devices, over that service's pseudowire, at the MA's CCM interval
+//   G.8032       rings[] (schema 1.5) joined across devices by ring id: the links whose two ends are ring ports
+//                of the ring, the RPL from the owner's and neighbour's port, a sub-ring's interconnection nodes
 
-import { ccmIntervalMs, devicesByName, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts } from '../../../js/src/index.ts';
+import { ccmIntervalMs, devicesByName, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts, ringsOf } from '../../../js/src/index.ts';
 import { CCM_INTERVALS_MS } from '../engine/cfm.js';
 import { intToIp, parsePrefix } from '../engine/ip.js';
 import { BACKBONE, normArea } from '../engine/ospf.js';
@@ -556,6 +558,115 @@ function buildCfm(devices, pseudowires, report) {
   return megs;
 }
 
+// The ring ports of one instance at one node: every port of the ring, except where the node
+// terminates a sub-ring. SAOS 10 lists two `ring-port`s even there (the YANG requires two) and names
+// the sub-ring's own port alone in the instance's `ports`; SAOS 6 / 8 says which port the sub-ring
+// terminates on. The other port is the major ring's, where the sub-ring's traffic continues.
+function instancePorts(ring, inst) {
+  if (inst.type !== 'sub' || ring.ports.length !== 2) return ring.ports;
+  if (inst.termination === 'west' || inst.termination === 'east') return ring.ports.filter((p) => p.name === inst.termination);
+  if (inst.rpl.length === 1) return ring.ports.filter((p) => p.name === inst.rpl[0].port);
+  return ring.ports;
+}
+
+// G.8032 rings (schema 1.5 `rings[]`, SAOS 10 and SAOS 6 / 8 alike), one per ring id across the file:
+// the ring's links are the topology links whose two ends are ring ports of the ring on their devices;
+// the RPL is the link of the port the owner configures `rpl owner` on. A device ring without a ring
+// id is a ring of its own (nothing says which other device's ring it is).
+function buildRings(devices, links, report) {
+  const linkOf = (node, port) => links.find((l) => (l.a.node === node && l.a.port === port) || (l.b.node === node && l.b.port === port)) ?? null;
+  const groups = new Map(); // ring id -> ring
+  const byDevice = new Map(); // `${device}|${ring name}` -> ring id
+  for (const [name, f] of devices) {
+    for (const r of ringsOf(f)) {
+      const inst = r.instances[0] ?? null;
+      if (r.instances.length > 1) report.warn(`${name}: ring ${r.name} has ${r.instances.length} protection instances; the view shows the first (${inst.name})`);
+      const key = r.ring_id !== null && r.ring_id !== undefined ? String(r.ring_id) : `${name}:${r.name}`;
+      if (!r.ring_id && r.ring_id !== 0) report.warn(`${name}: ring ${r.name} has no ring id; it cannot be joined with the other devices' rings`);
+      byDevice.set(`${name}|${r.name}`, key);
+      if (!groups.has(key)) groups.set(key, { id: key, ringId: r.ring_id ?? null, name: r.name, type: inst?.type ?? null, rapsVid: num(inst?.raps_vid), level: num(inst?.raps_level), virtualChannel: inst?.virtual_channel ?? null, revertive: inst?.revertive ?? null, wtrMin: num(inst?.timers?.wtr), guardMs: num(inst?.timers?.guard), holdOffMs: num(inst?.timers?.hold_off), members: [], nodes: [], links: [], rpl: null, subRingOf: null, interconnect: [] });
+      const g = groups.get(key);
+      if (g.name !== r.name) report.warn(`ring id ${key}: named ${g.name} on ${g.nodes[0]?.node} and ${r.name} on ${name}`);
+      for (const m of inst?.members ?? []) if (!g.members.includes(m)) g.members.push(m);
+      const ports = (inst ? instancePorts(r, inst) : r.ports).map((p) => {
+        const link = p.interface ? linkOf(name, p.interface) : null;
+        if (!link) report.warn(`${name}: ring ${r.name} port ${p.name} (${p.interface ?? 'no interface'}) is on no link of the view (no addressed interface rides it); the ring is drawn without it`);
+        return { name: p.name, if: p.interface ?? null, link: link?.id ?? null };
+      });
+      const rplOf = (role) => inst?.rpl.find((x) => x.role === role) ?? null;
+      const owner = rplOf('owner');
+      const neighbor = rplOf('neighbor');
+      g.nodes.push({ node: name, ring: r.name, instance: inst?.name ?? null, ports, rpl: owner ? 'owner' : neighbor ? 'neighbor' : null, rplPort: (owner ?? neighbor)?.port ?? null, terminates: Boolean(inst && inst.type === 'sub' && ports.length < r.ports.length), subRingOf: inst?.sub_ring_of ?? null });
+    }
+  }
+  const rings = [...groups.values()];
+  for (const g of rings) {
+    const portLinks = new Map(); // link id -> nodes whose ring ports are on it
+    for (const n of g.nodes) for (const p of n.ports) if (p.link) portLinks.set(p.link, [...(portLinks.get(p.link) ?? []), n.node]);
+    for (const [id, ends] of portLinks) {
+      if (ends.length === 2) g.links.push(id);
+      else report.warn(`ring ${g.name}: ${ends[0]} has a ring port on ${id} but the far end does not; the link is not on the ring`);
+    }
+    g.interconnect = g.nodes.filter((n) => n.terminates || n.subRingOf).map((n) => n.node);
+    const parent = g.nodes.map((n) => n.subRingOf && byDevice.get(`${n.node}|${n.subRingOf}`)).find(Boolean);
+    if (parent) g.subRingOf = parent;
+    const owners = g.nodes.filter((n) => n.rpl === 'owner');
+    const neighbors = g.nodes.filter((n) => n.rpl === 'neighbor');
+    if (owners.length > 1) report.warn(`ring ${g.name}: RPL owner on ${owners.map((n) => n.node).join(' and ')}; the view uses ${owners[0].node}`);
+    const owner = owners[0] ?? null;
+    if (owner) {
+      const link = owner.ports.find((p) => p.name === owner.rplPort)?.link ?? null;
+      if (!link || !g.links.includes(link)) report.warn(`ring ${g.name}: the RPL owner's port ${owner.rplPort} on ${owner.node} is on no link of the ring; no RPL drawn`);
+      else {
+        const nb = neighbors.find((n) => n.ports.some((p) => p.name === n.rplPort && p.link === link)) ?? null;
+        if (neighbors.length && !nb) report.warn(`ring ${g.name}: RPL neighbour ${neighbors.map((n) => n.node).join(', ')} is not at the other end of the RPL ${link}`);
+        g.rpl = { link, owner: owner.node, neighbor: nb?.node ?? null };
+      }
+    } else report.warn(`ring ${g.name}: no RPL owner configured; the view cannot say which port blocks`);
+    g.path = ringPath(g);
+  }
+  if (rings.length) {
+    const major = rings.filter((r) => r.type === 'major').length;
+    report.add('ring', 'facts', `${rings.length} G.8032 rings`, `${major} major, ${rings.length - major} sub-ring; ring ports, R-APS VID and level, RPL owner / neighbour, protected forwarding domains and timers as configured`);
+    report.add('ring', 'derived', 'ring links', 'a link whose two ends are ring ports of the same ring id on their devices; a ring port on no addressed link cannot be placed');
+    const sub = rings.filter((r) => r.type === 'sub');
+    if (sub.length) report.add('ring', 'derived', 'interconnection nodes', 'a node where a sub-ring instance names one port (SAOS 10) or terminates on a port (SAOS 6 / 8); the sub-ring is attached to the ring that shares its other port');
+    const defaults = rings.filter((r) => r.wtrMin === null || r.guardMs === null || r.holdOffMs === null || r.revertive === null);
+    if (defaults.length) report.add('ring', 'default', 'protection timers', `WTR ${rfcVendor.g8032.wtrMin} min, guard ${rfcVendor.g8032.guardMs} ms, hold-off ${rfcVendor.g8032.holdOffMs} ms, revertive (G.8032 defaults) where ${defaults.length === rings.length ? 'a ring' : defaults.map((r) => r.name).join(', ')} does not configure them`);
+  }
+  return rings;
+}
+
+// The ring's nodes in link order: a major ring from the RPL owner around and back (closed); a
+// sub-ring from one end to the other (open at the interconnection nodes). A ring whose links do
+// not chain (a port missing) gives the longest chain found.
+function ringPath(g) {
+  const adj = new Map();
+  const end = (id) => id.split(' ')[0].split('-');
+  const linkEnds = g.links.map((id) => {
+    const n = g.nodes.filter((x) => x.ports.some((p) => p.link === id)).map((x) => x.node);
+    return { id, a: n[0] ?? end(id)[0], b: n[1] ?? end(id)[1] };
+  });
+  for (const l of linkEnds) {
+    adj.set(l.a, [...(adj.get(l.a) ?? []), { node: l.b, link: l.id }]);
+    adj.set(l.b, [...(adj.get(l.b) ?? []), { node: l.a, link: l.id }]);
+  }
+  const start = [...adj.keys()].find((n) => adj.get(n).length === 1) ?? g.rpl?.owner ?? [...adj.keys()][0];
+  if (!start) return { nodes: g.nodes.map((n) => n.node), links: [], closed: false };
+  const nodes = [start];
+  const used = new Set();
+  let cur = start;
+  for (;;) {
+    const next = (adj.get(cur) ?? []).find((x) => !used.has(x.link));
+    if (!next) break;
+    used.add(next.link);
+    if (next.node === start) return { nodes, links: [...used], closed: true };
+    nodes.push(next.node);
+    cur = next.node;
+  }
+  return { nodes, links: [...used], closed: false };
+}
+
 // Services: one per pseudowire, with its MEG.
 function buildServices(pseudowires, megs) {
   return pseudowires.map((pw) => ({
@@ -605,6 +716,7 @@ export function importFacts(input, { name, positions } = {}) {
   const tpTunnels = buildTpTunnels(devices, links, report);
   const pseudowires = buildPseudowires(devices, owner, tpTunnels, report);
   const megs = buildCfm(devices, pseudowires, report);
+  const rings = buildRings(devices, links, report);
 
   // Roles: a router is a PE when it speaks BGP, ends a pseudowire or faces a CE.
   const edge = new Set([...bgp.sessions.flatMap((s) => [s.a, s.b]), ...pseudowires.flatMap((p) => p.ends.map((e) => e.node))]);
@@ -645,6 +757,7 @@ export function importFacts(input, { name, positions } = {}) {
     tpTunnels,
     pseudowires,
     cfm: { linkMegs: false, megs },
+    rings,
   };
   return {
     topology,

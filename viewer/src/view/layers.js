@@ -7,12 +7,15 @@ import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 
 export const LAYERS = [
   { id: 'physical', name: 'Physical / LAG', y: 0, color: 0x8b98a8 },
-  { id: 'isis', name: 'IGP (IS-IS / OSPF)', y: 6, color: 0x3fb950 },
-  { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', y: 12, color: 0xd29922 },
-  { id: 'bgp', name: 'BGP', y: 18, color: 0xa371f7 },
-  { id: 'pw', name: 'Pseudowires (VPWS)', y: 24, color: 0xf778ba },
-  { id: 'cfm', name: 'CFM MEG', y: 30, color: 0x39c5cf },
+  { id: 'ring', name: 'G.8032 rings', y: 6, color: 0xe3b341 },
+  { id: 'isis', name: 'IGP (IS-IS / OSPF)', y: 12, color: 0x3fb950 },
+  { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', y: 18, color: 0xd29922 },
+  { id: 'bgp', name: 'BGP', y: 24, color: 0xa371f7 },
+  { id: 'pw', name: 'Pseudowires (VPWS)', y: 30, color: 0xf778ba },
+  { id: 'cfm', name: 'CFM MEG', y: 36, color: 0x39c5cf },
 ];
+const SUB_RING = 0x79c0ff; // a sub-ring, apart from the major rings in the layer colour
+const RPL = 0xf0883e;
 export const layerY = (id) => LAYERS.find((l) => l.id === id)?.y ?? 0;
 // Gap report layers that share a plane.
 const LAYER_ALIAS = { ospf: 'isis', 'mpls-tp': 'mpls' };
@@ -180,6 +183,49 @@ export class LayerView {
         g.add(label(`${l.a.if} LAG ${st.distributing.length}/${l.members.length}`, 'edge-label', mid.clone().setY(2)));
       }
     }
+  }
+
+  // One line per ring link at the ring's height (a sub-ring a little above its major ring), a bar
+  // across the link where a ring port blocks (the RPL in the idle state, a failed port in
+  // protection, a recovered port waiting for R-APS), a failed link in red.
+  build_ring(g, net, L) {
+    const rings = net.g8032?.rings ?? [];
+    rings.forEach((st, k) => {
+      const ring = net.topo.rings.find((r) => r.id === st.id);
+      const sub = ring.type === 'sub';
+      const color = sub ? SUB_RING : L.color;
+      const y = L.y + 0.3 + (sub ? 0.7 : 0);
+      for (const n of st.nodes) {
+        const s = new THREE.Mesh(new THREE.SphereGeometry(sub ? 0.4 : 0.5, 16, 12), new THREE.MeshStandardMaterial({ color }));
+        s.position.copy(this.pos(n)).setY(y);
+        g.add(s);
+      }
+      for (const id of ring.links) {
+        const l = net.topo.links.find((x) => x.id === id);
+        const a = this.pos(l.a.node).setY(y);
+        const b = this.pos(l.b.node).setY(y);
+        const failed = st.failed.includes(id);
+        g.add(failed ? dashed([a, b], RED) : solid([a, b], color));
+        for (const blk of st.blocked.filter((x) => x.link === id)) {
+          const near = this.pos(blk.node).setY(y);
+          const far = blk.node === l.a.node ? b : a;
+          const at = new THREE.Vector3().lerpVectors(near, far, 0.2);
+          const dir = new THREE.Vector3().subVectors(far, near).normalize();
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.25), new THREE.MeshStandardMaterial({ color: blk.why === 'RPL' ? RPL : RED }));
+          bar.position.copy(at);
+          bar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+          g.add(bar);
+          const text = blk.why === 'RPL' ? (blk.node === ring.rpl?.owner ? 'RPL owner' : 'RPL') : blk.why === 'SF' ? 'blocked (SF)' : 'blocked (recovered)';
+          g.add(label(text, 'edge-label', at.clone().setY(y + 0.7)));
+        }
+      }
+      const anchor = ring.rpl ? net.topo.links.find((x) => x.id === ring.rpl.link) : null;
+      const mid = anchor ? new THREE.Vector3().lerpVectors(this.pos(anchor.a.node), this.pos(anchor.b.node), 0.5) : this.pos(st.nodes[0]);
+      const title = `${ring.name}${ring.ringId !== null ? ` (ring ${ring.ringId})` : ''} ${sub ? 'sub-ring' : 'major ring'} · R-APS VID ${ring.rapsVid ?? '?'} · ${st.state}`;
+      const lbl = label(title, 'edge-label', mid.setY(y + 1.6 + k * 0.8));
+      lbl.element.style.color = hex(color);
+      g.add(lbl);
+    });
   }
 
   build_isis(g, net, L) {

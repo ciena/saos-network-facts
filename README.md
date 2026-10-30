@@ -200,8 +200,9 @@ device is on:
 
 **[ciena.github.io/saos-network-facts](https://ciena.github.io/saos-network-facts/)** shows the
 facts of a ten-device SAOS 10 lab (segment routing, SR policies, VPWS pseudowires, CFM, iBGP route
-reflection) in the [viewer](viewer/): one plane per layer over the topology, a panel per device and
-per service, packet walks and link-failure replays. *Load your facts.json* there to see your own
+reflection, a G.8032 major ring and sub-ring) in the [viewer](viewer/): one plane per layer over
+the topology, a panel per device and per service, packet walks and link-failure replays (a ring
+link's with the R-APS protection switch and the revert after the repair). *Load your facts.json* there to see your own
 network; the file stays in your browser.
 
 ![The Adaptive-SR-CFM example in the viewer](docs/example.png)
@@ -261,7 +262,7 @@ In CI, for example a GitHub Pages workflow:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p site
-          gh release download v0.4.2 --repo ciena/saos-network-facts \
+          gh release download v0.5.0 --repo ciena/saos-network-facts \
             --pattern 'saos-network-facts-viewer-*.tgz' --output viewer.tgz
           tar -xzf viewer.tgz -C site
           mkdir -p site/labs && cp -r facts/* site/labs/    # facts files, positions and labs/index.json

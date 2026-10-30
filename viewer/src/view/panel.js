@@ -20,6 +20,7 @@ const HEADER_COLORS = {
   'G-ACh BFD CC': '#d29922',
   'BGP UPDATE': '#a371f7',
   'CFM CCM': '#39c5cf',
+  'R-APS': '#e3b341',
   'Ethernet II (customer)': '#f778ba',
   Payload: '#f778ba',
 };
