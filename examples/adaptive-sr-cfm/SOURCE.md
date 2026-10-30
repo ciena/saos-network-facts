@@ -9,7 +9,7 @@ and iBGP with PE6 as route reflector. CE1 hangs off PE1.
 The configurations are the recipe's startup configurations as the lab renders them to boot the
 devices, with the addresses outside RFC 1918 renumbered (below), plus one G.8032 template per ring
 device that was written for this example (below); `facts.json` was extracted from them with
-saos-network-facts 0.6.0 and translator 4.2.1 (the hosted translator).
+saos-network-facts 0.7.0 and translator 4.2.1 (the hosted translator).
 
 ## Added for the example: G.8032 rings
 
