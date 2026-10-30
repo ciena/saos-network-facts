@@ -36,7 +36,8 @@ Node 22.18 or later.
 The importer reads the file with the npm reader (`../js/src`). Facts carry configuration, so what
 they do not say is derived or defaulted and listed in the **Import** tab: links are two interfaces
 in one IPv4 subnet, a LAG when both ride one (`lags` / `ports[].lag`; members paired in configured
-order, which the facts do not say); the IGP (OSPF when more devices run OSPF than IS-IS: the engine runs one);
+order, which the facts do not say), plus the file's top-level `links[]` (schema 1.5, the extractor's
+`--clab` topology) as plain L2 links between ports no addressed link joins (no subnet, no IGP); the IGP (OSPF when more devices run OSPF than IS-IS: the engine runs one);
 roles (CE: no IGP and no MPLS-TP tunnel; PE: speaks BGP, ends a pseudowire or faces a CE); IS-IS
 metrics (each end's wide, else narrow, metric at the level the view runs; 10 where not configured)
 and OSPF costs where not configured; CFM level and CCM interval when not configured;
@@ -46,7 +47,7 @@ and LFIBs are computed by the engine from the RFCs; static PW and tunnel labels 
 
 G.8032 rings (`rings[]`, schema 1.5) are joined across devices by ring id; a ring's links are the
 links whose two ends are ring ports of that ring, so a ring port on a link the view does not have
-(no addressed interface on it) is reported and left out. The RPL is the link of the port the owner
+(no addressed interface on it and no `links[]` entry) is reported and left out. The RPL is the link of the port the owner
 configures `rpl owner` on; an interconnection node is one where a sub-ring instance names a single
 port (SAOS 10) or terminates on one (SAOS 6 / 8), and the sub-ring is attached to the ring sharing
 its other port. In the idle state the RPL owner and neighbour block the RPL; a failed ring link is

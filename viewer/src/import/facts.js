@@ -19,6 +19,8 @@
 //   BGP          peers of kind bgp, matched to the device owning the address
 //   pseudowires  the two ends that name each other (peer address + PW id); static on an MPLS-TP tunnel
 //   CFM          MEPs of one MD / MA on two devices, over that service's pseudowire, at the MA's CCM interval
+//   L2 links     top-level links[] (schema 1.5, from the extractor's --clab topology) between two ports no
+//                addressed link already joins: drawn as plain links with no subnet (no IGP, no routes)
 //   G.8032       rings[] (schema 1.5) joined across devices by ring id: the links whose two ends are ring ports
 //                of the ring, the RPL from the owner's and neighbour's port, a sub-ring's interconnection nodes
 
@@ -274,6 +276,27 @@ function buildLinks(devices, nodes, igp, isisLevel, report) {
 }
 
 // The device that owns an address (loopback or interface), by name.
+// The topology's own links (top-level `links[]`, written by the extractor from a containerlab file)
+// that no addressed link already joins at either port: plain L2 links between two shown devices,
+// with no subnet, so an IGP never runs on them. They place the ring ports of a pure L2 ring.
+function topologyLinks(file, links, nodes, report) {
+  const shown = new Set(nodes.map((n) => n.id));
+  const taken = (node, port) => links.some((l) => (l.a.node === node && l.a.port === port) || (l.b.node === node && l.b.port === port));
+  const ids = new Set(links.map((l) => l.id));
+  let added = 0;
+  for (const l of file.links ?? []) {
+    const [a, b] = [l.a, l.b];
+    if (!shown.has(a.device) || !shown.has(b.device) || a.device === b.device) continue;
+    if (taken(a.device, a.port) || taken(b.device, b.port)) continue;
+    let id = `${a.device}-${b.device}`;
+    if (ids.has(id)) id = `${id} ${a.port}/${b.port}`;
+    ids.add(id);
+    links.push({ id, kind: 'l2', lag: false, a: { node: a.device, if: a.port, port: a.port }, b: { node: b.device, if: b.port, port: b.port }, members: [{ id, a: a.port, b: b.port }] });
+    added += 1;
+  }
+  if (added) report.add('physical', 'facts', `${added} L2 links`, `from the file's links[] (the extractor's topology): between two ports that no addressed link joins; no subnet, so no IGP and no routes over them`);
+}
+
 function ownerIndex(devices) {
   const owner = new Map();
   for (const [name, f] of devices) {
@@ -590,7 +613,7 @@ function buildRings(devices, links, report) {
       for (const m of inst?.members ?? []) if (!g.members.includes(m)) g.members.push(m);
       const ports = (inst ? instancePorts(r, inst) : r.ports).map((p) => {
         const link = p.interface ? linkOf(name, p.interface) : null;
-        if (!link) report.warn(`${name}: ring ${r.name} port ${p.name} (${p.interface ?? 'no interface'}) is on no link of the view (no addressed interface rides it); the ring is drawn without it`);
+        if (!link) report.warn(`${name}: ring ${r.name} port ${p.name} (${p.interface ?? 'no interface'}) is on no link of the view (no addressed interface rides it and the file's links[] do not name it); the ring is drawn without it`);
         return { name: p.name, if: p.interface ?? null, link: link?.id ?? null };
       });
       const rplOf = (role) => inst?.rpl.find((x) => x.role === role) ?? null;
@@ -628,7 +651,7 @@ function buildRings(devices, links, report) {
   if (rings.length) {
     const major = rings.filter((r) => r.type === 'major').length;
     report.add('ring', 'facts', `${rings.length} G.8032 rings`, `${major} major, ${rings.length - major} sub-ring; ring ports, R-APS VID and level, RPL owner / neighbour, protected forwarding domains and timers as configured`);
-    report.add('ring', 'derived', 'ring links', 'a link whose two ends are ring ports of the same ring id on their devices; a ring port on no addressed link cannot be placed');
+    report.add('ring', 'derived', 'ring links', 'a link whose two ends are ring ports of the same ring id on their devices (an addressed link, or one of the links[] in the file); a ring port on neither cannot be placed');
     const sub = rings.filter((r) => r.type === 'sub');
     if (sub.length) report.add('ring', 'derived', 'interconnection nodes', 'a node where a sub-ring instance names one port (SAOS 10) or terminates on a port (SAOS 6 / 8); the sub-ring is attached to the ring that shares its other port');
     const defaults = rings.filter((r) => r.wtrMin === null || r.guardMs === null || r.holdOffMs === null || r.revertive === null);
@@ -709,6 +732,7 @@ export function importFacts(input, { name, positions } = {}) {
   const levels = [...new Set([...devices.values()].map((f) => levelNumber(f.isis?.instances?.[0]?.level)).filter(Boolean))];
   const nodes = buildNodes(devices, igp, report);
   const links = buildLinks(devices, nodes, igp, levels[0] ?? 2, report);
+  topologyLinks(file, links, nodes, report);
   const owner = ownerIndex(devices);
   const bgp = buildBgp(devices, owner, report);
   const srgb = srgbOf(devices, report);

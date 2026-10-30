@@ -132,3 +132,32 @@ describe('ring link failure replay', () => {
     expect(s.networks).toEqual({});
   });
 });
+
+describe('a pure L2 ring lab placed by the facts file\'s links[]', () => {
+  // No interface on the two-ring fixture has an address: its links come from the extractor's
+  // --clab topology (top-level links[], schema 1.5), and the rings sit on them.
+  const file = readFileSync(new URL('../../tests/fixtures/expected/g8032-two-ring.facts.json', import.meta.url), 'utf8');
+  const two = importFacts(file);
+
+  test('the topology links become L2 links and carry both rings', () => {
+    expect(two.topology.links.map((l) => [l.id, l.kind])).toEqual([
+      ['RM_1-RM_2', 'l2'], ['RM_2-RM_3', 'l2'], ['RM_3-RM_4', 'l2'], ['RM_4-RM_1', 'l2'], ['RM_1-RS_1', 'l2'],
+      ['RS_1-RS_2', 'l2'], ['RS_2-RM_4', 'l2'], ['CE_1-RM_2', 'l2'], ['CE_2-RM_3', 'l2'], ['CE_3-RS_1', 'l2'],
+    ]);
+    expect(two.report.gaps.physical.map((i) => i.item)).toContain('10 L2 links');
+    const [major, sub] = two.topology.rings;
+    expect(major.path).toEqual({ nodes: ['RM_4', 'RM_1', 'RM_2', 'RM_3'], links: ['RM_4-RM_1', 'RM_1-RM_2', 'RM_2-RM_3', 'RM_3-RM_4'], closed: true });
+    expect(major.rpl).toEqual({ link: 'RM_4-RM_1', owner: 'RM_4', neighbor: 'RM_1' });
+    expect(sub).toMatchObject({ type: 'sub', interconnect: ['RM_1', 'RM_4'], subRingOf: '1', rpl: { link: 'RM_1-RS_1', owner: 'RM_1', neighbor: 'RS_1' } });
+    expect(sub.path).toEqual({ nodes: ['RM_1', 'RS_1', 'RS_2', 'RM_4'], links: ['RM_1-RS_1', 'RS_1-RS_2', 'RS_2-RM_4'], closed: false });
+    expect(two.report.warnings.filter((w) => /ring/.test(w))).toEqual([]);
+  });
+
+  test('a ring link failure replays the R-APS exchange over the L2 links', () => {
+    const s = replayFailure(two.topology, 'RM_2-RM_3', { labelMode: two.labelMode });
+    expect(titles(s)).toContain('t=30 ms: ring_1: protection state');
+    expect(titles(s)).toContain('t=120.01 s: RM_4: ring_1 WTR expires');
+    expect(titles(s).at(-1)).toBe('t=120.03 s: ring_1: idle state restored');
+    expect(buildNetwork(two.topology, { labelMode: two.labelMode }).g8032.rings.map((r) => r.state)).toEqual(['idle', 'idle']);
+  });
+});
