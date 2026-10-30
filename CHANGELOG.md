@@ -17,6 +17,19 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-29
+
+### Fixed
+
+- **SAOS 10 devices without a platform** — translator 4.2.1 requires `platform`
+  on `convert_cli` / `convert_xml` and has no default, so a SAOS 10 device whose platform is
+  unknown (no `-10x` type and no platform-map entry, as when the extractor is detected from the
+  files) failed every file with the translator's raw `Missing required argument`. Such a device is
+  now `status: error` before any call, with a reason that names the device and its files and says
+  to set its type (`5164-10x`) or platform (`cn5164`) in `--platform-map`. Applies to every backend.
+  The recorded translator replies are all from 4.2.1; the `mixed-detected` case no longer records
+  any for PE3.
+
 ## [0.4.0] - 2026-10-29
 
 ### Added

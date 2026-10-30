@@ -56,6 +56,17 @@ Which parser reads a device: the platform map's `extractor`, else the device typ
 SAOS 6/8; `*-10x`: SAOS 10), else the containerlab kind (`ciena_saos`: SAOS 10), else the files
 themselves (XML, or CLI not written as SAOS 6 `verb [noun] action` commands, is SAOS 10).
 
+A SAOS 10 device needs its translator platform (`cn5164`): the platform map's `platform`, else the
+device type (`5164-10x`, `5164`, `cn5164`). The translator's convert tools require one from 4.2.1 and
+have no default, so a SAOS 10 device with neither (a configs directory with no platform map, say) is
+recorded as `error` with that reason and its files are not sent; give it a type or platform:
+
+```yaml
+devices:
+  PE3: 5164-10x          # the type, or
+  PE4: {platform: cn5164}
+```
+
 Other options: `--recipe NAME` labels every record, `--no-saos10` skips SAOS 10 devices, `--jobs N`
 sets parallel translator calls, `--quiet` prints only problems. The exit status is 1 when a device
 is `error` or `partial` (the facts file is still written), 2 on bad arguments.

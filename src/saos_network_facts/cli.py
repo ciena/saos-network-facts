@@ -74,7 +74,8 @@ def parser():
                         "files sharing a name up to the first dot are one device, applied in name order)")
     e.add_argument("--clab", metavar="FILE", help="a containerlab topology: node kinds and types, and startup-config files")
     e.add_argument("--platform-map", metavar="FILE",
-                   help="YAML/JSON {devices: {NAME: {type, platform, extractor, configs}}} for what the files do not say")
+                   help="YAML/JSON {devices: {NAME: {type, platform, extractor, configs}}} for what the files do not say; "
+                        "a SAOS 10 device needs a type (5164-10x) or platform (cn5164), else it is an error")
     e.add_argument("-o", "--output", default="-", metavar="FILE", help="the facts file to write (default: stdout)")
     e.add_argument("--recipe", metavar="NAME", help="label every device record with this recipe / lab name")
     e.add_argument("--no-saos10", action="store_true", help="skip SAOS 10 devices (no translator calls)")

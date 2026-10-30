@@ -7,7 +7,8 @@ Each device has an extractor:
 * ``saos6`` (SAOS 6 and SAOS 8): ``saos6`` parses the flat CLI directly.
 * ``saos10``: the translator turns each configuration file into pivot JSON and ``saos10`` walks it.
   A file the translator cannot parse is reported on the record (``status: partial``) and the others
-  still count.
+  still count. The translator needs the device's platform (``cn5164``), from the platform map's
+  ``platform`` or the device type; a device with neither is ``status: error`` without a call.
 * anything else (a Linux host, a line system): no facts, ``status: skipped``.
 
 The extractor comes from, in order: the platform map's ``extractor``, the device type (``-6x`` / ``-8x``
@@ -209,8 +210,19 @@ def device_facts(device, translator=None, jobs=1, recipe=None):
     if translator is None:
         record.update(status="skipped", reason="no translator")
         return record
+    if not platform:
+        record.update(status="error", reason=no_platform_reason(device))
+        return record
     saos10_device_facts(record, texts, platform, translator, jobs)
     return record
+
+
+def no_platform_reason(device):
+    """Why a SAOS 10 device is not sent to the translator: its convert tools need the platform (from
+    translator 4.2.1) and there is no default, so it must come from the device type or the platform map."""
+    files = ", ".join(label for label, _ in device.configs)
+    return (f"no SAOS 10 platform for {device.name} ({files}): the translator needs one; set its type "
+            f"(5164-10x) or platform (cn5164) in --platform-map")
 
 
 def saos10_device_facts(record, texts, platform, translator, jobs=1):

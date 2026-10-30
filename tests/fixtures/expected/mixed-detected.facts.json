@@ -182,158 +182,9 @@
     {
       "device": "PE3",
       "extractor": "saos10",
-      "facts": {
-        "bgp": {
-          "instances": []
-        },
-        "cfm": {
-          "meps": []
-        },
-        "classifiers": {
-          "UNTAGGED": []
-        },
-        "fds": [
-          {
-            "mode": "vpls",
-            "name": "FD-CORE"
-          }
-        ],
-        "fps": [
-          {
-            "classifiers": [
-              "UNTAGGED"
-            ],
-            "fd": "FD-CORE",
-            "logical_port": "1",
-            "name": "FP-CORE"
-          }
-        ],
-        "gateway": null,
-        "hostname": "PE3",
-        "interfaces": [
-          {
-            "description": null,
-            "fd": null,
-            "ip": "203.0.113.30/32",
-            "ipv4": [
-              "203.0.113.30/32"
-            ],
-            "ipv6": [],
-            "isis": "CORE",
-            "kind": "loopback",
-            "mtu": null,
-            "name": "lb0",
-            "vlan": null,
-            "vrf": null,
-            "vs": null
-          },
-          {
-            "description": null,
-            "fd": "FD-CORE",
-            "ip": "198.51.100.11/31",
-            "ipv4": [
-              "198.51.100.11/31"
-            ],
-            "ipv6": [],
-            "isis": "CORE",
-            "kind": "ip",
-            "mtu": null,
-            "name": "core1",
-            "vlan": null,
-            "vrf": null,
-            "vs": null
-          }
-        ],
-        "isis": {
-          "instances": [
-            {
-              "area": "49.0002.2030.0011.3030.00",
-              "area_id": "49.0002",
-              "level": "level-2",
-              "name": "CORE",
-              "net": "49.0002.2030.0011.3030.00",
-              "nets": [
-                "49.0002.2030.0011.3030.00"
-              ],
-              "sr_enabled": true,
-              "system_id": "2030.0011.3030"
-            }
-          ],
-          "interfaces": [
-            {
-              "instance": "CORE",
-              "interface": "core1",
-              "level": "level-2",
-              "metrics": [],
-              "type": "point-to-point"
-            },
-            {
-              "instance": "CORE",
-              "interface": "lb0",
-              "level": null,
-              "metrics": [],
-              "type": "point-to-point"
-            }
-          ]
-        },
-        "l2vpn_services": [],
-        "lags": [],
-        "lines": 10,
-        "objects": 10,
-        "ospf": {
-          "instances": [],
-          "interfaces": []
-        },
-        "peers": [],
-        "ports": {
-          "1": {
-            "description": null,
-            "lag": null,
-            "roles": [
-              "fp"
-            ],
-            "vlans": []
-          }
-        },
-        "pseudowires": [],
-        "recognised": 10,
-        "rings": [],
-        "segment_routing": {
-          "policies": [],
-          "prefix_sids": [
-            {
-              "interface": "lb0",
-              "node": true,
-              "prefix": "203.0.113.30/32",
-              "sid": "17030",
-              "value_type": "absolute"
-            }
-          ],
-          "segment_lists": {},
-          "srgb": [
-            {
-              "instance": "CORE",
-              "lower": "17000",
-              "upper": "17999"
-            }
-          ]
-        },
-        "segments": [],
-        "sub_ports": [],
-        "tp_corouted_tunnels": [],
-        "vlans": {},
-        "vrfs": [
-          "CUST-A"
-        ]
-      },
-      "failed_templates": [
-        {
-          "error": "Unknown top-level command: frobnicate",
-          "template": "PE3/03-broken.cfg"
-        }
-      ],
-      "reason": "PE3/03-broken.cfg: Unknown top-level command: frobnicate",
-      "status": "partial",
+      "facts": null,
+      "reason": "no SAOS 10 platform for PE3 (PE3/01-base.cfg, PE3/02-services.xml, PE3/03-broken.cfg): the translator needs one; set its type (5164-10x) or platform (cn5164) in --platform-map",
+      "status": "error",
       "templates": [
         "PE3/01-base.cfg",
         "PE3/02-services.xml",
@@ -345,7 +196,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.4.0"
+    "version": "0.4.1"
   },
   "schema_version": "1.3.0"
 }

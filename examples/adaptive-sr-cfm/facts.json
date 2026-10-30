@@ -2866,7 +2866,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (mcp, https://dgwl7tykn828q.cloudfront.net)",
-    "version": "0.4.0"
+    "version": "0.4.1"
   },
   "schema_version": "1.3.0"
 }
