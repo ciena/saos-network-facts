@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import {
-  bgpPeers, devicesByName, FactsFormatError, interfacesOnPort, isisArea, isisAreaId, isisMetric, isisSystemId, loopbacks, parseFacts, readFacts,
+  bgpPeers, ccmIntervalMs, devicesByName, FactsFormatError, interfacesOnPort, isisArea, isisAreaId, isisMetric, isisSystemId, isRouted, loopbacks,
+  parseFacts, readFacts,
 } from "../src/node.ts";
-import type { DeviceFacts } from "../src/generated/facts.ts";
+import type { DeviceFacts, Interface } from "../src/generated/facts.ts";
 
 const expected = path.resolve(import.meta.dirname, "..", "..", "tests", "fixtures", "expected");
 const srl2 = readFacts(path.join(expected, "sr-l2.facts.json"));
@@ -77,4 +78,21 @@ test("IS-IS interface metrics: wide, else narrow, per level; null when not set",
   assert.equal(isisMetric(narrow, "x", "L1"), 7);
   const old = { isis: { instances: [], interfaces: [{ interface: "x", instance: "I", level: null, type: null }] } } as unknown as DeviceFacts;
   assert.equal(isisMetric(old, "x", 2), null);
+});
+
+test("isRouted: addressed interfaces that can link devices; not loopbacks, LAGs, ports or the management plane", () => {
+  const iface = (kind: string, ip: string | null = "192.0.2.1/24") => ({ name: kind, kind, ip } as unknown as Interface);
+  assert.deepEqual(["ip", "point-to-point", "unknown"].map((k) => isRouted(iface(k))), [true, true, true]);
+  // SAOS 6 `management` and SAOS 10 `system` (mgmtbr0) address the shared management network
+  assert.deepEqual(["loopback", "lag", "ettp", "management", "system"].map((k) => isRouted(iface(k))), [false, false, false, false, false]);
+  assert.equal(isRouted(iface("ip", null)), false);
+});
+
+test("ccmIntervalMs: SAOS 10 and SAOS 6 spellings, 802.1Q indexes; null when unset or off", () => {
+  const pe1 = devicesByName(srl2).get("PE1")!;
+  assert.equal(ccmIntervalMs(pe1.cfm.meps[0]!), 10);
+  assert.equal(ccmIntervalMs(devicesByName(mixed).get("AGG1")!.cfm.meps[0]!), 100);
+  assert.deepEqual(["3.3ms", "10ms", "100ms", "1s", "10s", "1min", "10min"].map(ccmIntervalMs), [10 / 3, 10, 100, 1000, 10000, 60000, 600000]);
+  assert.deepEqual(["3.33ms", "1sec", "10sec", "1min", "4", "7"].map(ccmIntervalMs), [10 / 3, 1000, 10000, 60000, 1000, 600000]);
+  assert.deepEqual([null, undefined, "off", "0", "soon", { ccm_interval: null }].map(ccmIntervalMs), [null, null, null, null, null, null]);
 });

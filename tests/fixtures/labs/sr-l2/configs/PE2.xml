@@ -101,6 +101,7 @@
         <component-id>1</component-id>
         <fd-name xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-cfm">FD-VPWS-100</fd-name>
       </component-list>
+      <ccm-interval>10ms</ccm-interval>
       <maintenance-association-end-point>
         <mep-identifier>12</mep-identifier>
         <interface>FP-AC-100</interface>

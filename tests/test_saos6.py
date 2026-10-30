@@ -95,10 +95,27 @@ def test_cfm_mep_takes_level_from_its_service():
     )
     mep, sub = f["cfm"]["meps"]
     assert mep == {"md": None, "ma": "MA-200", "mep_id": "21", "level": "4", "direction": "up", "interface": None,
-                   "port": "3", "vlan": "200", "service": "VS200"}
+                   "port": "3", "vlan": "200", "service": "VS200", "ccm_interval": None}
     assert (sub["interface"], sub["port"], sub["direction"]) == ("sp1", None, "down")
     assert "cfm-mep" in f["ports"]["3"]["roles"]
     assert "_cfm_services" not in f
+
+
+def test_cfm_mep_ccm_interval_from_its_service_set_in_any_order():
+    f = facts(
+        "cfm service set service MA-100 ccm-interval 100ms",   # before the create
+        "cfm service create vs VS100 name MA-100 level 4",
+        "cfm service create vs VS200 name MA-200 level 4",
+        "cfm service set service MA-200 ccm-interval 3.33ms",  # after it
+        "cfm service create vs VS300 name MA-300 level 4",     # left at the default
+        "cfm service set service MA-300 alarm-time 3000",      # a setting the facts do not carry
+        "cfm mep create service MA-100 port 1 type up mepid 11",
+        "cfm mep create service MA-200 port 2 type up mepid 21",
+        "cfm mep create service MA-300 port 3 type up mepid 31",
+    )
+    assert [(m["ma"], m["level"], m["service"], m["ccm_interval"]) for m in f["cfm"]["meps"]] == [
+        ("MA-100", "4", "VS100", "100ms"), ("MA-200", "4", "VS200", "3.33ms"), ("MA-300", "4", "VS300", None)]
+    assert (f["lines"], f["recognised"]) == (9, 8)
 
 
 def test_expand_and_net_parts():

@@ -5,6 +5,8 @@
 //   ?labs=<url>                      a lab index: open its default lab, offer the others
 //   ?labs=<url>&lab=<id>             open lab <id> of that index
 //   ?lab=<id>                        the same with the index at labs/index.json
+//   (nothing)                        the default lab of labs/index.json beside the page when a site
+//                                    stages one, else the bundled example
 //
 // URLs are relative to the page; the index's own URLs are relative to the index. Lab index:
 //
@@ -39,8 +41,19 @@ async function fetchJson(fetchFn, url) {
 }
 
 // The labs of the index at `indexUrl`, their URLs made absolute; `defaultId` is the lab to open.
-export async function fetchLabIndex(fetchFn, indexUrl) {
-  const body = await fetchJson(fetchFn, indexUrl);
+// `optional`: null when the site stages no index there (not found, or not JSON, as a server's
+// fallback page); an index that is there but malformed is still an error.
+export async function fetchLabIndex(fetchFn, indexUrl, { optional = false } = {}) {
+  let body;
+  if (optional) {
+    const r = await fetchFn(indexUrl);
+    if (!r.ok) return null;
+    try {
+      body = JSON.parse(await r.text());
+    } catch {
+      return null;
+    }
+  } else body = await fetchJson(fetchFn, indexUrl);
   const list = Array.isArray(body) ? body : body?.labs;
   if (!Array.isArray(list) || !list.length) throw new Error(`${indexUrl}: expected { "labs": [{ "id", "title", "facts" }, ...] }`);
   const labs = list.map((l, i) => {
@@ -64,8 +77,9 @@ export async function loadLab(fetchFn, lab) {
   return { ...lab, factsText: facts, positions };
 }
 
-// What the page URL asks for: null when it names no facts and no lab (the page shows its
-// bundled example), else { index, lab } with `index` null for a bare ?facts=.
+// What the page URL asks for: { index, lab } with `index` null for a bare ?facts=; with no
+// parameter, the default lab of the index at labs/index.json beside the page, or null when the
+// site stages none (the page shows its bundled example).
 export async function loadFromParams(params, { base, fetch: fetchFn }) {
   if (params.facts) {
     const facts = resolveUrl(params.facts, base);
@@ -73,8 +87,9 @@ export async function loadFromParams(params, { base, fetch: fetchFn }) {
     const lab = { id: null, title: null, facts, ...(params.positions ? { positions: resolveUrl(params.positions, base) } : {}) };
     return { index: null, lab: await loadLab(fetchFn, lab) };
   }
-  if (!params.labs && !params.lab) return null;
-  const index = await fetchLabIndex(fetchFn, resolveUrl(params.labs ?? DEFAULT_INDEX, base));
+  const implicit = !params.labs && !params.lab;
+  const index = await fetchLabIndex(fetchFn, resolveUrl(params.labs ?? DEFAULT_INDEX, base), { optional: implicit });
+  if (!index) return null;
   const id = params.lab ?? index.defaultId;
   const lab = index.labs.find((l) => l.id === id);
   if (!lab) throw new Error(`no lab "${id}" in ${index.url}`);

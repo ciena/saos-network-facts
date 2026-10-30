@@ -7,8 +7,10 @@
 //
 //   IGP          IS-IS, or OSPF when more devices run OSPF than IS-IS (the engine runs one)
 //   nodes        every device with facts; a router when it runs the IGP or an MPLS-TP tunnel, else a CE
-//   links        two interfaces on different devices in one IPv4 subnet; core when both run the IGP;
-//                a LAG when both interfaces ride a LAG (lags / ports[].lag), members paired in order
+//   links        two routed interfaces on different devices in one IPv4 subnet (management interfaces
+//                never link: they share the management network); with more interfaces in the subnet,
+//                the two that run the IGP; core when both run the IGP; a LAG when both interfaces ride
+//                a LAG (lags / ports[].lag), members paired by port in natural order at both ends
 //   IS-IS        per link each end's interface metric at the level the view runs (wide, else narrow, else 10)
 //   OSPF         per link the area and cost of each end's interface, BFD when both ends enable it
 //   SRGB, SIDs   segment_routing.srgb / prefix_sids (node SID of the loopback)
@@ -16,9 +18,10 @@
 //   MPLS-TP      tp_corouted_tunnels: each node's segment, stitched from the ingress along next hops
 //   BGP          peers of kind bgp, matched to the device owning the address
 //   pseudowires  the two ends that name each other (peer address + PW id); static on an MPLS-TP tunnel
-//   CFM          MEPs of one MD / MA on two devices, over that service's pseudowire
+//   CFM          MEPs of one MD / MA on two devices, over that service's pseudowire, at the MA's CCM interval
 
-import { devicesByName, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts } from '../../../js/src/index.ts';
+import { ccmIntervalMs, devicesByName, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts } from '../../../js/src/index.ts';
+import { CCM_INTERVALS_MS } from '../engine/cfm.js';
 import { intToIp, parsePrefix } from '../engine/ip.js';
 import { BACKBONE, normArea } from '../engine/ospf.js';
 import { rfcVendor } from '../engine/vendor.js';
@@ -51,9 +54,24 @@ function lagOf(facts, port) {
   return lags.find((l) => l.name === port) ?? lags.find((l) => l.name === facts.ports?.[port]?.lag) ?? null;
 }
 
+// Natural order of port names: digit runs compare as numbers, so 1/2 < 1/10 and 29/30 < 29/100.
+export function naturalCompare(x, y) {
+  const parts = (v) => String(v).split(/(\d+)/);
+  const px = parts(x);
+  const py = parts(y);
+  for (let i = 0; i < Math.max(px.length, py.length); i++) {
+    const [a, b] = [px[i] ?? '', py[i] ?? ''];
+    if (a === b) continue;
+    const numeric = /^\d+$/.test(a) && /^\d+$/.test(b);
+    return numeric ? Number(a) - Number(b) : a < b ? -1 : 1;
+  }
+  return 0;
+}
+
 // The members of a link: one per member pair when both ends ride a LAG (802.1AX: the IP
 // interface sits on the aggregator, its members carry the frames), else the link itself.
-// The facts do not say which member faces which, so members are paired in configured order.
+// The facts do not say which member faces which: members are paired by port in natural order at
+// both ends (labs cable like for like, 29/30 to 29/30), not in the order they were configured.
 function linkMembers(id, a, b, report) {
   const plain = { lag: false, members: [{ id, a: a.if, b: b.if }] };
   if (!a.lag && !b.lag) return plain;
@@ -67,8 +85,9 @@ function linkMembers(id, a, b, report) {
     return plain;
   }
   if (a.lag.members.length !== b.lag.members.length) report.warn(`${id}: ${a.node} ${a.lag.name} has ${a.lag.members.length} members, ${b.node} ${b.lag.name} ${b.lag.members.length}; ${n} are drawn`);
+  const [ma, mb] = [a, b].map((e) => [...e.lag.members].sort(naturalCompare));
   const members = [];
-  for (let i = 0; i < n; i++) members.push({ id: `${id}/${i + 1}`, a: a.lag.members[i], b: b.lag.members[i] });
+  for (let i = 0; i < n; i++) members.push({ id: `${id}/${i + 1}`, a: ma[i], b: mb[i] });
   return { lag: true, members };
 }
 
@@ -198,13 +217,25 @@ function buildLinks(devices, nodes, igp, isisLevel, report) {
   const role = Object.fromEntries(nodes.map((n) => [n.id, n.role]));
   const links = [];
   const ids = new Set();
+  // The two ends of a point-to-point link in a subnet: its two interfaces when they are on
+  // different devices; with more interfaces (a leftover duplicate on one device), the two on
+  // different devices that run the IGP, when they are exactly two; else none.
+  const linkEnds = (ends) => {
+    const two = (list) => (list.length === 2 && list[0].node !== list[1].node ? list : null);
+    return two(ends) ?? (ends.length > 2 ? two(ends.filter((e) => e.igp)) : null);
+  };
+  const igpName = igp === 'ospf' ? 'OSPF' : 'IS-IS';
   for (const [subnet, ends] of bySubnet) {
-    const devs = new Set(ends.map((e) => e.node));
-    if (ends.length !== 2 || devs.size !== 2) {
-      if (ends.length > 2) report.warn(`${subnet}: ${ends.length} interfaces (${ends.map((e) => `${e.node} ${e.if}`).join(', ')}); only point-to-point links are drawn`);
+    const pair = linkEnds(ends);
+    if (!pair) {
+      if (ends.length > 2) report.warn(`${subnet}: ${ends.length} interfaces (${ends.map((e) => `${e.node} ${e.if}`).join(', ')}) and no two of different devices run ${igpName}; only point-to-point links are drawn`);
       continue;
     }
-    const [a, b] = ends;
+    const [a, b] = pair;
+    if (ends.length > 2) {
+      const rest = ends.filter((e) => e !== a && e !== b);
+      report.warn(`${subnet}: ${ends.length} interfaces; drawn between the two that run ${igpName} (${a.node} ${a.if}, ${b.node} ${b.if}), ignoring ${rest.map((e) => `${e.node} ${e.if}`).join(', ')}`);
+    }
     const core = role[a.node] !== 'ce' && role[b.node] !== 'ce' && a.igp && b.igp;
     let id = `${a.node}-${b.node}`;
     if (ids.has(id)) id = `${id} ${subnet}`;
@@ -216,11 +247,11 @@ function buildLinks(devices, nodes, igp, isisLevel, report) {
   const lags = links.filter((l) => l.lag);
   if (lags.length) {
     report.add('physical', 'facts', `${lags.length} LAG links`, `links whose interfaces ride a LAG at both ends: ${lags.map((l) => `${l.id} (${l.members.length} members)`).join(', ')}`);
-    report.add('physical', 'derived', 'LAG member pairing', 'the facts do not say which member faces which: members are paired in configured order');
+    report.add('physical', 'derived', 'LAG member pairing', 'the facts do not say which member faces which: members are paired by port in natural order at both ends (29/30 with 29/30)');
   }
   const core = links.filter((l) => l.kind === 'core');
   const name = igp === 'ospf' ? 'OSPF' : 'IS-IS';
-  report.add('physical', 'derived', `${links.length} links`, `from interface subnets (two interfaces of different devices in one IPv4 subnet); ${core.length} core (${name} at both ends), ${links.length - core.length} access`);
+  report.add('physical', 'derived', `${links.length} links`, `from interface subnets (two routed interfaces of different devices in one IPv4 subnet; management interfaces and loopbacks never link); ${core.length} core (${name} at both ends), ${links.length - core.length} access`);
   if (igp === 'isis' && core.length) {
     const defaults = { metric: 0 };
     for (const l of core) isisLink(l, devices, isisLevel, defaults);
@@ -472,6 +503,21 @@ function buildPseudowires(devices, owner, tpTunnels, report) {
   return pseudowires;
 }
 
+// The CCM interval of a MEG as { ms, code } (802.1Q Table 21-15), from the MEPs' ccm_interval
+// (schema 1.4); null when neither MEP's facts set one, or the text is not an interval the view knows.
+function ccmInterval(key, meps, report) {
+  const texts = [...new Set(meps.map((m) => m.ccm_interval).filter((t) => t !== null && t !== undefined))];
+  if (!texts.length) return null;
+  if (texts.length > 1) report.warn(`CFM ${key}: CCM interval ${texts.join(' and ')} on its two MEPs; the view uses ${texts[0]}`);
+  const ms = ccmIntervalMs(texts[0]);
+  const code = Object.keys(CCM_INTERVALS_MS).find((c) => Math.abs(CCM_INTERVALS_MS[c] - ms) < 0.01);
+  if (ms === null || !code) {
+    report.warn(`CFM ${key}: CCM interval "${texts[0]}" is ${ms === null ? 'not an interval the view knows' : 'no 802.1Q CCM interval'}; shown at 1 s`);
+    return null;
+  }
+  return { ms, code: Number(code) };
+}
+
 function buildCfm(devices, pseudowires, report) {
   const groups = new Map();
   for (const [name, f] of devices) {
@@ -482,6 +528,7 @@ function buildCfm(devices, pseudowires, report) {
     }
   }
   const megs = [];
+  const defaults = []; // MEGs without a CCM interval in the facts
   for (const [key, meps] of groups) {
     if (meps.length !== 2) {
       report.warn(`CFM ${key}: ${meps.length} MEP(s); only MEGs with two MEPs are drawn`);
@@ -495,12 +542,16 @@ function buildCfm(devices, pseudowires, report) {
       continue;
     }
     const level = meps.map((m) => num(m.level)).find((l) => l !== null) ?? null;
-    megs.push({ id: meps[0].ma, md: meps[0].md, pseudowire: pw.id, ...(level !== null ? { level } : {}), meps: meps.map((m) => ({ mepId: num(m.mep_id), node: m.node, if: m.interface ?? m.port ?? '' })) });
+    const interval = ccmInterval(key, meps, report);
+    megs.push({ id: meps[0].ma, md: meps[0].md, pseudowire: pw.id, ...(level !== null ? { level } : {}), ...(interval ? { intervalCode: interval.code } : {}), meps: meps.map((m) => ({ mepId: num(m.mep_id), node: m.node, if: m.interface ?? m.port ?? '' })) });
     if (level === null) report.add('cfm', 'default', `MEG ${meps[0].ma} level`, 'no MD level in the facts: shown at the default service level 4 (MEF 30.1)');
+    if (!interval) defaults.push(meps[0].ma);
   }
   if (megs.length) {
     report.add('cfm', 'facts', `${megs.length} service MEGs`, 'Up MEPs of one MD / MA on two devices, watching the pseudowire between them');
-    report.add('cfm', 'default', 'CCM interval', 'the facts carry no CCM interval: shown at 1 s');
+    report.add('cfm', defaults.length ? 'default' : 'facts', 'CCM interval', defaults.length
+      ? `${defaults.length === megs.length ? 'the facts carry no CCM interval' : `no CCM interval in the facts for MEG ${defaults.join(', ')}`}: shown at 1 s${defaults.length === megs.length ? '' : ' there'}`
+      : "each MEG's as configured on its maintenance association (ccm_interval)");
   }
   return megs;
 }

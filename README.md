@@ -142,7 +142,8 @@ with `level`, `type` and, since schema 1.3, `metrics`: per level the narrow `met
 `wide_metric`), `segment_routing` (`srgb`, `prefix_sids`, `policies`, `segment_lists`),
 `bgp` (`instances` with `router_id`, `cluster_id`, `route_reflector`), `pseudowires` (`peer`,
 `pw_id`, labels, `mode`, `tunnel_type` and `tunnel_color` since schema 1.1, `service`,
-`service_type`), `cfm` (`meps` with `md`, `ma`, `mep_id`, `level`, `direction`, `port`, `vlan`),
+`service_type`), `cfm` (`meps` with `md`, `ma`, `mep_id`, `level`, `direction`, `port`, `vlan` and,
+since schema 1.4, `ccm_interval` as written, null when the MA leaves the default),
 `lines`, `recognised`. SAOS 10 only: `fds`, `fps`,
 `classifiers`, `vrfs`, `segments` (EVPN ethernet segments), `objects`, and since schema 1.2 `ospf`
 (`instances` with `router_id`, `vrf` and `areas` with their `networks`; `interfaces` with `area`,
@@ -193,9 +194,11 @@ private GitHub Pages included. Put your facts files beside it and point the page
 | `index.html?labs=labs/index.json` | the default lab of a lab index, with a picker for the others |
 | `index.html?labs=labs/index.json&lab=core` | lab `core` of that index |
 | `index.html?lab=core` | lab `core` of `labs/index.json` beside the page |
-| `index.html` | the bundled example; *Load your facts.json* still opens a local file |
+| `index.html` | the default lab of `labs/index.json` beside the page when the site stages one, else the bundled example; *Load your facts.json* still opens a local file |
 
-A lab index lists facts files (URLs relative to the index):
+A lab index lists facts files (URLs relative to the index). Its default lab, the one `?labs=` and a
+bare `index.html` open, is the lab marked `"default": true`, else the one the index's top-level
+`"default"` names by id, else the first:
 
 ```json
 {
@@ -216,7 +219,7 @@ In CI, for example a GitHub Pages workflow:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p site
-          gh release download v0.4.0 --repo ciena/saos-network-facts \
+          gh release download v0.4.2 --repo ciena/saos-network-facts \
             --pattern 'saos-network-facts-viewer-*.tgz' --output viewer.tgz
           tar -xzf viewer.tgz -C site
           mkdir -p site/labs && cp -r facts/* site/labs/    # facts files, positions and labs/index.json
@@ -225,20 +228,21 @@ In CI, for example a GitHub Pages workflow:
           path: site
 ```
 
-Then link to `.../index.html?labs=labs/index.json`. The page fetches the facts from the same site,
-so they stay as private as the site that serves them.
+Then link to `.../index.html` (it opens the index's default lab) or `.../index.html?lab=<id>`. The
+page fetches the facts from the same site, so they stay as private as the site that serves them.
 
 ## Reading facts from JavaScript / TypeScript
 
 ```ts
 import { readFacts } from "@ciena/saos-network-facts/node";
-import { devicesByName, interfacesOnPort, isisArea, isisMetric } from "@ciena/saos-network-facts";
+import { ccmIntervalMs, devicesByName, interfacesOnPort, isisArea, isisMetric } from "@ciena/saos-network-facts";
 
 const facts = readFacts("facts.json");          // schema 1.x (or a pre-schema bare list)
 const pe1 = devicesByName(facts).get("PE1")!;
 interfacesOnPort(pe1, "1");                     // [{ name: "PE1-PE2", ip: "198.51.100.0/31", vlan: null, isis: "CORE", lag: null }]
 isisArea(pe1.isis.instances[0]!);               // "49.0001"
 isisMetric(pe1, "PE1-PE2", 2);                  // 100: the level-2 wide metric, else the narrow one, else null
+ccmIntervalMs(pe1.cfm.meps[0]!);                // 10: the MA's CCM interval ("10ms", "1s", "1sec", "3.3ms", an 802.1Q index) in ms, else null
 ```
 
 The main entry point has no Node dependencies (`parseFacts(json)` for browsers); see [`js/`](js/).

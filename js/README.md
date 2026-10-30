@@ -5,7 +5,7 @@ The facts-file schema, TypeScript types generated from it, and a reader, for fil
 
 ```ts
 import { readFacts } from "@ciena/saos-network-facts/node";   // Node: read a file
-import { parseFacts, devicesByName, interfacesOnPort, loopbacks, bgpPeers, isisArea, isisAreaId, isisSystemId }
+import { parseFacts, devicesByName, interfacesOnPort, isRouted, loopbacks, bgpPeers, isisArea, isisAreaId, isisSystemId, isisMetric, ccmIntervalMs }
   from "@ciena/saos-network-facts";                          // anywhere: no Node APIs
 import type { FactsFile, DeviceFacts } from "@ciena/saos-network-facts";
 import schema from "@ciena/saos-network-facts/schema" with { type: "json" };
@@ -16,6 +16,11 @@ import schema from "@ciena/saos-network-facts/schema" with { type: "json" };
 - `devicesByName(file)`: the facts of every `ok` / `partial` device.
 - `interfacesOnPort(facts, port)`: the IP interfaces on a port (or its LAG): SAOS 10 through flow
   point -> forwarding domain -> interface, SAOS 6 through the VLANs the port carries.
-- `isisAreaId(net)`, `isisSystemId(net)`, `isisArea(instance)`: the parts of an IS-IS NET.
+- `isRouted(interface)`: an addressed interface that can link two devices: not a loopback, a LAG or
+  port interface, or the management plane (`management`, SAOS 10 `system` such as mgmtbr0).
+- `isisAreaId(net)`, `isisSystemId(net)`, `isisArea(instance)`: the parts of an IS-IS NET;
+  `isisMetric(facts, interface, level)`: the wide, else narrow, metric at a level (schema 1.3).
+- `ccmIntervalMs(mep | text)`: a MEP's `ccm_interval` (schema 1.4) in milliseconds, in the SAOS 10
+  (`1s`, `3.3ms`) and SAOS 6 (`1sec`, `3.33ms`, an 802.1Q index) spellings; null when not set or off.
 
 Types and `schema/` are generated from the Python package's schema (`npm run generate`).
