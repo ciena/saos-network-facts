@@ -216,8 +216,12 @@ saos-network-facts extract --configs configs --platform-map devices.yaml --recip
 cd ../../viewer && npm ci && npm run build      # the site, in dist/
 ```
 
-The site is built by `.github/workflows/pages.yml`: deployed to GitHub Pages from `main`, and
-uploaded as the `site-preview` artifact on every pull request.
+The site is built by `.github/workflows/pages.yml`, which deploys `main` to the `gh-pages` branch
+that GitHub Pages serves. Every pull request gets a live preview of its own at
+`https://ciena.github.io/saos-network-facts/pr-preview/pr-<N>/`, linked from a comment on the PR
+(`.github/workflows/pr-preview.yml`); a pull request from a fork gets the built site as the
+`site-preview` artifact of its run instead. [CONTRIBUTING.md](CONTRIBUTING.md#previewing-the-site)
+has the details.
 
 ## Use the viewer in your repo
 

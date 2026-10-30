@@ -17,6 +17,29 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-30
+
+### Added
+
+- **Live pull-request previews of the example site** — `.github/workflows/pr-preview.yml` deploys
+  every pull request from a branch of this repository to `pr-preview/pr-<N>/` on the `gh-pages`
+  branch, live at `https://ciena.github.io/saos-network-facts/pr-preview/pr-<N>/`, with a sticky
+  comment on the PR carrying the link; the preview follows every push and is removed when the PR
+  closes or merges (a weekly job prunes any left behind). A fork PR, whose token is read-only, gets
+  no live preview and no comment; every PR still gets the built site as the `site-preview` artifact
+  of its run. Fork code is only built under the read-only token (no `pull_request_target`); the
+  actions are pinned to commits. CONTRIBUTING "Previewing the site".
+
+### Changed
+
+- **The site deploys from the `gh-pages` branch** — `pages.yml` now deploys `main` to the root of
+  `gh-pages` (keeping `pr-preview/`) instead of through `actions/deploy-pages`, so one branch holds
+  the site and its previews. One-time repository setting: *Settings > Pages > Source: Deploy from a
+  branch*, `gh-pages` / `(root)`; the old Actions deployment stays up until the switch, and the
+  first `main` deploy creates the branch. `pages.yml` no longer runs on pull requests.
+- **Viewer package version** — `viewer/package.json` is bumped with the release again (0.5.0 shipped
+  the viewer download named 0.4.2), so the release asset is `saos-network-facts-viewer-0.6.0.tgz`.
+
 ## [0.5.0] - 2026-10-30
 
 ### Added

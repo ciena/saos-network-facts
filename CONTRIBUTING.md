@@ -46,6 +46,25 @@ documentation: RFC 1918 (10/8, 172.16/12, 192.168/16), RFC 5737 (192.0.2/24, 198
 203.0.113/24), 0.0.0.0/8 ("this network", where OSPF area ids are written), and for IPv6
 2001:db8::/32, :: and ::1. `scripts/check_addresses.py` checks it in CI; run it before you push. Renumber a lab's other addresses into those ranges.
 
+## Previewing the site
+
+The example site (the viewer with the bundled example) is deployed from `main` to the root of the
+`gh-pages` branch by `.github/workflows/pages.yml`; GitHub Pages serves that branch (the one-time
+repository setting is *Settings > Pages > Build and deployment > Source: Deploy from a branch*,
+branch `gh-pages`, folder `/ (root)`).
+
+Every pull request from a branch of this repository gets a live preview of the site it builds, at
+`https://ciena.github.io/saos-network-facts/pr-preview/pr-<N>/`: `.github/workflows/pr-preview.yml`
+deploys the build to `pr-preview/pr-<N>/` on `gh-pages` and keeps a comment on the PR with the link,
+updated on every push and removed (with the preview) when the PR closes or merges. A `main` deploy
+leaves the previews in place, and a weekly job prunes the previews of PRs that are no longer open.
+
+A pull request from a fork has no live preview: its workflow token is read-only, so it can neither
+push `gh-pages` nor comment, and no fork code is ever run with a write token (there is no
+`pull_request_target`). Every PR, fork or not, still has the built site as the `site-preview`
+artifact of its `pr-preview` run: download it from the run's summary page and serve the folder,
+`python3 -m http.server -d site-preview`, then open `http://localhost:8000/`.
+
 ## Changelog and versioning
 
 Every PR updates `CHANGELOG.md` (or carries the `skip-changelog` label) and cuts a release: rename
