@@ -124,7 +124,10 @@
           "if1": [],
           "if2": [],
           "if3": [],
-          "if4": []
+          "if4": [],
+          "ring-vlan-100": [
+            "100"
+          ]
         },
         "fds": [
           {
@@ -142,6 +145,10 @@
           {
             "mode": "vpls",
             "name": "if4"
+          },
+          {
+            "mode": "vpls",
+            "name": "ring-data"
           }
         ],
         "fps": [
@@ -176,6 +183,30 @@
             "fd": "if4",
             "logical_port": "4",
             "name": "if4"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "1",
+            "name": "ring-data_1"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "3",
+            "name": "ring-data_3"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "4",
+            "name": "ring-data_4"
           }
         ],
         "gateway": null,
@@ -317,8 +348,8 @@
         },
         "l2vpn_services": [],
         "lags": [],
-        "lines": 12,
-        "objects": 12,
+        "lines": 16,
+        "objects": 16,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -329,9 +360,12 @@
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "2": {
             "description": null,
@@ -345,22 +379,124 @@
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "4": {
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           }
         },
         "pseudowires": [],
-        "recognised": 9,
-        "rings": [],
+        "recognised": 13,
+        "rings": [
+          {
+            "east": "3",
+            "instances": [
+              {
+                "members": [
+                  "ring-data"
+                ],
+                "name": "erp-core",
+                "raps_level": "7",
+                "raps_vid": "4094",
+                "revertive": true,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "none"
+                  },
+                  {
+                    "interface": "3",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": "500",
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "major",
+                "virtual_channel": null
+              }
+            ],
+            "name": "ring-core",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "3",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "1",
+            "west": "1"
+          },
+          {
+            "east": "4",
+            "instances": [
+              {
+                "members": [
+                  "ring-data"
+                ],
+                "name": "erp-access",
+                "raps_level": "7",
+                "raps_vid": "4093",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "4",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": "ring-core",
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "sub",
+                "virtual_channel": false
+              }
+            ],
+            "name": "ring-access",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "3",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "4",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "2",
+            "west": "3"
+          }
+        ],
         "segment_routing": {
           "policies": [],
           "prefix_sids": [
@@ -384,7 +520,15 @@
         "segments": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
-        "vlans": {},
+        "vlans": {
+          "100": {
+            "ports": [
+              "1",
+              "3",
+              "4"
+            ]
+          }
+        },
         "vrfs": []
       },
       "platform": "cn5166",
@@ -392,7 +536,8 @@
       "status": "ok",
       "templates": [
         "P2/01-P_createldp.xml",
-        "P2/02-P_advertisemapping.xml"
+        "P2/02-P_advertisemapping.xml",
+        "P2/03-G8032_ringCreate.xml"
       ],
       "type": "5166-10x"
     },
@@ -423,7 +568,10 @@
           "Untagged": [],
           "if1": [],
           "if2": [],
-          "if3": []
+          "if3": [],
+          "ring-vlan-100": [
+            "100"
+          ]
         },
         "fds": [
           {
@@ -445,6 +593,10 @@
           {
             "mode": "vpws",
             "name": "testsat"
+          },
+          {
+            "mode": "vpls",
+            "name": "ring-data"
           }
         ],
         "fps": [
@@ -487,6 +639,22 @@
             "fd": "testsat",
             "logical_port": "24",
             "name": "testsat_1"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "23",
+            "name": "ring-data_23"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "21",
+            "name": "ring-data_21"
           }
         ],
         "gateway": null,
@@ -624,8 +792,8 @@
           }
         ],
         "lags": [],
-        "lines": 24,
-        "objects": 24,
+        "lines": 28,
+        "objects": 28,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -645,9 +813,12 @@
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "22": {
             "description": null,
@@ -661,9 +832,12 @@
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "24": {
             "description": null,
@@ -704,8 +878,59 @@
             "tunnel_type": "sr-policy"
           }
         ],
-        "recognised": 15,
-        "rings": [],
+        "recognised": 19,
+        "rings": [
+          {
+            "east": "21",
+            "instances": [
+              {
+                "members": [
+                  "ring-data"
+                ],
+                "name": "erp-core",
+                "raps_level": "7",
+                "raps_vid": "4094",
+                "revertive": true,
+                "rpl": [
+                  {
+                    "interface": "23",
+                    "port": "port0",
+                    "role": "owner"
+                  },
+                  {
+                    "interface": "21",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": "500",
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "major",
+                "virtual_channel": null
+              }
+            ],
+            "name": "ring-core",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "23",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "21",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "1",
+            "west": "23"
+          }
+        ],
         "segment_routing": {
           "policies": [
             {
@@ -753,7 +978,14 @@
         "segments": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
-        "vlans": {},
+        "vlans": {
+          "100": {
+            "ports": [
+              "23",
+              "21"
+            ]
+          }
+        },
         "vrfs": []
       },
       "platform": "cn5144",
@@ -766,7 +998,8 @@
         "P3/04-P_servicesCreate.xml",
         "P3/05-P_l2vpnCreate.xml",
         "P3/06-P_cfmCreate.xml",
-        "P3/07-P_satCreateall.xml"
+        "P3/07-P_satCreateall.xml",
+        "P3/08-G8032_ringCreate.xml"
       ],
       "type": "5144-10x"
     },
@@ -1295,7 +1528,10 @@
           "Untagged": [],
           "if1": [],
           "if2": [],
-          "if3": []
+          "if3": [],
+          "ring-vlan-100": [
+            "100"
+          ]
         },
         "fds": [
           {
@@ -1313,6 +1549,10 @@
           {
             "mode": "vpws",
             "name": "testsat"
+          },
+          {
+            "mode": "vpls",
+            "name": "ring-data"
           }
         ],
         "fps": [
@@ -1347,6 +1587,22 @@
             "fd": "testsat",
             "logical_port": "4",
             "name": "testsat_1"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "1",
+            "name": "ring-data_1"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "2",
+            "name": "ring-data_2"
           }
         ],
         "gateway": null,
@@ -1467,8 +1723,8 @@
           }
         ],
         "lags": [],
-        "lines": 20,
-        "objects": 20,
+        "lines": 24,
+        "objects": 24,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -1490,17 +1746,23 @@
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "2": {
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "3": {
             "description": null,
@@ -1535,8 +1797,59 @@
             "tunnel_type": "sr-policy"
           }
         ],
-        "recognised": 15,
-        "rings": [],
+        "recognised": 19,
+        "rings": [
+          {
+            "east": "2",
+            "instances": [
+              {
+                "members": [
+                  "ring-data"
+                ],
+                "name": "erp-core",
+                "raps_level": "7",
+                "raps_vid": "4094",
+                "revertive": true,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "none"
+                  },
+                  {
+                    "interface": "2",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": "500",
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "major",
+                "virtual_channel": null
+              }
+            ],
+            "name": "ring-core",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "1",
+            "west": "1"
+          }
+        ],
         "segment_routing": {
           "policies": [
             {
@@ -1585,7 +1898,14 @@
         "segments": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
-        "vlans": {},
+        "vlans": {
+          "100": {
+            "ports": [
+              "1",
+              "2"
+            ]
+          }
+        },
         "vrfs": []
       },
       "platform": "cn5170",
@@ -1597,7 +1917,8 @@
         "PE1/03-PE1_SR_Policies.xml",
         "PE1/04-P_servicesCreate.xml",
         "PE1/05-P_l2vpnCreate.xml",
-        "PE1/06-P_satCreateall.xml"
+        "PE1/06-P_satCreateall.xml",
+        "PE1/07-G8032_ringCreate.xml"
       ],
       "type": "5170-10x"
     },
@@ -1622,7 +1943,10 @@
           "Untagged": [],
           "if1": [],
           "if2": [],
-          "if3": []
+          "if3": [],
+          "ring-vlan-100": [
+            "100"
+          ]
         },
         "fds": [
           {
@@ -1640,6 +1964,10 @@
           {
             "mode": "vpws",
             "name": "testsat"
+          },
+          {
+            "mode": "vpls",
+            "name": "ring-data"
           }
         ],
         "fps": [
@@ -1674,6 +2002,30 @@
             "fd": "testsat",
             "logical_port": "4",
             "name": "testsat_1"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "1",
+            "name": "ring-data_1"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "2",
+            "name": "ring-data_2"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "3",
+            "name": "ring-data_3"
           }
         ],
         "gateway": null,
@@ -1802,8 +2154,8 @@
           }
         ],
         "lags": [],
-        "lines": 20,
-        "objects": 20,
+        "lines": 24,
+        "objects": 24,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -1825,25 +2177,34 @@
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "2": {
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "3": {
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "4": {
             "description": null,
@@ -1870,8 +2231,104 @@
             "tunnel_type": null
           }
         ],
-        "recognised": 15,
-        "rings": [],
+        "recognised": 19,
+        "rings": [
+          {
+            "east": "2",
+            "instances": [
+              {
+                "members": [
+                  "ring-data"
+                ],
+                "name": "erp-core",
+                "raps_level": "7",
+                "raps_vid": "4094",
+                "revertive": true,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "none"
+                  },
+                  {
+                    "interface": "2",
+                    "port": "port1",
+                    "role": "neighbor"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": "500",
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "major",
+                "virtual_channel": null
+              }
+            ],
+            "name": "ring-core",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "1",
+            "west": "1"
+          },
+          {
+            "east": "3",
+            "instances": [
+              {
+                "members": [
+                  "ring-data"
+                ],
+                "name": "erp-access",
+                "raps_level": "7",
+                "raps_vid": "4093",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "3",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": "ring-core",
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "sub",
+                "virtual_channel": false
+              }
+            ],
+            "name": "ring-access",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "3",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "2",
+            "west": "2"
+          }
+        ],
         "segment_routing": {
           "policies": [
             {
@@ -1918,7 +2375,15 @@
         "segments": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
-        "vlans": {},
+        "vlans": {
+          "100": {
+            "ports": [
+              "1",
+              "2",
+              "3"
+            ]
+          }
+        },
         "vrfs": []
       },
       "platform": "cn5170",
@@ -1930,7 +2395,8 @@
         "PE4/03-PE1_SR_Policies.xml",
         "PE4/04-P_servicesCreate.xml",
         "PE4/05-P_l2vpnCreate.xml",
-        "PE4/06-P_satCreateall.xml"
+        "PE4/06-P_satCreateall.xml",
+        "PE4/07-G8032_ringCreate.xml"
       ],
       "type": "5170-10x"
     },
@@ -1955,7 +2421,10 @@
           "Untagged": [],
           "if1": [],
           "if2": [],
-          "if3": []
+          "if3": [],
+          "ring-vlan-100": [
+            "100"
+          ]
         },
         "fds": [
           {
@@ -1969,6 +2438,10 @@
           {
             "mode": "vpls",
             "name": "if3"
+          },
+          {
+            "mode": "vpls",
+            "name": "ring-data"
           }
         ],
         "fps": [
@@ -1995,6 +2468,22 @@
             "fd": "if3",
             "logical_port": "3",
             "name": "if3"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "1",
+            "name": "ring-data_1"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "2",
+            "name": "ring-data_2"
           }
         ],
         "gateway": null,
@@ -2113,8 +2602,8 @@
         },
         "l2vpn_services": [],
         "lags": [],
-        "lines": 13,
-        "objects": 13,
+        "lines": 17,
+        "objects": 17,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -2136,17 +2625,23 @@
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "2": {
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "3": {
             "description": null,
@@ -2158,8 +2653,59 @@
           }
         },
         "pseudowires": [],
-        "recognised": 10,
-        "rings": [],
+        "recognised": 14,
+        "rings": [
+          {
+            "east": "2",
+            "instances": [
+              {
+                "members": [
+                  "ring-data"
+                ],
+                "name": "erp-access",
+                "raps_level": "7",
+                "raps_vid": "4093",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "none"
+                  },
+                  {
+                    "interface": "2",
+                    "port": "port1",
+                    "role": "neighbor"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "sub",
+                "virtual_channel": false
+              }
+            ],
+            "name": "ring-access",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "2",
+            "west": "1"
+          }
+        ],
         "segment_routing": {
           "policies": [],
           "prefix_sids": [
@@ -2183,7 +2729,14 @@
         "segments": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
-        "vlans": {},
+        "vlans": {
+          "100": {
+            "ports": [
+              "1",
+              "2"
+            ]
+          }
+        },
         "vrfs": []
       },
       "platform": "cn5166",
@@ -2191,7 +2744,8 @@
       "status": "ok",
       "templates": [
         "PE5/01-P_createldp.xml",
-        "PE5/02-P_advertisemapping.xml"
+        "PE5/02-P_advertisemapping.xml",
+        "PE5/03-G8032_ringCreate.xml"
       ],
       "type": "5166-10x"
     },
@@ -2229,7 +2783,10 @@
           "Untagged": [],
           "if1": [],
           "if2": [],
-          "if3": []
+          "if3": [],
+          "ring-vlan-100": [
+            "100"
+          ]
         },
         "fds": [
           {
@@ -2247,6 +2804,10 @@
           {
             "mode": "vpws",
             "name": "testcfm"
+          },
+          {
+            "mode": "vpls",
+            "name": "ring-data"
           }
         ],
         "fps": [
@@ -2281,6 +2842,22 @@
             "fd": "testcfm",
             "logical_port": "5",
             "name": "testcfm_1"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "2",
+            "name": "ring-data_2"
+          },
+          {
+            "classifiers": [
+              "ring-vlan-100"
+            ],
+            "fd": "ring-data",
+            "logical_port": "1",
+            "name": "ring-data_1"
           }
         ],
         "gateway": null,
@@ -2409,8 +2986,8 @@
           }
         ],
         "lags": [],
-        "lines": 20,
-        "objects": 20,
+        "lines": 24,
+        "objects": 24,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -2462,17 +3039,23 @@
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "2": {
             "description": null,
             "lag": null,
             "roles": [
+              "ring",
               "fp"
             ],
-            "vlans": []
+            "vlans": [
+              "100"
+            ]
           },
           "3": {
             "description": null,
@@ -2508,8 +3091,59 @@
             "tunnel_type": "sr-policy"
           }
         ],
-        "recognised": 16,
-        "rings": [],
+        "recognised": 20,
+        "rings": [
+          {
+            "east": "1",
+            "instances": [
+              {
+                "members": [
+                  "ring-data"
+                ],
+                "name": "erp-access",
+                "raps_level": "7",
+                "raps_vid": "4093",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "2",
+                    "port": "port0",
+                    "role": "owner"
+                  },
+                  {
+                    "interface": "1",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "sub",
+                "virtual_channel": false
+              }
+            ],
+            "name": "ring-access",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "2",
+            "west": "2"
+          }
+        ],
         "segment_routing": {
           "policies": [
             {
@@ -2557,7 +3191,14 @@
         "segments": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
-        "vlans": {},
+        "vlans": {
+          "100": {
+            "ports": [
+              "2",
+              "1"
+            ]
+          }
+        },
         "vrfs": []
       },
       "platform": "cn5164",
@@ -2569,7 +3210,8 @@
         "PE6/03-PE1_SR_Policies.xml",
         "PE6/04-P_servicesCreate.xml",
         "PE6/05-P_l2vpnCreate.xml",
-        "PE6/06-P_cfmCreate.xml"
+        "PE6/06-P_cfmCreate.xml",
+        "PE6/07-G8032_ringCreate.xml"
       ],
       "type": "5164-10x"
     },

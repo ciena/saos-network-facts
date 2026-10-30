@@ -1,0 +1,64 @@
+<config>
+    <!-- G.8032 Ethernet ring protection, added for this example (not part of the Adaptive-SR-CFM recipe). -->
+    <classifiers xmlns="urn:ciena:params:xml:ns:yang:ciena-pn::ciena-mef-classifier">
+        <classifier>
+            <name>ring-vlan-100</name>
+            <filter-entry>
+                <filter-parameter xmlns:classifier="urn:ciena:params:xml:ns:yang:ciena-pn::ciena-mef-classifier">vtag-stack</filter-parameter>
+                <vtags><tag>1</tag><vlan-id>100</vlan-id></vtags>
+            </filter-entry>
+        </classifier>
+    </classifiers>
+
+    <fds xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fd">
+        <fd>
+            <name>ring-data</name>
+            <mode>vpls</mode>
+        </fd>
+    </fds>
+
+    <fps xmlns="urn:ciena:params:xml:ns:yang:ciena-pn:ciena-mef-fp">
+        <fp>
+            <name>ring-data_1</name>
+            <fd-name>ring-data</fd-name>
+            <logical-port>1</logical-port>
+            <stats-collection>on</stats-collection>
+            <classifier-list>ring-vlan-100</classifier-list>
+        </fp>
+        <fp>
+            <name>ring-data_2</name>
+            <fd-name>ring-data</fd-name>
+            <logical-port>2</logical-port>
+            <stats-collection>on</stats-collection>
+            <classifier-list>ring-vlan-100</classifier-list>
+        </fp>
+    </fps>
+
+    <g8032-rings xmlns="http://www.ciena.com/ns/yang/ciena-itut-g8032-draft">
+        <ring-system-control>enabled</ring-system-control>
+        <g8032-ring>
+            <ring-name>ring-core</ring-name>
+            <ring-id>1</ring-id>
+            <ring-ports>
+                <ring-port><port-id>port0</port-id><interface>1</interface></ring-port>
+                <ring-port><port-id>port1</port-id><interface>2</interface></ring-port>
+            </ring-ports>
+            <erp-instances>
+                <erp-instance>
+                    <instance-name>erp-core</instance-name>
+                    <raps-vid>4094</raps-vid>
+                    <raps-level>7</raps-level>
+                    <erp-instance-construct xmlns:g8032="http://www.ciena.com/ns/yang/ciena-itut-g8032-draft">g8032:major-ring</erp-instance-construct>
+                    <data-members>ring-data</data-members>
+                    <wtr-timer>1</wtr-timer>
+                    <guard-timer>500</guard-timer>
+                    <reversion>revertive</reversion>
+                    <ports>
+                        <port><port-id>port0</port-id><rpl>none</rpl></port>
+                        <port><port-id>port1</port-id><rpl>none</rpl></port>
+                    </ports>
+                </erp-instance>
+            </erp-instances>
+        </g8032-ring>
+    </g8032-rings>
+</config>
