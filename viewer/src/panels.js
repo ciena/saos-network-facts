@@ -84,7 +84,7 @@ export function renderOverview(el, imp, net) {
         const sub = r.type === 'sub' ? `sub-ring${r.subRingOf ? ` of ${topo.rings.find((x) => x.id === r.subRingOf)?.name ?? r.subRingOf}` : ''}` : r.type === 'major' ? 'major ring' : null;
         return [
           `${r.name}${r.ringId !== null ? ` (${r.ringId})` : ''}`, sub, r.rapsVid,
-          { html: r.path.nodes.map(deviceLink).join(r.path.closed ? ' – ' : ' – ') + (r.path.closed ? ` – ${deviceLink(r.path.nodes[0])}` : '') },
+          { html: r.path.nodes.map(deviceLink).join(' – ') + (r.path.closed ? ` – ${deviceLink(r.path.nodes[0])}` : '') },
           r.rpl ? `${r.rpl.link}: owner ${r.rpl.owner}${r.rpl.neighbor ? `, neighbour ${r.rpl.neighbor}` : ''}` : 'no owner',
           r.members.join(', '),
           `${st.state}${st.failed.length ? ` (${st.failed.join(', ')} down)` : ''}`,
