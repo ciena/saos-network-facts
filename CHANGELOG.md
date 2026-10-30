@@ -17,6 +17,36 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-30
+
+### Added
+
+- **G.8032 ring facts (schema 1.5.0)** — `rings[]` now describes Ethernet ring protection on SAOS 10
+  as well as SAOS 6 / 8, with optional `ring_id`, `ports` (the ring ports under their configured
+  names, with the SAOS 6 / 8 per-port hold-off) and `instances`: the protection instances on the
+  ring (SAOS 10 `erp-instance`, SAOS 6 / 8 virtual ring) with `raps_vid`, `raps_level`, `type`
+  `major` / `sub`, `virtual_channel`, SAOS 6 / 8 sub-ring `termination`, the RPL role per port
+  (`owner` / `neighbor` / `next-neighbor` / `none`, with the port's interface), `members` (SAOS 10
+  forwarding domains, SAOS 6 VLANs, SAOS 8 virtual switches), `timers` (`wtr` minutes, `guard` and
+  `hold_off` milliseconds) and `revertive`, all as configured with no defaults filled in. The derived
+  `sub_ring_of` names the ring a sub-ring is attached to on an interconnection node (the two rings
+  share a port). SAOS 10 ring ports get the `ring` role too; `west` / `east` are `port0` / `port1`.
+- **SAOS 10 `g8032-rings`** — a handler for the translator's `ciena-itut-g8032-draft:g8032-rings`
+  pivot, merged across a device's files and honouring removals (pivot and NETCONF `g8032-ring`).
+- **SAOS 6 / 8 virtual rings** — `ring-protection logical-ring create|set` (ring id, `guard-time`,
+  `wtr`, port hold-off) and `ring-protection virtual-ring create|set|unset|add|remove` (R-APS VID,
+  `mel`, `sub-ring` termination, `west-port-rpl` / `east-port-rpl owner`, `revertive`, `vid` / `vs`
+  members) attached to the logical rings; syntax from the SAOS 6.21 / 8.6 command references.
+- **Top-level `links`** — with `--clab`, the topology's `links` (brief `NODE:PORT` and extended
+  `{node, interface}` endpoints) are written as `links[] {a: {device, port}, b: {device, port}}`, so
+  a reader can place L2 rings whose ports carry no addresses. Absent without a topology.
+- **npm reader** — `ringsOf(device)` (a device's rings with `ports` / `instances` always present) and
+  `ringMembers(file, ringId)` (every device on a ring id, with its ring); types regenerated.
+- **Fixtures** — `labs/g8032-two-ring`: a two-ring G.8032 lab on nine SAOS 10 devices with its containerlab
+  topology (major ring RM_1..RM_4, sub-ring RM_1 - RS_1 - RS_2 - RM_4 without a virtual channel,
+  three CEs), recorded with translator 4.2.1; `labs/g8032-saos6`: a synthetic SAOS 6 / 8 major ring
+  and sub-ring with an interconnection node. README section "Rings".
+
 ## [0.4.2] - 2026-10-30
 
 ### Added

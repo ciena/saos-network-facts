@@ -1,0 +1,45 @@
+# A two-ring G.8032 lab on SAOS 10: a four-node major ring RM_1 - RM_2 - RM_3 - RM_4 and a sub-ring
+# RM_1 - RS_1 - RS_2 - RM_4 attached to it at RM_1 and RM_4, with a customer edge on RM_2, RM_3 and RS_1.
+name: g8032-two-ring
+topology:
+  defaults:
+    kind: ciena_saos
+  nodes:
+    RM_1:
+      type: '5162'
+      startup-config: configs/RM_1.cfg
+    RM_2:
+      type: '5162'
+      startup-config: configs/RM_2.cfg
+    RM_3:
+      type: '5162'
+      startup-config: configs/RM_3.cfg
+    RM_4:
+      type: '5162'
+      startup-config: configs/RM_4.cfg
+    RS_1:
+      type: '5162'
+      startup-config: configs/RS_1.cfg
+    RS_2:
+      type: '5162'
+      startup-config: configs/RS_2.cfg
+    CE_1:
+      type: '5162'
+      startup-config: configs/CE_1.cfg
+    CE_2:
+      type: '5162'
+      startup-config: configs/CE_2.cfg
+    CE_3:
+      type: '5162'
+      startup-config: configs/CE_3.cfg
+  links:
+    - endpoints: ["RM_1:2", "RM_2:1"]
+    - endpoints: ["RM_2:2", "RM_3:1"]
+    - endpoints: ["RM_3:2", "RM_4:1"]
+    - endpoints: ["RM_4:2", "RM_1:1"]
+    - endpoints: ["RM_1:3", "RS_1:1"]
+    - endpoints: ["RS_1:2", "RS_2:1"]
+    - endpoints: ["RS_2:2", "RM_4:3"]
+    - endpoints: ["CE_1:1", "RM_2:3"]
+    - endpoints: ["CE_2:1", "RM_3:3"]
+    - endpoints: ["CE_3:1", "RS_1:3"]

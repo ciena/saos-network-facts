@@ -28,7 +28,7 @@ def new_facts():
         "ports": {},        # port (str) -> {"description", "vlans", "lag", "roles"}
         "lags": [],         # {"name", "members": [...]}
         "sub_ports": [],    # {"name", "parent"}
-        "rings": [],        # {"name", "west", "east"}
+        "rings": [],        # {"name", "west", "east", "ring_id", "ports", "instances"}
         "peers": [],        # {"kind": mpls-vc|tp-tunnel|bgp, "name", "ip"}
         "isis": {"instances": [], "interfaces": []},
         "segment_routing": {"srgb": [], "prefix_sids": [], "policies": [], "segment_lists": {}},
@@ -157,9 +157,85 @@ def _pseudowire(facts, name):
     return pw
 
 
+def _ring(facts, name):
+    for ring in facts["rings"]:
+        if ring["name"] == name:
+            return ring
+    ring = new_ring(name)
+    facts["rings"].append(ring)
+    return ring
+
+
+def _virtual_ring(facts, name):
+    """The instance (virtual ring) called ``name`` on whichever logical ring carries it, or None."""
+    for ring in facts["rings"]:
+        for instance in ring["instances"]:
+            if instance["name"] == name:
+                return instance
+    return None
+
+
+def _lower_keys(kv):
+    """Ring commands are documented with ``WTR`` and ``wtr`` alike: match their keys case-insensitively."""
+    return {str(k).lower(): v for k, v in kv.items()}
+
+
 def new_pseudowire(name):
     return {"name": name, "kind": None, "peer": None, "pw_id": None, "in_label": None, "out_label": None,
             "mode": None, "tunnel": None, "tunnel_type": None, "tunnel_color": None, "service": None, "service_type": None}
+
+
+def new_ring(name, west=None, east=None):
+    """A G.8032 ring: the two ring ports and the protection instances configured on it."""
+    return {"name": name, "west": west, "east": east, "ring_id": None, "ports": [], "instances": []}
+
+
+def new_ring_instance(name):
+    """An Ethernet ring protection instance (SAOS 10 erp-instance, SAOS 6 / 8 virtual ring), nothing
+    configured yet: null means the configuration does not say, nothing is filled in from defaults."""
+    return {"name": name, "raps_vid": None, "raps_level": None, "type": None, "virtual_channel": None,
+            "termination": None, "sub_ring_of": None, "rpl": [], "members": [],
+            "timers": {"wtr": None, "guard": None, "hold_off": None}, "revertive": None}
+
+
+def ring_port(ring, name):
+    """The ring's port entry called ``name`` (``west`` / ``east``, ``port0`` / ``port1``), created when missing."""
+    for port in ring["ports"]:
+        if port["name"] == name:
+            return port
+    port = {"name": name, "interface": None, "hold_off": None}
+    ring["ports"].append(port)
+    return port
+
+
+def set_rpl(instance, port, role):
+    """The RPL role configured on one ring port of an instance (the latest setting per port wins)."""
+    entry = next((r for r in instance["rpl"] if r["port"] == port), None)
+    if role is None:
+        if entry is not None:
+            instance["rpl"].remove(entry)
+        return
+    if entry is None:
+        entry = {"port": port, "interface": None, "role": role}
+        instance["rpl"].append(entry)
+    entry["role"] = role
+
+
+def finish_rings(facts):
+    """Derived ring views once every file is in: the interface behind each RPL port, and on an
+    interconnection node ``sub_ring_of``: a sub-ring instance whose ring shares a port with another
+    ring on this device is attached to that ring (the sub-ring terminates here)."""
+    rings = facts["rings"]
+    for ring in rings:
+        interfaces = {p["name"]: p["interface"] for p in ring["ports"]}
+        ends = {i for i in interfaces.values() if i}
+        shared = next((other["name"] for other in rings if other is not ring
+                       and ends & {p["interface"] for p in other["ports"] if p["interface"]}), None)
+        for instance in ring["instances"]:
+            for rpl in instance["rpl"]:
+                rpl["interface"] = interfaces.get(rpl["port"])
+            instance["sub_ring_of"] = shared if instance["type"] == "sub" else None
+    return facts
 
 
 def net_parts(net):
@@ -284,13 +360,8 @@ def apply(facts, line):
         _pseudowire(facts, str(kv["mpls-vc"]))["service"] = _s(kv["vs"])
         return True
 
-    if head == "ring-protection logical-ring create":
-        kv = kv_after(3)
-        facts["rings"].append({"name": kv.get("logical-ring-name"), "west": kv.get("west-port"), "east": kv.get("east-port")})
-        for port in (kv.get("west-port"), kv.get("east-port")):
-            if port:
-                _role(facts, port, "ring")
-        return True
+    if t[0] == "ring-protection" and len(t) > 2:
+        return _ring_protection(facts, t, head)
 
     if t[0] == "mpls" and len(t) > 3 and t[1] == "l2-vpn" and t[2] == "create" and t[3] in ("static-vc", "dynamic-vc"):
         name = after(t, t[3])
@@ -377,9 +448,88 @@ def _cfm_service(facts, name):
     return facts.setdefault("_cfm_services", {}).setdefault(name, {})
 
 
+def _ring_protection(facts, t, head):
+    """``ring-protection logical-ring ...`` (a G.8032 ring: its two ports, ring id and timers) and
+    ``ring-protection virtual-ring ...`` (a protection instance on a logical ring: R-APS VID, MEG
+    level, sub-ring termination, RPL owner, revertive, and the VLANs (SAOS 6) or virtual switches
+    (SAOS 8) it protects). Timers are configured on the logical ring and reported on each of its
+    instances in ``finish``; port hold-off stays on the ring port."""
+    kv = _lower_keys(pairs(t[3:]))
+    if head == "ring-protection logical-ring create" and _s(kv.get("logical-ring-name")):
+        ring = _ring(facts, _s(kv["logical-ring-name"]))
+        ring["west"], ring["east"] = _s(kv.get("west-port")), _s(kv.get("east-port"))
+        for name, port in (("west", ring["west"]), ("east", ring["east"])):
+            ring_port(ring, name)["interface"] = port
+            if port:
+                _role(facts, port, "ring")
+        if _s(kv.get("ring-id")):
+            ring["ring_id"] = _s(kv["ring-id"])
+        _ring_timers(facts, ring, kv)
+        return True
+    if head == "ring-protection logical-ring set" and _s(kv.get("ring")):
+        _ring_timers(facts, _ring(facts, _s(kv["ring"])), kv)
+        return True
+    if head == "ring-protection virtual-ring create" and _s(kv.get("virtual-ring-name")) and _s(kv.get("logical-ring")):
+        instance = new_ring_instance(_s(kv["virtual-ring-name"]))
+        instance.update({"raps_vid": _s(kv.get("raps-vid")), "raps_level": _s(kv.get("mel"))})
+        sub = _s(kv.get("sub-ring"))
+        instance["type"] = "sub" if sub else "major"
+        if sub:
+            # west-port-termination / east-port-termination: the sub-ring ends on that port here;
+            # no-port-termination: it passes through this node
+            instance["termination"] = sub.split("-")[0] if sub.startswith(("west-", "east-")) else "none"
+        _ring(facts, _s(kv["logical-ring"]))["instances"].append(instance)
+        return True
+    instance = _virtual_ring(facts, _s(kv.get("ring")))
+    if instance is None:
+        return False  # a command on an unknown virtual ring, or a show / clear / force
+    if head == "ring-protection virtual-ring set":
+        if _s(kv.get("mel")):
+            instance["raps_level"] = _s(kv["mel"])
+        if _s(kv.get("revertive")):
+            instance["revertive"] = _s(kv["revertive"]).lower() == "on"
+        for port in ("west", "east"):
+            if _s(kv.get(f"{port}-port-rpl")):
+                set_rpl(instance, port, _s(kv[f"{port}-port-rpl"]))
+        return True
+    if head == "ring-protection virtual-ring unset":
+        flags = {x.lower() for x in t[5:]}
+        if "mel" in flags:
+            instance["raps_level"] = None
+        if "revertive" in flags:
+            instance["revertive"] = None
+        for port in ("west", "east"):
+            if f"{port}-port-rpl" in flags:
+                set_rpl(instance, port, None)
+        return True
+    if head in ("ring-protection virtual-ring add", "ring-protection virtual-ring remove"):
+        members = expand(kv["vid"]) if _s(kv.get("vid")) else [m for m in str(kv.get("vs") or "").split(",") if m]
+        for member in members:
+            if head.endswith(" add"):
+                _add(instance["members"], member)
+            elif member in instance["members"]:
+                instance["members"].remove(member)
+        return True
+    return False
+
+
+def _ring_timers(facts, ring, kv):
+    """``guard-time`` (ms) and ``wtr`` (minutes) of a logical ring, and the hold-off time (ms) of each
+    of its ports: kept aside until ``finish`` copies the ring timers onto the ring's instances."""
+    timers = facts.setdefault("_ring_timers", {}).setdefault(ring["name"], {"wtr": None, "guard": None})
+    if _s(kv.get("wtr")):
+        timers["wtr"] = _s(kv["wtr"])
+    if _s(kv.get("guard-time")):
+        timers["guard"] = _s(kv["guard-time"])
+    for port in ("west", "east"):
+        if _s(kv.get(f"{port}-port-holdoff-time")):
+            ring_port(ring, port)["hold_off"] = _s(kv[f"{port}-port-holdoff-time"])
+
+
 def finish(facts):
-    """Derived views once every file is in: MEP levels, services and CCM intervals from their CFM service,
-    IS-IS NET parts."""
+    """Derived views once every file is in: MEP levels, services and CCM intervals from their CFM
+    service, IS-IS NET parts, ring timers and RPL interfaces on every ring instance, sub-rings
+    attached to their ring."""
     services = facts.pop("_cfm_services", {})
     for mep in facts["cfm"]["meps"]:
         service = services.get(mep["ma"]) or {}
@@ -387,6 +537,11 @@ def finish(facts):
         mep["service"] = mep["service"] or service.get("vs")
         mep["vlan"] = mep["vlan"] or service.get("vlan")
         mep["ccm_interval"] = mep["ccm_interval"] or service.get("ccm_interval")
+    timers = facts.pop("_ring_timers", {})
+    for ring in facts["rings"]:
+        for instance in ring["instances"]:
+            instance["timers"].update(timers.get(ring["name"], {}))
+    finish_rings(facts)
     return finish_isis(facts)
 
 

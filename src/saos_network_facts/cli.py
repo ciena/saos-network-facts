@@ -33,7 +33,8 @@ def cmd_extract(args):
         records.append(record)
         if not args.quiet or record["status"] in ("error", "partial"):
             print(extract.summary_line(record), file=sys.stderr)
-    write_json(extract.document(records, translator), args.output)
+    links = extract.links_from_clab(args.clab) if args.clab else None
+    write_json(extract.document(records, translator, links), args.output)
     counts = {s: sum(1 for r in records if r["status"] == s) for s in ("ok", "partial", "error", "skipped")}
     print(f"devices {len(records)} / ok {counts['ok']} / partial {counts['partial']} / errors {counts['error']} "
           f"/ skipped {counts['skipped']}", file=sys.stderr)
@@ -72,7 +73,8 @@ def parser():
     e.add_argument("--configs", nargs="+", metavar="PATH",
                    help="configuration directories or files (one device per file or per subdirectory; "
                         "files sharing a name up to the first dot are one device, applied in name order)")
-    e.add_argument("--clab", metavar="FILE", help="a containerlab topology: node kinds and types, and startup-config files")
+    e.add_argument("--clab", metavar="FILE",
+                   help="a containerlab topology: node kinds and types, startup-config files, and the links between nodes")
     e.add_argument("--platform-map", metavar="FILE",
                    help="YAML/JSON {devices: {NAME: {type, platform, extractor, configs}}} for what the files do not say; "
                         "a SAOS 10 device needs a type (5164-10x) or platform (cn5164), else it is an error")

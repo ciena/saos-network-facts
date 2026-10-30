@@ -11,6 +11,8 @@ Each device has an extractor:
   ``platform`` or the device type; a device with neither is ``status: error`` without a call.
 * anything else (a Linux host, a line system): no facts, ``status: skipped``.
 
+A containerlab topology also gives the facts file its ``links`` (``links_from_clab``).
+
 The extractor comes from, in order: the platform map's ``extractor``, the device type (``-6x`` / ``-8x``
 -> saos6, ``-10x`` -> saos10), the containerlab kind (``ciena_saos`` -> saos10), and last the files
 themselves (XML, or CLI that is not in the SAOS 6 ``verb [noun] action`` form, is SAOS 10).
@@ -139,6 +141,30 @@ def from_clab(path):
     return devices
 
 
+def links_from_clab(path):
+    """The physical links of a containerlab topology, ``[{"a": {"device", "port"}, "b": {...}}]`` in
+    file order: each ``links`` entry's two endpoints, written ``NODE:PORT`` (brief form) or as
+    ``{node, interface}`` objects (extended form). Entries with other than two endpoints (a host
+    bridge, a dangling veth) are left out."""
+    path = Path(path)
+    data = yaml.safe_load(path.read_text()) or {}
+    out = []
+    for link in (data.get("topology") or {}).get("links") or []:
+        ends = [_link_end(e) for e in (link or {}).get("endpoints") or []]
+        if len(ends) == 2 and all(ends):
+            out.append({"a": ends[0], "b": ends[1]})
+    return out
+
+
+def _link_end(endpoint):
+    if isinstance(endpoint, str) and ":" in endpoint:
+        device, port = endpoint.split(":", 1)
+        return {"device": device, "port": port}
+    if isinstance(endpoint, dict) and endpoint.get("node") and endpoint.get("interface"):
+        return {"device": str(endpoint["node"]), "port": str(endpoint["interface"])}
+    return None
+
+
 def load_platform_map(path):
     """``{device: {"type", "platform", "extractor", "configs"}}`` from a YAML or JSON file: either
     ``devices: {name: {...}}`` or ``{name: {...}}``, where a bare string is the device type."""
@@ -260,14 +286,18 @@ def saos10_device_facts(record, texts, platform, translator, jobs=1):
         record["reason"] = "; ".join(f"{f['template']}: {f['error']}" for f in failed)[:300]
 
 
-def document(records, translator=None):
-    """The facts file: ``schema_version``, what produced it, and the device records."""
-    return {
+def document(records, translator=None, links=None):
+    """The facts file: ``schema_version``, what produced it, the device records, and (when a
+    topology was given) the physical ``links`` between the devices."""
+    doc = {
         "schema_version": SCHEMA_VERSION,
         "generator": {"name": "saos-network-facts", "version": __version__,
                       "translator": translator.describe() if translator is not None else None},
         "devices": records,
     }
+    if links is not None:
+        doc["links"] = links
+    return doc
 
 
 def needs_translator(devices):

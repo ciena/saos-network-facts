@@ -1,5 +1,125 @@
 {
  "pivots": {
+  "085672f740f942fed7b177bb": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-itut-g8032-draft:g8032-rings": {
+      "g8032-ring": [
+       {
+        "erp-instances": {
+         "erp-instance": [
+          {
+           "data-members": [
+            "ring_1-fd"
+           ],
+           "erp-instance-construct": "ciena-itut-g8032-draft:major-ring",
+           "instance-name": "erp_1",
+           "ports": {
+            "port": [
+             {
+              "port-id": "port0",
+              "rpl": "none"
+             },
+             {
+              "port-id": "port1",
+              "rpl": "none"
+             }
+            ]
+           },
+           "raps-level": 7,
+           "raps-vid": 4090,
+           "wtr-timer": 1
+          }
+         ]
+        },
+        "ring-id": 1,
+        "ring-name": "ring_1",
+        "ring-ports": {
+         "ring-port": [
+          {
+           "interface": "1",
+           "port-id": "port0"
+          },
+          {
+           "interface": "2",
+           "port-id": "port1"
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "CLASSIFIER-100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "ring_1-fd"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "3",
+        "mtu-size": 2000,
+        "name": "ring_1-ce2-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "1",
+        "mtu-size": 2000,
+        "name": "ring_1-p0-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "2",
+        "mtu-size": 2000,
+        "name": "ring_1-p1-fp",
+        "stats-collection": "on"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "RM_3"
+      }
+     }
+    }
+   }
+  },
   "0b64ca8607b4b89b6494cb4e": {
    "pivot": {
     "yuma-netconf:config": {
@@ -419,6 +539,98 @@
      "openconfig-system:system": {
       "config": {
        "hostname": "P1"
+      }
+     }
+    }
+   }
+  },
+  "2ba0e6ec5d4fd74237f096c9": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "CLASSIFIER-100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "CE_1-RM_2-FD"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "egress-l2-transform": [
+         {
+          "egress-name": "push-vid-100",
+          "vlan-stack": [
+           {
+            "push-tpid": "tpid-8100",
+            "push-vid": 100,
+            "tag": 1
+           }
+          ]
+         }
+        ],
+        "fd-name": "CE_1-RM_2-FD",
+        "logical-port": "1",
+        "name": "CE_1-RM_2-FP",
+        "stats-collection": "on"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "172.16.100.1",
+             "prefix-length": 24
+            },
+            "ip": "172.16.100.1"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "CE_1-RM_2-FD"
+          }
+         },
+         "mtu": 1500,
+         "name": "CE_1-RM_2-if"
+        },
+        "name": "CE_1-RM_2-if"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "CE_1"
       }
      }
     }
@@ -868,6 +1080,134 @@
     }
    }
   },
+  "441d25e848756173d7a1c663": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-itut-g8032-draft:g8032-rings": {
+      "g8032-ring": [
+       {
+        "erp-instances": {
+         "erp-instance": [
+          {
+           "data-members": [
+            "ring_1-fd"
+           ],
+           "erp-instance-construct": "ciena-itut-g8032-draft:major-ring",
+           "instance-name": "erp_1",
+           "ports": {
+            "port": [
+             {
+              "port-id": "port0",
+              "rpl": "none"
+             },
+             {
+              "port-id": "port1",
+              "rpl": "none"
+             }
+            ]
+           },
+           "raps-level": 7,
+           "raps-vid": 4090,
+           "wtr-timer": 1
+          }
+         ]
+        },
+        "ring-id": 1,
+        "ring-name": "ring_1",
+        "ring-ports": {
+         "ring-port": [
+          {
+           "interface": "1",
+           "port-id": "port0"
+          },
+          {
+           "interface": "2",
+           "port-id": "port1"
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "CLASSIFIER-100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "ring_1-fd"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "3",
+        "mtu-size": 2000,
+        "name": "ring_1-ce1-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "1",
+        "mtu-size": 2000,
+        "name": "ring_1-p0-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "2",
+        "mtu-size": 2000,
+        "name": "ring_1-p1-fp",
+        "stats-collection": "on"
+       }
+      ]
+     },
+     "ciena-mef-logical-port:logical-ports": {
+      "logical-port": [
+       {
+        "admin-state": "enable",
+        "name": "2"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "RM_2"
+      }
+     }
+    }
+   }
+  },
   "47708ef50057fbaacd9050e0": {
    "pivot": {
     "yuma-netconf:config": {
@@ -1050,6 +1390,98 @@
        "vrfName": "CUST-A"
       }
      ]
+    }
+   }
+  },
+  "5e888a93f781a9137cfac3d1": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "CLASSIFIER-100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "CE_2-RM_3-FD"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "egress-l2-transform": [
+         {
+          "egress-name": "push-vid-100",
+          "vlan-stack": [
+           {
+            "push-tpid": "tpid-8100",
+            "push-vid": 100,
+            "tag": 1
+           }
+          ]
+         }
+        ],
+        "fd-name": "CE_2-RM_3-FD",
+        "logical-port": "1",
+        "name": "CE_2-RM_3-FP",
+        "stats-collection": "on"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "172.16.100.2",
+             "prefix-length": 24
+            },
+            "ip": "172.16.100.2"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "CE_2-RM_3-FD"
+          }
+         },
+         "mtu": 1500,
+         "name": "CE_2-RM_3-if"
+        },
+        "name": "CE_2-RM_3-if"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "CE_2"
+      }
+     }
     }
    }
   },
@@ -1344,6 +1776,651 @@
      "openconfig-system:system": {
       "config": {
        "hostname": "PE2"
+      }
+     }
+    }
+   }
+  },
+  "937f22d517bede4ae4549511": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-itut-g8032-draft:g8032-rings": {
+      "g8032-ring": [
+       {
+        "erp-instances": {
+         "erp-instance": [
+          {
+           "data-members": [
+            "ring_1-fd"
+           ],
+           "erp-instance-construct": "ciena-itut-g8032-draft:sub-ring-no-virtual-channel",
+           "instance-name": "erp_2",
+           "ports": {
+            "port": [
+             {
+              "port-id": "port0",
+              "rpl": "neighbor"
+             },
+             {
+              "port-id": "port1",
+              "rpl": "none"
+             }
+            ]
+           },
+           "raps-level": 7,
+           "raps-vid": 4089,
+           "wtr-timer": 1
+          }
+         ]
+        },
+        "ring-id": 2,
+        "ring-name": "ring_2",
+        "ring-ports": {
+         "ring-port": [
+          {
+           "interface": "1",
+           "port-id": "port0"
+          },
+          {
+           "interface": "2",
+           "port-id": "port1"
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "CLASSIFIER-100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "ring_1-fd"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "3",
+        "mtu-size": 2000,
+        "name": "ring_1-ce3-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "1",
+        "mtu-size": 2000,
+        "name": "ring_1-p0-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "2",
+        "mtu-size": 2000,
+        "name": "ring_1-p1-fp",
+        "stats-collection": "on"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "RS_1"
+      }
+     }
+    }
+   }
+  },
+  "99b67ea8027757e26b033119": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-itut-g8032-draft:g8032-rings": {
+      "g8032-ring": [
+       {
+        "erp-instances": {
+         "erp-instance": [
+          {
+           "data-members": [
+            "ring_1-fd"
+           ],
+           "erp-instance-construct": "ciena-itut-g8032-draft:major-ring",
+           "instance-name": "erp_1",
+           "ports": {
+            "port": [
+             {
+              "port-id": "port0",
+              "rpl": "none"
+             },
+             {
+              "port-id": "port1",
+              "rpl": "owner"
+             }
+            ]
+           },
+           "raps-level": 7,
+           "raps-vid": 4090,
+           "wtr-timer": 1
+          }
+         ]
+        },
+        "ring-id": 1,
+        "ring-name": "ring_1",
+        "ring-ports": {
+         "ring-port": [
+          {
+           "interface": "1",
+           "port-id": "port0"
+          },
+          {
+           "interface": "2",
+           "port-id": "port1"
+          }
+         ]
+        }
+       },
+       {
+        "erp-instances": {
+         "erp-instance": [
+          {
+           "data-members": [
+            "ring_1-fd"
+           ],
+           "erp-instance-construct": "ciena-itut-g8032-draft:sub-ring-no-virtual-channel",
+           "instance-name": "erp_2",
+           "ports": {
+            "port": [
+             {
+              "port-id": "port0",
+              "rpl": "none"
+             }
+            ]
+           },
+           "raps-level": 7,
+           "raps-vid": 4089,
+           "wtr-timer": 1
+          }
+         ]
+        },
+        "ring-id": 2,
+        "ring-name": "ring_2",
+        "ring-ports": {
+         "ring-port": [
+          {
+           "interface": "3",
+           "port-id": "port0"
+          },
+          {
+           "interface": "1",
+           "port-id": "port1"
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "CLASSIFIER-100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "ring_1-fd"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "1",
+        "mtu-size": 2000,
+        "name": "ring_1-p0-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "2",
+        "mtu-size": 2000,
+        "name": "ring_1-p1-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "3",
+        "mtu-size": 2000,
+        "name": "ring_1-p2-fp",
+        "stats-collection": "on"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "RM_4"
+      }
+     }
+    }
+   }
+  },
+  "a210fb36b6437042cea3882e": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "CLASSIFIER-100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "CE_3-RS_1-FD"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "egress-l2-transform": [
+         {
+          "egress-name": "push-vid-100",
+          "vlan-stack": [
+           {
+            "push-tpid": "tpid-8100",
+            "push-vid": 100,
+            "tag": 1
+           }
+          ]
+         }
+        ],
+        "fd-name": "CE_3-RS_1-FD",
+        "logical-port": "1",
+        "name": "CE_3-RS_1-FP",
+        "stats-collection": "on"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "172.16.100.3",
+             "prefix-length": 24
+            },
+            "ip": "172.16.100.3"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "CE_3-RS_1-FD"
+          }
+         },
+         "mtu": 1500,
+         "name": "CE_3-RS_1-if"
+        },
+        "name": "CE_3-RS_1-if"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "CE_3"
+      }
+     }
+    }
+   }
+  },
+  "a33346a64190aedf5ef53b9e": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-itut-g8032-draft:g8032-rings": {
+      "g8032-ring": [
+       {
+        "erp-instances": {
+         "erp-instance": [
+          {
+           "data-members": [
+            "ring_1-fd"
+           ],
+           "erp-instance-construct": "ciena-itut-g8032-draft:sub-ring-no-virtual-channel",
+           "instance-name": "erp_2",
+           "ports": {
+            "port": [
+             {
+              "port-id": "port0",
+              "rpl": "none"
+             },
+             {
+              "port-id": "port1",
+              "rpl": "none"
+             }
+            ]
+           },
+           "raps-level": 7,
+           "raps-vid": 4089,
+           "wtr-timer": 1
+          }
+         ]
+        },
+        "ring-id": 2,
+        "ring-name": "ring_2",
+        "ring-ports": {
+         "ring-port": [
+          {
+           "interface": "1",
+           "port-id": "port0"
+          },
+          {
+           "interface": "2",
+           "port-id": "port1"
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "CLASSIFIER-100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "ring_1-fd"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "1",
+        "mtu-size": 2000,
+        "name": "ring_1-p0-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "2",
+        "mtu-size": 2000,
+        "name": "ring_1-p1-fp",
+        "stats-collection": "on"
+       }
+      ]
+     },
+     "ciena-mef-logical-port:logical-ports": {
+      "logical-port": [
+       {
+        "admin-state": "enable",
+        "name": "2"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "RS_2"
+      }
+     }
+    }
+   }
+  },
+  "a57d9c5024caacb987ba010b": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-itut-g8032-draft:g8032-rings": {
+      "g8032-ring": [
+       {
+        "erp-instances": {
+         "erp-instance": [
+          {
+           "data-members": [
+            "ring_1-fd"
+           ],
+           "erp-instance-construct": "ciena-itut-g8032-draft:major-ring",
+           "instance-name": "erp_1",
+           "ports": {
+            "port": [
+             {
+              "port-id": "port0",
+              "rpl": "neighbor"
+             },
+             {
+              "port-id": "port1",
+              "rpl": "none"
+             }
+            ]
+           },
+           "raps-level": 7,
+           "raps-vid": 4090,
+           "wtr-timer": 1
+          }
+         ]
+        },
+        "ring-id": 1,
+        "ring-name": "ring_1",
+        "ring-ports": {
+         "ring-port": [
+          {
+           "interface": "1",
+           "port-id": "port0"
+          },
+          {
+           "interface": "2",
+           "port-id": "port1"
+          }
+         ]
+        }
+       },
+       {
+        "erp-instances": {
+         "erp-instance": [
+          {
+           "data-members": [
+            "ring_1-fd"
+           ],
+           "erp-instance-construct": "ciena-itut-g8032-draft:sub-ring-no-virtual-channel",
+           "instance-name": "erp_2",
+           "ports": {
+            "port": [
+             {
+              "port-id": "port1",
+              "rpl": "owner"
+             }
+            ]
+           },
+           "raps-level": 7,
+           "raps-vid": 4089,
+           "wtr-timer": 1
+          }
+         ]
+        },
+        "ring-id": 2,
+        "ring-name": "ring_2",
+        "ring-ports": {
+         "ring-port": [
+          {
+           "interface": "2",
+           "port-id": "port0"
+          },
+          {
+           "interface": "3",
+           "port-id": "port1"
+          }
+         ]
+        }
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "CLASSIFIER-100"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "ring_1-fd"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "1",
+        "mtu-size": 2000,
+        "name": "ring_1-p0-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "2",
+        "mtu-size": 2000,
+        "name": "ring_1-p1-fp",
+        "stats-collection": "on"
+       },
+       {
+        "classifier-list": [
+         "CLASSIFIER-100"
+        ],
+        "classifier-list-precedence": 7,
+        "fd-name": "ring_1-fd",
+        "logical-port": "3",
+        "mtu-size": 2000,
+        "name": "ring_1-p2-fp",
+        "stats-collection": "on"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "RM_1"
       }
      }
     }

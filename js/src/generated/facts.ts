@@ -15,6 +15,10 @@ export interface FactsFile {
    * One record per device, in input order.
    */
   devices: DeviceRecord[];
+  /**
+   * Physical links between devices, as the input topology declares them (the `links` of a containerlab file given with `--clab`), in topology order. Optional: present only when the extractor was given a topology; absent in files before schema 1.4. Since schema 1.5.
+   */
+  links?: Link[];
 }
 /**
  * What wrote the file.
@@ -124,7 +128,7 @@ export interface DeviceFacts {
    */
   sub_ports: SubPort[];
   /**
-   * SAOS 6 logical rings.
+   * G.8032 rings configured on the device (SAOS 6 / 8 logical rings, SAOS 10 `g8032-ring`s), with their protection instances since schema 1.5.
    */
   rings: Ring[];
   /**
@@ -274,7 +278,7 @@ export interface Port {
    */
   lag: string | null;
   /**
-   * What uses the port: `aggregation`, `sub-port`, `virtual-switch`, `ring`, `cfm-mep` (SAOS 6), `fp`, `cfm-mep` (SAOS 10).
+   * What uses the port: `aggregation`, `sub-port`, `virtual-switch`, `ring`, `cfm-mep` (SAOS 6 / 8), `fp`, `ring`, `cfm-mep` (SAOS 10).
    */
   roles: string[];
   /**
@@ -352,24 +356,145 @@ export interface SubPort {
   parent: string | null;
 }
 /**
- * SAOS 6 G.8032 logical ring.
+ * A G.8032 ring on this device: a SAOS 6 / 8 logical ring (`ring-protection logical-ring`) or a SAOS 10 `g8032-ring`. `name`, `west` and `east` are the schema 1.0 fields; the rest are optional and absent in files before schema 1.4.
  *
  * This interface was referenced by `FactsFile`'s JSON-Schema
  * via the `definition` "Ring".
  */
 export interface Ring {
   /**
-   * Ring name.
+   * The ring name (SAOS 6 / 8 logical ring name, SAOS 10 ring name).
    */
   name: string | null;
   /**
-   * West port.
+   * The west ring port: SAOS 6 / 8 `west-port`; SAOS 10 the interface of ring port `port0`.
    */
   west: string | null;
   /**
-   * East port.
+   * The east ring port: SAOS 6 / 8 `east-port`; SAOS 10 the interface of ring port `port1`.
    */
   east: string | null;
+  /**
+   * The G.8032 ring id (`ring-id`), as written; null when not configured. Since schema 1.5.
+   */
+  ring_id?: string | null;
+  /**
+   * The ring ports as configured, in configuration order: SAOS 6 / 8 `west` and `east`, SAOS 10 `port0` and `port1`. Since schema 1.5.
+   */
+  ports?: RingPort[];
+  /**
+   * The Ethernet ring protection instances on the ring (SAOS 10 `erp-instance`, SAOS 6 / 8 virtual ring), in configuration order; empty when the configuration creates none. Since schema 1.5.
+   */
+  instances?: RingInstance[];
+}
+/**
+ * One of a ring's two ports. Values are text, as written. Since schema 1.5.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "RingPort".
+ */
+export interface RingPort {
+  /**
+   * The ring port's name in the configuration: SAOS 6 / 8 `west` / `east`, SAOS 10 `port0` / `port1`.
+   */
+  name: string;
+  /**
+   * The port or interface the ring port is on (a port, a LAG, or a SAOS 10 logical port); null when the configuration does not say.
+   */
+  interface: string | null;
+  /**
+   * SAOS 6 / 8: the port's hold-off time in milliseconds (`west-port-holdoff-time` / `east-port-holdoff-time`), as configured; null when not configured. Always null on SAOS 10, whose hold-off is per instance (`RingTimers.hold_off`).
+   */
+  hold_off: string | null;
+}
+/**
+ * An Ethernet ring protection (ERP) instance on a ring: a SAOS 10 `erp-instance` or a SAOS 6 / 8 virtual ring (`ring-protection virtual-ring`). Values are as configured: nothing is filled in from defaults, and null means the configuration does not say. Since schema 1.5.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "RingInstance".
+ */
+export interface RingInstance {
+  /**
+   * The instance name (SAOS 10 `erp-instance` name, SAOS 6 / 8 virtual ring name).
+   */
+  name: string;
+  /**
+   * The VLAN id of the R-APS control channel (`raps-vid`), as written.
+   */
+  raps_vid: string | null;
+  /**
+   * The maintenance entity group (MEG / MD) level of the R-APS messages (SAOS 10 `raps-level`, SAOS 6 / 8 `mel`), as written; null when not configured.
+   */
+  raps_level: string | null;
+  /**
+   * `major` for a major ring instance, `sub` for a sub-ring instance (SAOS 10 `erp-instance-construct`; SAOS 6 / 8 `sub-ring` on the virtual ring, else major); null when the configuration does not say.
+   */
+  type: "major" | "sub" | null;
+  /**
+   * For a sub-ring, whether its R-APS channel is carried over the major ring (SAOS 10 `sub-ring-virtual-channel` true, `sub-ring-no-virtual-channel` false). Null for a major ring and on SAOS 6 / 8, where the configuration does not say.
+   */
+  virtual_channel: boolean | null;
+  /**
+   * SAOS 6 / 8 sub-rings: the ring port the sub-ring terminates on at this node (`sub-ring west-port-termination` / `east-port-termination`), or `none` (`no-port-termination`: the sub-ring passes through this node). Null for a major ring and on SAOS 10, which has no such leaf (a terminating node lists one port in `rpl`).
+   */
+  termination: "west" | "east" | "none" | null;
+  /**
+   * Derived: for a sub-ring instance on an interconnection node, the name of the other ring on this device that shares one of this ring's ports (the ring the sub-ring is attached to). Null on a node where the sub-ring passes through, and for a major ring.
+   */
+  sub_ring_of: string | null;
+  /**
+   * The RPL role configured per ring port, in configuration order (SAOS 10 `ports port <id> rpl <role>`; SAOS 6 / 8 `west-port-rpl owner` / `east-port-rpl owner`). Empty when the configuration sets none.
+   */
+  rpl: RplPort[];
+  /**
+   * What the instance protects, as named in the configuration: SAOS 10 forwarding domains (`data-members`), SAOS 6 VLAN ids (`virtual-ring add ... vid`), SAOS 8 virtual switches (`virtual-ring add ... vs`).
+   */
+  members: string[];
+  timers: RingTimers;
+  /**
+   * Whether the instance reverts to the RPL after a failure clears (SAOS 10 `reversion revertive` / `non-revertive`, SAOS 6 / 8 `revertive on` / `off`); null when not configured (the device default).
+   */
+  revertive: boolean | null;
+}
+/**
+ * The ring protection link (RPL) role configured on one ring port of an instance. Since schema 1.5.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "RplPort".
+ */
+export interface RplPort {
+  /**
+   * The ring port, as in `Ring.ports[].name` (`port0` / `port1`, `west` / `east`).
+   */
+  port: string;
+  /**
+   * The port or interface of that ring port (`Ring.ports[].interface`), for convenience; null when unknown.
+   */
+  interface: string | null;
+  /**
+   * The configured RPL role: `owner` (this port is the RPL and blocks in the idle state), `neighbor` (the other end of the RPL), `next-neighbor`, or `none` (written explicitly, as SAOS 10 `rpl none`). A port the configuration says nothing about has no entry.
+   */
+  role: "owner" | "neighbor" | "next-neighbor" | "none";
+}
+/**
+ * The protection timers of an instance, as configured; null when the configuration does not set one (the device uses its default). Values are text, as written. Since schema 1.5.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "RingTimers".
+ */
+export interface RingTimers {
+  /**
+   * Wait-to-restore time in minutes (SAOS 10 `wtr-timer`; SAOS 6 / 8 `wtr` on the logical ring, reported on each of its instances).
+   */
+  wtr: string | null;
+  /**
+   * Guard time in milliseconds (SAOS 10 `guard-timer`; SAOS 6 / 8 `guard-time` on the logical ring, reported on each of its instances).
+   */
+  guard: string | null;
+  /**
+   * SAOS 10: hold-off time in milliseconds (`hold-off-time`). Always null on SAOS 6 / 8, whose hold-off is per ring port (`RingPort.hold_off`).
+   */
+  hold_off: string | null;
 }
 /**
  * A remote end the device is configured to talk to.
@@ -1127,4 +1252,30 @@ export interface FailedTemplate {
    * The translator's message (first line).
    */
   error: string;
+}
+/**
+ * A physical link between two device ports, as the input topology declares it. Since schema 1.5.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "Link".
+ */
+export interface Link {
+  a: LinkEnd;
+  b: LinkEnd;
+}
+/**
+ * One end of a physical link. Since schema 1.5.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "LinkEnd".
+ */
+export interface LinkEnd {
+  /**
+   * The device, as in `devices[].device`.
+   */
+  device: string;
+  /**
+   * The port on that device, as the topology names it (`2`, `eth1`).
+   */
+  port: string;
 }

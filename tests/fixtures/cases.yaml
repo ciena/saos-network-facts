@@ -15,3 +15,8 @@ ospf-tp:
 leaf-delete:
   configs: [labs/leaf-delete]
   platform_map: labs/leaf-delete/platform-map.yaml
+g8032-two-ring:
+  clab: labs/g8032-two-ring/topo.clab.yml
+g8032-saos6:
+  configs: [labs/g8032-saos6]
+  platform_map: labs/g8032-saos6/platform-map.yaml

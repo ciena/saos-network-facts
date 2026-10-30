@@ -11,7 +11,8 @@ from saos_network_facts import extract, schema
 def run_case(name, translator=None):
     translator = translator or RecordedTranslator()
     records = [extract.device_facts(d, translator, recipe=CASES[name].get("recipe")) for d in case_devices(name)]
-    return extract.document(records, translator)
+    clab = CASES[name].get("clab")
+    return extract.document(records, translator, extract.links_from_clab(FIXTURES / clab) if clab else None)
 
 
 @pytest.mark.parametrize("name", sorted(CASES))
@@ -165,3 +166,108 @@ def test_isis_metrics_are_optional():
     assert schema.errors(doc) == []
     doc["devices"][0]["facts"]["isis"]["interfaces"][0]["metrics"] = [{"level": "level-2", "metric": 10}]
     assert schema.errors(doc)  # an entry needs level, metric and wide_metric
+
+
+def test_links_from_clab():
+    assert run_case("sr-l2")["links"] == [{"a": {"device": "PE1", "port": "1"}, "b": {"device": "PE2", "port": "1"}},
+                                          {"a": {"device": "PE1", "port": "3"}, "b": {"device": "CE1", "port": "eth1"}}]
+    assert "links" not in run_case("mixed")  # no topology given
+
+
+def test_links_from_clab_extended_form_and_odd_links(tmp_path):
+    (tmp_path / "topo.clab.yml").write_text(
+        "topology:\n  nodes: {A: {kind: linux}, B: {kind: linux}}\n  links:\n"
+        "    - endpoints: [\"A:1\", \"B:1\"]\n"
+        "    - type: veth\n      endpoints: [{node: A, interface: eth2}, {node: B, interface: eth2}]\n"
+        "    - endpoints: [\"A:3\"]\n"
+        "    - endpoints: [\"A:4\", \"B:4\", \"host:x\"]\n"
+        "    - endpoints: [\"A:5\", \"nocolon\"]\n")
+    assert extract.links_from_clab(tmp_path / "topo.clab.yml") == [
+        {"a": {"device": "A", "port": "1"}, "b": {"device": "B", "port": "1"}},
+        {"a": {"device": "A", "port": "eth2"}, "b": {"device": "B", "port": "eth2"}}]
+    (tmp_path / "empty.clab.yml").write_text("topology:\n  nodes: {A: {kind: linux}}\n")
+    assert extract.links_from_clab(tmp_path / "empty.clab.yml") == []
+
+
+def rpl(instance):
+    return [(r["port"], r["interface"], r["role"]) for r in instance["rpl"]]
+
+
+def test_g8032_two_ring_lab_per_node():
+    """The expected facts of the two-ring SAOS 10 lab, checked against its configurations: ring ids,
+    ports, instance types, R-APS VID / level, RPL roles, members and the interconnection nodes."""
+    doc = run_case("g8032-two-ring")
+    by = {r["device"]: r for r in doc["devices"]}
+    assert all(r["status"] == "ok" for r in doc["devices"])
+    assert len(doc["links"]) == 10 and doc["links"][3] == {"a": {"device": "RM_4", "port": "2"}, "b": {"device": "RM_1", "port": "1"}}
+    for ce in ("CE_1", "CE_2", "CE_3"):
+        assert by[ce]["facts"]["rings"] == []
+        assert not any("ring" in p["roles"] for p in by[ce]["facts"]["ports"].values())
+    for name in ("RM_1", "RM_2", "RM_3", "RM_4"):
+        major = next(r for r in by[name]["facts"]["rings"] if r["name"] == "ring_1")
+        assert (major["ring_id"], major["west"], major["east"]) == ("1", "1", "2")
+        assert [(p["name"], p["interface"]) for p in major["ports"]] == [("port0", "1"), ("port1", "2")]
+        (erp,) = major["instances"]
+        assert (erp["name"], erp["raps_vid"], erp["raps_level"], erp["type"], erp["virtual_channel"], erp["sub_ring_of"]) == (
+            "erp_1", "4090", "7", "major", None, None)
+        assert erp["members"] == ["ring_1-fd"] and erp["revertive"] is None
+        assert erp["timers"] == {"wtr": "1", "guard": None, "hold_off": None}
+        assert all("ring" in by[name]["facts"]["ports"][p]["roles"] for p in ("1", "2"))
+    for name in ("RM_1", "RM_4", "RS_1", "RS_2"):
+        sub = next(r for r in by[name]["facts"]["rings"] if r["name"] == "ring_2")
+        (erp,) = sub["instances"]
+        assert sub["ring_id"] == "2"
+        assert (erp["name"], erp["raps_vid"], erp["raps_level"], erp["type"]) == ("erp_2", "4089", "7", "sub")
+        assert erp["virtual_channel"] is False
+        assert erp["members"] == ["ring_1-fd"] and erp["timers"]["wtr"] == "1"
+    # the major ring's RPL: owner RM_4 port1 (interface 2), neighbour RM_1 port0 (interface 1), none elsewhere
+    major_rpl = {n: rpl(next(r for r in by[n]["facts"]["rings"] if r["name"] == "ring_1")["instances"][0])
+                 for n in ("RM_1", "RM_2", "RM_3", "RM_4")}
+    assert major_rpl == {"RM_1": [("port0", "1", "neighbor"), ("port1", "2", "none")],
+                         "RM_2": [("port0", "1", "none"), ("port1", "2", "none")],
+                         "RM_3": [("port0", "1", "none"), ("port1", "2", "none")],
+                         "RM_4": [("port0", "1", "none"), ("port1", "2", "owner")]}
+    # the sub-ring's RPL: owner RM_1 port1 (interface 3), neighbour RS_1 port0 (interface 1); the
+    # interconnection nodes RM_1 / RM_4 list one port and are attached to ring_1
+    sub_ring = {n: next(r for r in by[n]["facts"]["rings"] if r["name"] == "ring_2") for n in ("RM_1", "RM_4", "RS_1", "RS_2")}
+    assert {n: rpl(r["instances"][0]) for n, r in sub_ring.items()} == {
+        "RM_1": [("port1", "3", "owner")], "RM_4": [("port0", "3", "none")],
+        "RS_1": [("port0", "1", "neighbor"), ("port1", "2", "none")], "RS_2": [("port0", "1", "none"), ("port1", "2", "none")]}
+    assert {n: r["instances"][0]["sub_ring_of"] for n, r in sub_ring.items()} == {
+        "RM_1": "ring_1", "RM_4": "ring_1", "RS_1": None, "RS_2": None}
+    assert (sub_ring["RM_1"]["west"], sub_ring["RM_1"]["east"], sub_ring["RM_4"]["west"], sub_ring["RM_4"]["east"]) == ("2", "3", "3", "1")
+    assert sorted(p for p, v in by["RM_1"]["facts"]["ports"].items() if "ring" in v["roles"]) == ["1", "2", "3"]
+
+
+def test_g8032_saos6_lab_yields_the_same_instance_fields():
+    by = {r["device"]: r for r in run_case("g8032-saos6")["devices"]}
+    assert {n: r["extractor"] for n, r in by.items()} == {"A1": "saos6", "A2": "saos6", "S1": "saos6", "S2": "saos6"}
+    lr1, lr2 = by["A1"]["facts"]["rings"]
+    (vr1,) = lr1["instances"]
+    assert (lr1["ring_id"], vr1["raps_vid"], vr1["raps_level"], vr1["type"], rpl(vr1), vr1["members"], vr1["revertive"]) == (
+        "1", "100", "7", "major", [("east", "3", "owner")], ["1000", "1001"], True)
+    assert vr1["timers"] == {"wtr": "1", "guard": "1000", "hold_off": None} and lr1["ports"][0]["hold_off"] == "100"
+    (vr2,) = lr2["instances"]
+    assert (vr2["type"], vr2["termination"], vr2["sub_ring_of"], vr2["virtual_channel"]) == ("sub", "east", "lr1", None)
+    (s1,) = by["S1"]["facts"]["rings"][0]["instances"]
+    assert (s1["termination"], s1["sub_ring_of"], rpl(s1)) == ("none", None, [("east", "2", "owner")])
+    assert s1["timers"] == {"wtr": "5", "guard": "500", "hold_off": None}
+    (s2,) = by["S2"]["facts"]["rings"][0]["instances"]
+    assert (s2["members"], s2["raps_level"], rpl(s2)) == (["ring-vs-1"], "7", [])
+    (a2,) = by["A2"]["facts"]["rings"][0]["instances"]
+    assert a2["revertive"] is None and rpl(a2) == []
+
+
+def test_ring_extras_and_links_are_optional():
+    # a file before schema 1.5 (rings with name / west / east only, no links) still validates against 1.5
+    doc = json.loads((EXPECTED / "g8032-saos6.facts.json").read_text())
+    for record in doc["devices"]:
+        record["facts"]["rings"] = [{"name": r["name"], "west": r["west"], "east": r["east"]} for r in record["facts"]["rings"]]
+    doc.pop("links", None)
+    doc["schema_version"] = "1.4.0"
+    assert schema.errors(doc) == []
+    doc["devices"][0]["facts"]["rings"][0]["instances"] = [{"name": "x"}]
+    assert schema.errors(doc)  # an instance carries every field
+    doc["devices"][0]["facts"]["rings"][0]["instances"] = []
+    doc["links"] = [{"a": {"device": "A"}}]
+    assert schema.errors(doc)  # a link has two ends with device and port
