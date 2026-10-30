@@ -198,7 +198,7 @@ export interface Interface {
    */
   name: string;
   /**
-   * SAOS 6: `loopback`, `ip` or `management`. SAOS 10: the interface type as configured (`loopback`, `ip`, `lag`, `point-to-point`, ...).
+   * SAOS 6: `loopback`, `ip` or `management`. SAOS 10: the interface type as configured (`loopback`, `ip`, `lag`, `point-to-point`, ...; `system` is the management bridge, mgmtbr0). Management interfaces (`management`, `system`) address the management network, not a link between devices.
    */
   kind: string;
   /**
@@ -795,6 +795,10 @@ export interface Mep {
    * SAOS 10: the MA's forwarding domain; SAOS 6: the CFM service's virtual switch.
    */
   service: string | null;
+  /**
+   * The CCM interval of the MEP's maintenance association as written (since schema 1.4): SAOS 10 `ccm-interval` (`3.3ms`, `10ms`, `100ms`, `1s`, `10s`, `1min`, `10min`); SAOS 6 `cfm service set ... ccm-interval` (`3.33ms`, `1sec`, `10sec`, `1min`, ..., `off`, or the 802.1Q interval index `0`-`7`). Null when not configured (the device default, 1 s).
+   */
+  ccm_interval?: string | null;
 }
 /**
  * SAOS 10 forwarding domain.

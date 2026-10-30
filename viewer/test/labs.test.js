@@ -23,10 +23,25 @@ describe('the page URL', () => {
     expect(labParams('')).toEqual({ facts: null, positions: null, labs: null, lab: null });
   });
 
-  test('no facts and no lab: nothing to load (the page shows its example)', async () => {
+  test('no facts and no lab: the default lab of labs/index.json beside the page when the site stages one', async () => {
+    const index = { default: 'b', labs: [{ id: 'a', facts: 'a.json' }, { id: 'b', title: 'B lab', facts: 'b.json' }] };
+    const { fetchFn, calls } = stub({ 'https://example.test/site/labs/index.json': index, 'https://example.test/site/labs/b.json': 'B' });
+    const out = await loadFromParams(labParams(''), { base: BASE, fetch: fetchFn });
+    expect(out.index.defaultId).toBe('b');
+    expect(out.lab).toMatchObject({ id: 'b', title: 'B lab', factsText: 'B' });
+    expect(calls[0]).toBe('https://example.test/site/labs/index.json');
+  });
+
+  test('no facts, no lab and no staged index: nothing to load (the page shows its example)', async () => {
     const { fetchFn, calls } = stub({});
     expect(await loadFromParams(labParams(''), { base: BASE, fetch: fetchFn })).toBeNull();
-    expect(calls).toEqual([]);
+    expect(calls).toEqual(['https://example.test/site/labs/index.json']);
+    // a server that answers a page instead of 404 (an SPA fallback) counts as no index
+    const html = stub({ 'https://example.test/site/labs/index.json': '<!doctype html><title>x</title>' });
+    expect(await loadFromParams(labParams(''), { base: BASE, fetch: html.fetchFn })).toBeNull();
+    // an index that is there but malformed is still an error, not silently the example
+    const bad = stub({ 'https://example.test/site/labs/index.json': { labs: [{ id: 'a' }] } });
+    await expect(loadFromParams(labParams(''), { base: BASE, fetch: bad.fetchFn })).rejects.toThrow('needs an id and a facts URL');
   });
 
   test('?facts= loads that file relative to the page, with optional positions', async () => {

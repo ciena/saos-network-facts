@@ -348,9 +348,16 @@ def apply(facts, line):
         # cfm service create vs|vlan <x> name <ma> level <n>: the MA, and the level its MEPs run at
         kv = kv_after(3)
         if _s(kv.get("name")):
-            facts.setdefault("_cfm_services", {})[_s(kv["name"])] = {
-                "level": _s(kv.get("level")), "vs": _s(kv.get("vs")), "vlan": _s(kv.get("vlan"))}
+            _cfm_service(facts, _s(kv["name"])).update(
+                {"level": _s(kv.get("level")), "vs": _s(kv.get("vs")), "vlan": _s(kv.get("vlan"))})
         return True
+    if t[0] == "cfm" and len(t) > 2 and t[1] in ("service", "servi") and t[2] == "set":
+        # cfm service set service <ma> ccm-interval <1sec|100ms|3.33ms|...|0-7|off>: the interval its MEPs send CCMs at
+        kv = kv_after(3)
+        if _s(kv.get("service")) and "ccm-interval" in kv:
+            _cfm_service(facts, _s(kv["service"]))["ccm_interval"] = _s(kv["ccm-interval"])
+            return True
+        return False
     if head == "cfm mep create":
         kv = kv_after(3)
         port = _s(kv.get("port"))
@@ -359,20 +366,27 @@ def apply(facts, line):
         facts["cfm"]["meps"].append({
             "md": None, "ma": _s(kv.get("service")), "mep_id": _s(kv.get("mepid")), "level": None,
             "direction": _s(kv.get("type")), "interface": _s(kv.get("sub-port")), "port": port,
-            "vlan": _s(kv.get("vlan")), "service": None})
+            "vlan": _s(kv.get("vlan")), "service": None, "ccm_interval": None})
         return True
 
     return False
 
 
+def _cfm_service(facts, name):
+    """The settings collected so far for CFM service ``name`` (``cfm service create`` / ``set`` lines, in any order)."""
+    return facts.setdefault("_cfm_services", {}).setdefault(name, {})
+
+
 def finish(facts):
-    """Derived views once every file is in: MEP levels and services from their CFM service, IS-IS NET parts."""
+    """Derived views once every file is in: MEP levels, services and CCM intervals from their CFM service,
+    IS-IS NET parts."""
     services = facts.pop("_cfm_services", {})
     for mep in facts["cfm"]["meps"]:
         service = services.get(mep["ma"]) or {}
         mep["level"] = mep["level"] or service.get("level")
         mep["service"] = mep["service"] or service.get("vs")
         mep["vlan"] = mep["vlan"] or service.get("vlan")
+        mep["ccm_interval"] = mep["ccm_interval"] or service.get("ccm_interval")
     return finish_isis(facts)
 
 

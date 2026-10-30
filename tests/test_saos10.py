@@ -120,9 +120,18 @@ def test_pseudowire_service_and_cfm_mep_port():
     assert (pw["kind"], pw["peer"], pw["pw_id"], pw["mode"], pw["service"], pw["service_type"]) == (
         "configured", "192.0.2.2", "100", "spoke", "SVC", "vpws")
     assert f["cfm"]["meps"] == [{"md": "MD5", "ma": "MA1", "mep_id": "11", "level": "5", "direction": "up", "interface": "AC",
-                                 "port": "3", "vlan": "100", "service": "FD-V"}]
+                                 "port": "3", "vlan": "100", "service": "FD-V", "ccm_interval": None}]
     assert f["ports"]["3"]["roles"] == ["fp", "cfm-mep"]
     assert f["l2vpn_services"] == [{"name": "SVC", "fd": "FD-V", "pseudowires": ["PW1"], "mtu": None, "signaling_type": None}]
+
+
+def test_cfm_mep_ccm_interval_is_the_maintenance_associations():
+    md = lambda ma: {"mef-cfm:maintenance-domain": [{"id": "MD5", "md-level": 5, "maintenance-association": [ma]}]}  # noqa: E731
+    mep = lambda n: {"mep-identifier": n, "interface": f"AC{n}", "direction": "up"}  # noqa: E731
+    f = run(md({"id": "MA1", "ccm-interval": "10ms", "maintenance-association-end-point": [mep(11), mep(12)]}),
+            md({"id": "MA2", "maintenance-association-end-point": [mep(21)]}))
+    assert [(m["ma"], m["mep_id"], m["ccm_interval"]) for m in f["cfm"]["meps"]] == [
+        ("MA1", "11", "10ms"), ("MA1", "12", "10ms"), ("MA2", "21", None)]
 
 
 def test_pseudowire_steered_onto_an_sr_policy():

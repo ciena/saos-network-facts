@@ -10,8 +10,9 @@ the LACP timeout or the IGP hold timer. The
 published site shows the bundled [Adaptive-SR-CFM example](../examples/adaptive-sr-cfm/); *Load
 your facts.json* (or drop a file on the page) reads any facts file of schema 1.x in the browser,
 without uploading it. `?facts=<url>`, `?labs=<index>` and `?lab=<id>` open facts served next to
-the site ([Use the viewer in your repo](../README.md#use-the-viewer-in-your-repo)); every release
-carries the built site as `saos-network-facts-viewer-X.Y.Z.tgz`.
+the site, and a site that stages `labs/index.json` beside the page opens that index's default lab
+without any parameter ([Use the viewer in your repo](../README.md#use-the-viewer-in-your-repo));
+every release carries the built site as `saos-network-facts-viewer-X.Y.Z.tgz`.
 
 ```bash
 npm ci

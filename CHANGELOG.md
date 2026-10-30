@@ -17,6 +17,37 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-30
+
+### Added
+
+- **CFM CCM interval (schema 1.4.0)** — `cfm.meps[].ccm_interval`: the CCM interval of the MEP's
+  maintenance association as written, from the SAOS 10 MA's `ccm-interval` (`3.3ms` ... `10min`)
+  and from SAOS 6 / 8 `cfm service set service <ma> ccm-interval <1sec|100ms|3.33ms|...|0-7|off>`
+  (in any order with the `cfm service create`); null when not configured. Optional, so 1.3 files
+  still validate. The npm reader adds `ccmIntervalMs(mep | text)`, which reads both spellings and
+  the 802.1Q interval index; the viewer runs each service MEG at its configured interval and says so
+  in the Import tab instead of defaulting every MEG to 1 s.
+
+### Fixed
+
+- **Viewer: management networks drew links** — the npm reader's `isRouted` excluded SAOS 6
+  `management` interfaces but not SAOS 10 `system` ones (the mgmtbr0 management bridge), so two
+  devices on one management /24 got a bogus access link and one of them was labelled PE. Both kinds
+  are now unrouted (`UNROUTED_KINDS`); the schema documents `system`.
+- **Viewer: a subnet with three interfaces was dropped** — a leftover duplicate interface on one
+  device (same address on another port) hid the link, because only exact pairs made one. The link
+  now joins the two interfaces on different devices that run the IGP (IS-IS, or a non-passive OSPF
+  interface), with an Import-tab warning naming the ignored interface; when the IGP does not single
+  out a pair the subnet is still skipped, and the warning names it and says why.
+- **Viewer: LAG members paired by port** — members of a LAG link are paired by port in natural order
+  at both ends (`29/4`, `29/30`, `29/100`; `29/30` meets `29/30`), not in the order each device
+  configured them.
+- **Viewer: a staged lab index opens without parameters** — a site that stages `labs/index.json`
+  beside the page now opens that index's default lab (the lab marked `default: true`, else the
+  index's `default` id, else the first) when the URL names no facts and no lab; without a staged
+  index the bundled example still shows. The README documents how the default is marked.
+
 ## [0.4.1] - 2026-10-29
 
 ### Fixed

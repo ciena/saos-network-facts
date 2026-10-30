@@ -695,7 +695,8 @@ def _tp_tunnels(facts, container):
 
 
 def _cfm(facts, container):
-    """``mef-cfm:maintenance-domain``: one MEP record per maintenance-association end point."""
+    """``mef-cfm:maintenance-domain``: one MEP record per maintenance-association end point, with the
+    MD level and the MA's CCM interval (``ccm-interval``, as written; None when the MA leaves the default)."""
     meps = facts["cfm"]["meps"]
     for md in as_list(container):
         md_id = text(get(md, "id"))
@@ -712,7 +713,7 @@ def _cfm(facts, container):
                     continue
                 meps.append({"md": md_id, "ma": ma_id, "mep_id": mep_id, "level": text(get(md, "md-level")),
                              "direction": text(get(mep, "direction")), "interface": text(get(mep, "interface")),
-                             "port": None, "vlan": None, "service": fd})
+                             "port": None, "vlan": None, "service": fd, "ccm_interval": text(get(ma, "ccm-interval"))})
 
 
 def _system(facts, container):

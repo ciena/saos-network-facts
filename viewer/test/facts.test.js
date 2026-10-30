@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { buildNetwork, ccmWalk, replayFailure, vpwsWalk } from '../src/engine/index.js';
-import { importFacts, ipv4Subnet } from '../src/import/facts.js';
+import { importFacts, ipv4Subnet, naturalCompare } from '../src/import/facts.js';
 import { layoutNodes } from '../src/import/layout.js';
 
 const example = readFileSync(new URL('../../examples/adaptive-sr-cfm/facts.json', import.meta.url), 'utf8');
@@ -86,7 +86,7 @@ describe('the bundled Adaptive-SR-CFM example', () => {
   test('the CFM MEPs form one service MEG on the testcfm pseudowire', () => {
     expect(topo.cfm).toEqual({
       linkMegs: false,
-      megs: [{ id: 'testcfm', md: 'md3', pseudowire: 'testcfm P3-PE6', meps: [{ mepId: 22, node: 'P3', if: 'testcfm_1' }, { mepId: 33, node: 'PE6', if: 'testcfm_1' }] }],
+      megs: [{ id: 'testcfm', md: 'md3', pseudowire: 'testcfm P3-PE6', intervalCode: 4, meps: [{ mepId: 22, node: 'P3', if: 'testcfm_1' }, { mepId: 33, node: 'PE6', if: 'testcfm_1' }] }],
     });
     expect(net.cfm.megs[0].meps.map((m) => m.defect)).toEqual([null, null]);
     expect(imp.report.gaps.cfm.some((i) => i.source === 'default' && /level/.test(i.item))).toBe(true);
@@ -132,7 +132,7 @@ describe('importing other facts files', () => {
     expect(imp.topology.pseudowires).toEqual([]);
     expect(imp.report.warnings).toEqual([
       'R4: error (convert failed); not shown',
-      '198.51.100.0/29: 3 interfaces (R1 a, R2 a, R3 a); only point-to-point links are drawn',
+      '198.51.100.0/29: 3 interfaces (R1 a, R2 a, R3 a) and no two of different devices run IS-IS; only point-to-point links are drawn',
       'R1: PW PW (id 7) to 192.0.2.2: R2 has no PW 7 back; not drawn',
     ]);
   });
@@ -202,7 +202,7 @@ describe('LAG links from the facts', () => {
   const imp = importFacts(lagLab());
   const topo = imp.topology;
 
-  test('a link whose interfaces ride a LAG at both ends is a LAG, members paired in order', () => {
+  test('a link whose interfaces ride a LAG at both ends is a LAG, members paired by port', () => {
     const lag = topo.links.find((l) => l.id === 'R1-R2');
     expect(lag).toMatchObject({ lag: true, a: { node: 'R1', if: 'to-r2', port: 'LAG1' }, b: { node: 'R2', if: 'to-r1', port: 'LAG1' } });
     expect(lag.members).toEqual([
@@ -229,6 +229,22 @@ describe('LAG links from the facts', () => {
     expect(net.isis.adjacencies.find((a) => a.link === 'R1-R2')?.state ?? 'Down').not.toBe('Up');
   });
 
+  test('members pair by port in natural order at both ends, not in configured order', () => {
+    // R1 lists 2 before 1; R2 lists 12 before 11: 1 still meets 11. Slot names sort numerically: 29/30 meets 29/30, not 29/100.
+    const f = lagLab({ r2Members: ['12', '11'] });
+    f.devices[0].facts.lags[0].members = ['2', '1'];
+    expect(importFacts(f).topology.links.find((l) => l.id === 'R1-R2').members).toEqual([
+      { id: 'R1-R2/1', a: '1', b: '11' },
+      { id: 'R1-R2/2', a: '2', b: '12' },
+    ]);
+    const slots = lagLab({ r2Members: ['29/100', '29/30', '29/4'] });
+    slots.devices[0].facts.lags[0].members = ['29/30', '29/4', '29/100'];
+    for (const d of slots.devices.slice(0, 2)) for (const m of d.facts.lags[0].members) d.facts.ports[m] = { roles: ['aggregation'], vlans: [], lag: 'LAG1' };
+    expect(importFacts(slots).topology.links.find((l) => l.id === 'R1-R2').members.map((m) => [m.a, m.b])).toEqual([['29/4', '29/4'], ['29/30', '29/30'], ['29/100', '29/100']]);
+    expect(naturalCompare('1/2', '1/10')).toBeLessThan(0);
+    expect(['b1', 'a10', 'a2'].sort(naturalCompare)).toEqual(['a2', 'a10', 'b1']);
+  });
+
   test('a port that is a member of the LAG, not the LAG itself, also makes it a LAG link', () => {
     const f = lagLab();
     f.devices[0].facts.fps[0].logical_port = '1';
@@ -245,6 +261,91 @@ describe('LAG links from the facts', () => {
     const oneSided = importFacts(f);
     expect(oneSided.topology.links.find((l) => l.id === 'R1-R2')).toMatchObject({ lag: false, members: [{ id: 'R1-R2', a: 'to-r2', b: 'to-r1' }] });
     expect(oneSided.report.warnings).toEqual(['R1-R2: R1 rides LAG LAG1, R2 no LAG; drawn as a plain link']);
+  });
+});
+
+describe('links from interface subnets: what does not link', () => {
+  // R1 - R2 core link; R1 and R2 both have a management interface on 192.168.100.0/24 (a SAOS 10
+  // `system` interface, mgmtbr0, on R1; a SAOS 6 `management` one on R2), like every device of a lab.
+  const mgmt = (d, name, kind, ip) => {
+    d.facts.interfaces.push({ name, kind, ip, ipv4: [ip] });
+    return d;
+  };
+  test('management interfaces (kind system / management) never form a link, so nobody turns PE for it', () => {
+    const imp = importFacts(file([
+      mgmt(device('R1', '192.0.2.1', [['to-r2', '198.51.100.0/31', '1']]), 'mgmtbr0', 'system', '192.168.100.11/24'),
+      mgmt(device('R2', '192.0.2.2', [['to-r1', '198.51.100.1/31', '1']]), 'remote', 'management', '192.168.100.12/24'),
+    ]));
+    expect(imp.topology.links.map((l) => [l.id, l.kind])).toEqual([['R1-R2', 'core']]);
+    expect(imp.topology.nodes.map((n) => n.role)).toEqual(['p', 'p']);
+    expect(imp.report.warnings).toEqual([]);
+  });
+
+  test('a third interface in a point-to-point subnet: the link joins the two that run the IGP', () => {
+    // R2 kept a stale copy of its interface to R1, on a port that runs no IS-IS.
+    const f = file([
+      device('R1', '192.0.2.1', [['to-r2', '198.51.100.0/31', '1']]),
+      device('R2', '192.0.2.2', [['to-r1', '198.51.100.1/31', '1'], ['to-r1-old', '198.51.100.1/31', '7']]),
+    ]);
+    f.devices[1].facts.interfaces.find((i) => i.name === 'to-r1-old').isis = null;
+    const imp = importFacts(f);
+    expect(imp.topology.links).toHaveLength(1);
+    expect(imp.topology.links[0]).toMatchObject({ id: 'R1-R2', kind: 'core', a: { node: 'R1', if: 'to-r2' }, b: { node: 'R2', if: 'to-r1' } });
+    expect(imp.report.warnings).toEqual(['198.51.100.0/31: 3 interfaces; drawn between the two that run IS-IS (R1 to-r2, R2 to-r1), ignoring R2 to-r1-old']);
+    // With the IGP on all three (or on one only) there is no pair to pick: skipped, and the Import tab names the subnet.
+    const all = importFacts(file([
+      device('R1', '192.0.2.1', [['to-r2', '198.51.100.0/31', '1']]),
+      device('R2', '192.0.2.2', [['to-r1', '198.51.100.1/31', '1'], ['to-r1-old', '198.51.100.1/31', '7']]),
+    ]));
+    expect(all.topology.links).toEqual([]);
+    expect(all.report.warnings).toEqual(['198.51.100.0/31: 3 interfaces (R1 to-r2, R2 to-r1, R2 to-r1-old) and no two of different devices run IS-IS; only point-to-point links are drawn']);
+  });
+});
+
+describe('CFM CCM interval from the facts (schema 1.4)', () => {
+  // R1 - R2 with a VPWS pseudowire and an Up MEP on each end; ccm as each test sets it per MEP.
+  const lab = (ccm1, ccm2) => {
+    const pw = (peer) => ({ name: 'PW', peer, pw_id: '7', service: 'S', tunnel_type: null });
+    const mep = (id, ccm) => ({ md: 'MD5', ma: 'MA', mep_id: id, level: '5', direction: 'up', interface: 'S-AC', port: '9', vlan: null, service: 'S', ccm_interval: ccm });
+    const ac = { fps: [{ name: 'S-AC', fd: 'S', logical_port: '9' }] };
+    return file([
+      device('R1', '192.0.2.1', [['a', '198.51.100.0/31', '1']], { ...ac, pseudowires: [pw('192.0.2.2')], meps: [mep('1', ccm1)] }),
+      device('R2', '192.0.2.2', [['a', '198.51.100.1/31', '1']], { ...ac, pseudowires: [pw('192.0.2.1')], meps: [mep('2', ccm2)] }),
+    ]);
+  };
+  const megOf = (imp) => buildNetwork(imp.topology, { labelMode: imp.labelMode }).cfm.megs.find((m) => m.id === 'MA');
+  const intervalLine = (imp) => imp.report.gaps.cfm.find((i) => i.item === 'CCM interval');
+
+  test('the configured interval, shown instead of the 1 s default', () => {
+    const imp = importFacts(lab('10ms', '10ms'));
+    expect(imp.topology.cfm.megs[0]).toMatchObject({ id: 'MA', intervalCode: 2 });
+    expect(megOf(imp).intervalMs).toBe(10);
+    expect(intervalLine(imp)).toMatchObject({ source: 'facts' });
+    expect(imp.report.warnings).toEqual([]);
+    expect(megOf(importFacts(lab('3.3ms', null))).intervalMs).toBeCloseTo(10 / 3);
+    expect(megOf(importFacts(lab(null, '1min'))).intervalMs).toBe(60000);
+  });
+
+  test('no interval in the facts: 1 s, reported as a default; a text the view cannot read too', () => {
+    const imp = importFacts(lab(null, null));
+    expect(imp.topology.cfm.megs[0].intervalCode).toBeUndefined();
+    expect(megOf(imp).intervalMs).toBe(1000);
+    expect(intervalLine(imp)).toMatchObject({ source: 'default', detail: 'the facts carry no CCM interval: shown at 1 s' });
+    const odd = importFacts(lab('soon', null));
+    expect(megOf(odd).intervalMs).toBe(1000);
+    expect(odd.report.warnings).toEqual(['CFM MD5/MA: CCM interval "soon" is not an interval the view knows; shown at 1 s']);
+  });
+
+  test('two MEPs with different intervals: the first is used, with a warning', () => {
+    const imp = importFacts(lab('100ms', '1s'));
+    expect(megOf(imp).intervalMs).toBe(100);
+    expect(imp.report.warnings).toEqual(['CFM MD5/MA: CCM interval 100ms and 1s on its two MEPs; the view uses 100ms']);
+  });
+
+  test('the bundled example: 1 s as configured on both MAs', () => {
+    const imp = importFacts(example);
+    expect(imp.topology.cfm.megs.map((m) => [m.id, m.intervalCode])).toEqual([['testcfm', 4]]);
+    expect(intervalLine(imp)).toMatchObject({ source: 'facts' });
   });
 });
 

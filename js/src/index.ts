@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Reader for saos-network-facts facts files, and the helpers every consumer needs: which IP
 // interfaces ride a port (SAOS 10: flow point -> forwarding domain -> interface; SAOS 6: the VLANs
-// the port carries), loopbacks, BGP neighbours, the parts of an IS-IS NET and IS-IS interface
-// metrics. Pure functions, no
-// Node APIs, so this entry point works in a browser too; `@ciena/saos-network-facts/node` adds
-// `readFacts(file)`.
+// the port carries), loopbacks, BGP neighbours, the parts of an IS-IS NET, IS-IS interface metrics
+// and CCM intervals. Pure functions, no Node APIs, so this entry point works in a browser too;
+// `@ciena/saos-network-facts/node` adds `readFacts(file)`.
 
-import type { DeviceFacts, DeviceRecord, FactsFile, Interface, IsisInstance } from "./generated/facts.ts";
+import type { DeviceFacts, DeviceRecord, FactsFile, Interface, IsisInstance, Mep } from "./generated/facts.ts";
 
 export type * from "./generated/facts.ts";
 
@@ -45,10 +44,15 @@ export function devicesByName(file: FactsFile): Map<string, DeviceFacts> {
   return out;
 }
 
+/** Interface kinds that never form a link between devices: loopbacks, LAG and physical-port
+ * interfaces, and the management plane (SAOS 6 `management`; SAOS 10 `system`, the mgmtbr0-style
+ * management bridge, which shares a management network with every other device). */
+export const UNROUTED_KINDS: readonly string[] = ["loopback", "lag", "ettp", "management", "system"];
+
 /** A routed interface that can sit on a port: anything addressed that is not a loopback, a LAG,
- * a physical port or the management interface (SAOS 10 types `ip`, `point-to-point`, ...). */
+ * a physical port or a management interface (SAOS 10 types `ip`, `point-to-point`, ...). */
 export function isRouted(i: Interface): boolean {
-  return Boolean(i.ip) && !["loopback", "lag", "ettp", "management"].includes(i.kind);
+  return Boolean(i.ip) && !UNROUTED_KINDS.includes(i.kind);
 }
 
 export type PortInterface = {
@@ -160,4 +164,23 @@ export function isisMetric(facts: DeviceFacts, iface: string, level: string | nu
     if (value !== null && value !== "" && Number.isFinite(Number(value))) return Number(value);
   }
   return null;
+}
+
+/** The CCM interval a MEP's maintenance association is configured with, in milliseconds: the
+ * `ccm_interval` text as SAOS 10 (`3.3ms`, `10ms`, `100ms`, `1s`, `10s`, `1min`, `10min`) or
+ * SAOS 6 / 8 (`3.33ms`, `1sec`, `10sec`, ... or the 802.1Q interval index `1`-`7`) write it.
+ * Null when not configured (the device sends at its default), or when CCMs are off (`0`, `off`). */
+export function ccmIntervalMs(mep: Pick<Mep, "ccm_interval"> | string | null | undefined): number | null {
+  const text = (typeof mep === "string" ? mep : mep?.ccm_interval) ?? null;
+  if (text === null) return null;
+  const s = String(text).trim().toLowerCase();
+  const byIndex: Record<string, number> = { "1": 10 / 3, "2": 10, "3": 100, "4": 1000, "5": 10000, "6": 60000, "7": 600000 };
+  const byIndexMs = byIndex[s];
+  if (byIndexMs !== undefined) return byIndexMs;
+  const m = /^(\d+(?:\.\d+)?)\s*(ms|s|sec|min)$/.exec(s);
+  if (!m) return null;
+  const value = Number(m[1]);
+  const unit = m[2];
+  if (unit === "ms") return Math.abs(value - 3.3) < 0.1 ? 10 / 3 : value;
+  return unit === "min" ? value * 60000 : value * 1000;
 }

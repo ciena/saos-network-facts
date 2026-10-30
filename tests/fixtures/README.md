@@ -5,8 +5,9 @@ documentation ranges) and services are made up.
 
 - `labs/sr-l2/`: a containerlab topology with two SAOS 10 PEs (one CLI, one NETCONF XML) running
   IS-IS with SR-MPLS, an SR policy, BGP with a route-reflector client, a VPWS pseudowire and CFM
-  MEPs, plus a Linux host (skipped).
-- `labs/mixed/`: a configs directory without a topology: a SAOS 6 device (`AGG1.cfg`) and a SAOS 10
+  MEPs (CCM interval 10 ms, set in the CLI on PE1 and in the XML on PE2), plus a Linux host (skipped).
+- `labs/mixed/`: a configs directory without a topology: a SAOS 6 device (`AGG1.cfg`, with a CFM
+  service whose `cfm service set ... ccm-interval` is 100 ms) and a SAOS 10
   device with three files applied in order (`PE3/`), the second removing objects over NETCONF and the
   third rejected by the translator (status `partial`); `platform-map.yaml` gives the device types.
   The `mixed-detected` case reads it without the map: PE3 has no platform, so it is `error` and

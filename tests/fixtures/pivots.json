@@ -1349,7 +1349,7 @@
     }
    }
   },
-  "965dc80fddafd10c7c1d7353": {
+  "c66a8024b75c9a7401d54bd3": {
    "pivot": {
     "yuma-netconf:config": {
      "ciena-bgp:bgp": {
@@ -1576,6 +1576,7 @@
        "id": "MD5",
        "maintenance-association": [
         {
+         "ccm-interval": "10ms",
          "component-list": [
           {
            "ciena-cfm:fd-name": "FD-VPWS-100",
@@ -1657,7 +1658,7 @@
     }
    }
   },
-  "eead4dc8f4d090349434bc60": {
+  "ef2ebd33c951e9a3fc2460fb": {
    "pivot": {
     "yuma-netconf:config": {
      "ciena-bgp:bgp": {
@@ -1803,6 +1804,7 @@
        "id": "MD5",
        "maintenance-association": [
         {
+         "ccm-interval": "10ms",
          "component-list": [
           {
            "ciena-cfm:fd-name": "FD-VPWS-100",
