@@ -105,7 +105,7 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 ```json
 {
   "schema_version": "1.5.0",
-  "generator": {"name": "saos-network-facts", "version": "0.6.0", "translator": "translator 4.2.1 (mcp, https://...)"},
+  "generator": {"name": "saos-network-facts", "version": "0.7.0", "translator": "translator 4.2.1 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -202,8 +202,10 @@ device is on:
 facts of a ten-device SAOS 10 lab (segment routing, SR policies, VPWS pseudowires, CFM, iBGP route
 reflection, a G.8032 major ring and sub-ring) in the [viewer](viewer/): one plane per layer over
 the topology, a panel per device and per service, packet walks and link-failure replays (a ring
-link's with the R-APS protection switch and the revert after the repair). *Load your facts.json* there to see your own
-network; the file stays in your browser.
+link's with the R-APS protection switch and the revert after the repair). The site also stages the
+`g8032-two-ring` fixture lab (a pure L2 ring lab, its links from the containerlab topology): pick it
+in the page's lab menu or open [`?lab=g8032-two-ring`](https://ciena.github.io/saos-network-facts/?lab=g8032-two-ring).
+*Load your facts.json* there to see your own network; the file stays in your browser.
 
 ![The Adaptive-SR-CFM example in the viewer](docs/example.png)
 
@@ -216,6 +218,10 @@ cd examples/adaptive-sr-cfm
 saos-network-facts extract --configs configs --platform-map devices.yaml --recipe Adaptive-SR-CFM -o facts.json
 cd ../../viewer && npm ci && npm run build      # the site, in dist/
 ```
+
+The build stages `labs/index.json` beside the page with the example (the default lab) and the
+`g8032-two-ring` fixture lab, from `viewer/labs.config.js`; the page opens that index as any staged
+site would (below).
 
 The site is built by `.github/workflows/pages.yml`, which deploys `main` to the `gh-pages` branch
 that GitHub Pages serves. Every pull request gets a live preview of its own at
@@ -262,7 +268,7 @@ In CI, for example a GitHub Pages workflow:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p site
-          gh release download v0.6.0 --repo ciena/saos-network-facts \
+          gh release download v0.7.0 --repo ciena/saos-network-facts \
             --pattern 'saos-network-facts-viewer-*.tgz' --output viewer.tgz
           tar -xzf viewer.tgz -C site
           mkdir -p site/labs && cp -r facts/* site/labs/    # facts files, positions and labs/index.json

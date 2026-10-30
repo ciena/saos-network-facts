@@ -8,7 +8,8 @@ LSP BFD packet through a tunnel, an IS-IS LSP or OSPF LSA flood, per area with m
 link and LAG member failure replays, found by loss of signal or, for a silent failure, by CFM / BFD,
 the LACP timeout or the IGP hold timer, with the G.8032 protection switch and revert when the link
 is on a ring. The
-published site shows the bundled [Adaptive-SR-CFM example](../examples/adaptive-sr-cfm/); *Load
+published site opens the [Adaptive-SR-CFM example](../examples/adaptive-sr-cfm/) and offers the
+`g8032-two-ring` fixture lab, from the `labs/index.json` the build stages (`labs.config.js`); *Load
 your facts.json* (or drop a file on the page) reads any facts file of schema 1.x in the browser,
 without uploading it. `?facts=<url>`, `?labs=<index>` and `?lab=<id>` open facts served next to
 the site, and a site that stages `labs/index.json` beside the page opens that index's default lab
@@ -29,6 +30,7 @@ Node 22.18 or later.
 | `src/import/facts.js` | facts file -> engine topology, and the import report |
 | `src/import/layout.js` | node positions: a layout of the links, or authored positions scaled into the scene |
 | `src/labs.js` | facts by URL: `?facts=`, `?positions=`, `?labs=`, `?lab=` and the lab index |
+| `labs.config.js` | the labs the build stages as `labs/index.json` (vite plugin; the dev server serves them too) |
 | `src/engine/` | the network model: IS-IS, OSPF, SR-MPLS and SR policies, MPLS-TP, BGP, VPWS, CFM, G.8032, LAG, walks, failure replay |
 | `src/view/` | the three.js layers, the walk animation and the engine's per-node tables |
 | `src/panels.js`, `src/main.js` | the overview / device / service panels and the page |
