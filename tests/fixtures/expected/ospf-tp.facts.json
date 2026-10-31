@@ -190,6 +190,7 @@
           }
         },
         "segments": [],
+        "static_routes": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [
           {
@@ -212,6 +213,7 @@
           }
         ],
         "vlans": {},
+        "vrf_instances": [],
         "vrfs": []
       },
       "platform": "cn5164",
@@ -411,6 +413,7 @@
           }
         },
         "segments": [],
+        "static_routes": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [
           {
@@ -433,6 +436,7 @@
           }
         ],
         "vlans": {},
+        "vrf_instances": [],
         "vrfs": []
       },
       "platform": "cn5164",
@@ -682,6 +686,7 @@
           }
         },
         "segments": [],
+        "static_routes": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [
           {
@@ -737,6 +742,7 @@
             ]
           }
         },
+        "vrf_instances": [],
         "vrfs": []
       },
       "platform": "cn5164",
@@ -986,6 +992,7 @@
           }
         },
         "segments": [],
+        "static_routes": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [
           {
@@ -1041,6 +1048,7 @@
             ]
           }
         },
+        "vrf_instances": [],
         "vrfs": []
       },
       "platform": "cn5164",
@@ -1054,7 +1062,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.8.0"
+    "version": "0.9.0"
   },
-  "schema_version": "1.6.0"
+  "schema_version": "1.7.0"
 }

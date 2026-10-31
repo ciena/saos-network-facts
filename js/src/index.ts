@@ -2,12 +2,13 @@
 // Reader for saos-network-facts facts files, and the helpers every consumer needs: which IP
 // interfaces ride a port (SAOS 10: flow point -> forwarding domain -> interface; SAOS 6: the VLANs
 // the port carries), loopbacks, BGP neighbours, the parts of an IS-IS NET, IS-IS interface metrics,
-// CCM intervals, G.8032 rings and the devices on a ring, SRv6 locators, Flex-Algo definitions and
-// EVPN instances. Pure functions, no Node APIs, so this entry
+// CCM intervals, G.8032 rings and the devices on a ring, SRv6 locators, Flex-Algo definitions,
+// EVPN instances, VRFs and static routes. Pure functions, no Node APIs, so this entry
 // point works in a browser too; `@ciena/saos-network-facts/node` adds `readFacts(file)`.
 
 import type {
   DeviceFacts, DeviceRecord, EvpnInstance, FactsFile, FlexAlgorithm, Interface, IsisInstance, Mep, Ring, RingInstance, RingPort, Srv6Locator,
+  StaticRoute, VrfInstance,
 } from "./generated/facts.ts";
 
 export type * from "./generated/facts.ts";
@@ -110,10 +111,11 @@ export function loopbacks(facts: DeviceFacts): Array<{ name: string; ip: string;
 /** BGP neighbours, with the remote AS as a number (null when not set). `routeReflectorClient` is null
  * when the record does not say (a SAOS 6 peer, a pre-schema file), so a caller can fall back to
  * another source; only an explicit flag is true or false. `peerGroup` is the neighbour's peer group
- * (schema 1.6), null when it has none or the file predates it. */
+ * (schema 1.6), null when it has none or the file predates it. `vrf` is the VRF of a CE neighbour of an
+ * L3VPN (schema 1.7), null for a neighbour of the global table or an older file. */
 export function bgpPeers(
   facts: DeviceFacts,
-): Array<{ ip: string | null; remoteAs: number | null; routeReflectorClient: boolean | null; peerGroup: string | null }> {
+): Array<{ ip: string | null; remoteAs: number | null; routeReflectorClient: boolean | null; peerGroup: string | null; vrf: string | null }> {
   return (facts.peers ?? [])
     .filter((p) => p.kind === "bgp")
     .map((p) => ({
@@ -121,6 +123,7 @@ export function bgpPeers(
       remoteAs: p.remote_as == null ? null : Number(p.remote_as),
       routeReflectorClient: p.route_reflector_client == null ? null : Boolean(p.route_reflector_client),
       peerGroup: p.peer_group ?? null,
+      vrf: p.vrf ?? null,
     }));
 }
 
@@ -264,4 +267,47 @@ export function evpnMembers(file: FactsFile, evi: string | number): EvpnMember[]
     }
   }
   return out;
+}
+
+/** The VRFs a device configures (SAOS 10, schema 1.7), with route distinguisher, route targets, address
+ * families, SRv6 locators and bound interfaces; empty when there are none or the file predates 1.7. */
+export function vrfInstances(device: DeviceFacts | DeviceRecord | null | undefined): VrfInstance[] {
+  return factsOf(device)?.vrf_instances ?? [];
+}
+
+/** The route targets a VRF imports or exports in one address family (`ipv4 unicast`): those set for
+ * that address family and those set for every address family, with direction `both` counting as each. */
+export function vrfRouteTargets(vrf: Pick<VrfInstance, "route_targets">, addressFamily: string, direction: "import" | "export"): string[] {
+  const out: string[] = [];
+  for (const t of vrf.route_targets ?? []) {
+    const af = t.address_family ?? addressFamily;
+    if (af === addressFamily && (t.type === direction || t.type === "both") && !out.includes(t.route_target)) out.push(t.route_target);
+  }
+  return out;
+}
+
+export type VrfMember = {
+  /** the device name, as in `devices[].device` */
+  device: string;
+  /** that device's VRF */
+  instance: VrfInstance;
+};
+
+/** Every device of the file that configures a VRF of this name, with its VRF, in file order (the PEs of
+ * an L3VPN when they name it alike; the route targets are what actually join them). */
+export function vrfMembers(file: FactsFile, name: string): VrfMember[] {
+  const out: VrfMember[] = [];
+  for (const [device, facts] of devicesByName(file)) {
+    for (const instance of vrfInstances(facts)) {
+      if (instance.name === name) out.push({ device, instance });
+    }
+  }
+  return out;
+}
+
+/** A device's static routes (SAOS 10, schema 1.7), one per next hop, optionally only those of one VRF
+ * (`default` is the global table); empty when there are none or the file predates 1.7. */
+export function staticRoutes(device: DeviceFacts | DeviceRecord | null | undefined, vrf?: string): StaticRoute[] {
+  const routes = factsOf(device)?.static_routes ?? [];
+  return vrf === undefined ? routes : routes.filter((r) => r.vrf === vrf);
 }

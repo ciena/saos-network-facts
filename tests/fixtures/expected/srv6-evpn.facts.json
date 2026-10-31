@@ -300,9 +300,11 @@
           }
         },
         "segments": [],
+        "static_routes": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
         "vlans": {},
+        "vrf_instances": [],
         "vrfs": []
       },
       "platform": "cn5164",
@@ -323,7 +325,12 @@
               "as": "64500",
               "cluster_id": null,
               "route_reflector": false,
-              "router_id": "192.0.2.1"
+              "router_id": "192.0.2.1",
+              "srv6_locator": null,
+              "srv6_locators": {
+                "vpnv4 unicast": "LOC",
+                "vpnv6 unicast": "LOC"
+              }
             }
           ]
         },
@@ -337,6 +344,9 @@
           ],
           "VLAN200": [
             "200"
+          ],
+          "VLAN300": [
+            "300"
           ]
         },
         "evpn_instances": [
@@ -395,6 +405,10 @@
           {
             "mode": "evpn-vpws",
             "name": "FD-VPWS-200"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-CE-300"
           }
         ],
         "fps": [
@@ -421,6 +435,14 @@
             "fd": "FD-VPWS-200",
             "logical_port": "5",
             "name": "FP-AC-200"
+          },
+          {
+            "classifiers": [
+              "VLAN300"
+            ],
+            "fd": "FD-CE-300",
+            "logical_port": "5",
+            "name": "FP-CE-300"
           }
         ],
         "gateway": null,
@@ -458,6 +480,23 @@
             "name": "PE1-P1",
             "vlan": null,
             "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-CE-300",
+            "ip": "198.51.100.0/31",
+            "ipv4": [
+              "198.51.100.0/31"
+            ],
+            "ipv6": [
+              "2001:db8:100::/127"
+            ],
+            "kind": "ip",
+            "mtu": null,
+            "name": "CE-A",
+            "vlan": null,
+            "vrf": "CUST-A",
             "vs": null
           }
         ],
@@ -518,8 +557,8 @@
         },
         "l2vpn_services": [],
         "lags": [],
-        "lines": 18,
-        "objects": 18,
+        "lines": 25,
+        "objects": 25,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -528,14 +567,41 @@
           {
             "address_families": [
               "l2vpn evpn",
-              "ipv6 unicast"
+              "ipv6 unicast",
+              "vpnv4 unicast",
+              "vpnv6 unicast"
             ],
             "ip": "2001:db8::4",
             "kind": "bgp",
             "name": "as64500",
             "peer_group": "RR",
             "remote_as": "64500",
-            "route_reflector_client": false
+            "route_reflector_client": false,
+            "vrf": null
+          },
+          {
+            "address_families": [
+              "ipv4 unicast"
+            ],
+            "ip": "198.51.100.1",
+            "kind": "bgp",
+            "name": "as64500",
+            "peer_group": null,
+            "remote_as": "64510",
+            "route_reflector_client": false,
+            "vrf": "CUST-A"
+          },
+          {
+            "address_families": [
+              "ipv6 unicast"
+            ],
+            "ip": "2001:db8:100::1",
+            "kind": "bgp",
+            "name": "as64500",
+            "peer_group": null,
+            "remote_as": "64510",
+            "route_reflector_client": false,
+            "vrf": "CUST-A"
           }
         ],
         "ports": {
@@ -555,12 +621,13 @@
             ],
             "vlans": [
               "100",
-              "200"
+              "200",
+              "300"
             ]
           }
         },
         "pseudowires": [],
-        "recognised": 17,
+        "recognised": 24,
         "rings": [],
         "segment_routing": {
           "flex_algorithms": [
@@ -627,6 +694,18 @@
           }
         },
         "segments": [],
+        "static_routes": [
+          {
+            "description": "CE-A site LAN",
+            "family": "ipv4",
+            "interface": null,
+            "next_hop": "198.51.100.1",
+            "preference": null,
+            "prefix": "198.51.100.128/25",
+            "tag": null,
+            "vrf": "CUST-A"
+          }
+        ],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
         "vlans": {
@@ -639,16 +718,61 @@
             "ports": [
               "5"
             ]
+          },
+          "300": {
+            "ports": [
+              "5"
+            ]
           }
         },
-        "vrfs": []
+        "vrf_instances": [
+          {
+            "address_families": [
+              "ipv4 unicast",
+              "ipv6 unicast"
+            ],
+            "bgp_as": "64500",
+            "description": "L3VPN service A",
+            "interfaces": [
+              "CE-A"
+            ],
+            "label_allocation": {},
+            "name": "CUST-A",
+            "redistribute": {},
+            "role": null,
+            "route_distinguisher": "0:64500:1",
+            "route_targets": [
+              {
+                "address_family": null,
+                "route_target": "0:64500:1",
+                "type": "both"
+              },
+              {
+                "address_family": "ipv6 unicast",
+                "route_target": "0:64500:6",
+                "type": "import"
+              }
+            ],
+            "sr_policy_color": null,
+            "srv6_locator_address": null,
+            "srv6_locators": {
+              "ipv4 unicast": "LOC",
+              "ipv6 unicast": "LOC-ALGO128"
+            },
+            "srv6_sid_type": null
+          }
+        ],
+        "vrfs": [
+          "CUST-A"
+        ]
       },
       "platform": "cn5164",
       "status": "ok",
       "templates": [
         "PE1.1-base.cfg",
         "PE1.3-device.cfg",
-        "PE1.6-services.cfg"
+        "PE1.6-services.cfg",
+        "PE1.7-l3vpn.cfg"
       ],
       "type": "5164-10x"
     },
@@ -662,7 +786,12 @@
               "as": "64500",
               "cluster_id": null,
               "route_reflector": false,
-              "router_id": "192.0.2.2"
+              "router_id": "192.0.2.2",
+              "srv6_locator": null,
+              "srv6_locators": {
+                "vpnv4 unicast": "LOC",
+                "vpnv6 unicast": "LOC"
+              }
             }
           ]
         },
@@ -676,6 +805,9 @@
           ],
           "VLAN200": [
             "200"
+          ],
+          "VLAN300": [
+            "300"
           ]
         },
         "evpn_instances": [
@@ -734,6 +866,10 @@
           {
             "mode": "evpn-vpws",
             "name": "FD-VPWS-200"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-CE-300"
           }
         ],
         "fps": [
@@ -760,6 +896,14 @@
             "fd": "FD-VPWS-200",
             "logical_port": "5",
             "name": "FP-AC-200"
+          },
+          {
+            "classifiers": [
+              "VLAN300"
+            ],
+            "fd": "FD-CE-300",
+            "logical_port": "5",
+            "name": "FP-CE-300"
           }
         ],
         "gateway": null,
@@ -797,6 +941,21 @@
             "name": "PE2-P1",
             "vlan": null,
             "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-CE-300",
+            "ip": "203.0.113.0/31",
+            "ipv4": [
+              "203.0.113.0/31"
+            ],
+            "ipv6": [],
+            "kind": "ip",
+            "mtu": null,
+            "name": "CE-B",
+            "vlan": null,
+            "vrf": "CUST-A",
             "vs": null
           }
         ],
@@ -857,8 +1016,8 @@
         },
         "l2vpn_services": [],
         "lags": [],
-        "lines": 18,
-        "objects": 18,
+        "lines": 25,
+        "objects": 25,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -867,14 +1026,29 @@
           {
             "address_families": [
               "l2vpn evpn",
-              "ipv6 unicast"
+              "ipv6 unicast",
+              "vpnv4 unicast",
+              "vpnv6 unicast"
             ],
             "ip": "2001:db8::4",
             "kind": "bgp",
             "name": "as64500",
             "peer_group": "RR",
             "remote_as": "64500",
-            "route_reflector_client": false
+            "route_reflector_client": false,
+            "vrf": null
+          },
+          {
+            "address_families": [
+              "ipv4 unicast"
+            ],
+            "ip": "203.0.113.1",
+            "kind": "bgp",
+            "name": "as64500",
+            "peer_group": null,
+            "remote_as": "64511",
+            "route_reflector_client": false,
+            "vrf": "CUST-A"
           }
         ],
         "ports": {
@@ -894,12 +1068,13 @@
             ],
             "vlans": [
               "100",
-              "200"
+              "200",
+              "300"
             ]
           }
         },
         "pseudowires": [],
-        "recognised": 17,
+        "recognised": 24,
         "rings": [],
         "segment_routing": {
           "flex_algorithms": [
@@ -966,6 +1141,28 @@
           }
         },
         "segments": [],
+        "static_routes": [
+          {
+            "description": null,
+            "family": "ipv4",
+            "interface": null,
+            "next_hop": "203.0.113.1",
+            "preference": "10",
+            "prefix": "203.0.113.128/25",
+            "tag": null,
+            "vrf": "CUST-A"
+          },
+          {
+            "description": "CE-B discard",
+            "family": "ipv4",
+            "interface": "Null0",
+            "next_hop": null,
+            "preference": null,
+            "prefix": "203.0.113.64/26",
+            "tag": null,
+            "vrf": "CUST-A"
+          }
+        ],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
         "vlans": {
@@ -978,16 +1175,54 @@
             "ports": [
               "5"
             ]
+          },
+          "300": {
+            "ports": [
+              "5"
+            ]
           }
         },
-        "vrfs": []
+        "vrf_instances": [
+          {
+            "address_families": [
+              "ipv4 unicast"
+            ],
+            "bgp_as": "64500",
+            "description": "L3VPN service A",
+            "interfaces": [
+              "CE-B"
+            ],
+            "label_allocation": {},
+            "name": "CUST-A",
+            "redistribute": {},
+            "role": null,
+            "route_distinguisher": "0:64500:2",
+            "route_targets": [
+              {
+                "address_family": null,
+                "route_target": "0:64500:1",
+                "type": "both"
+              }
+            ],
+            "sr_policy_color": null,
+            "srv6_locator_address": null,
+            "srv6_locators": {
+              "ipv4 unicast": "LOC"
+            },
+            "srv6_sid_type": null
+          }
+        ],
+        "vrfs": [
+          "CUST-A"
+        ]
       },
       "platform": "cn5164",
       "status": "ok",
       "templates": [
         "PE2.1-base.cfg",
         "PE2.3-device.cfg",
-        "PE2.6-services.cfg"
+        "PE2.6-services.cfg",
+        "PE2.7-l3vpn.cfg"
       ],
       "type": "5164-10x"
     },
@@ -1001,7 +1236,9 @@
               "as": "64500",
               "cluster_id": "192.0.2.4",
               "route_reflector": true,
-              "router_id": "192.0.2.4"
+              "router_id": "192.0.2.4",
+              "srv6_locator": null,
+              "srv6_locators": {}
             }
           ]
         },
@@ -1122,8 +1359,8 @@
         },
         "l2vpn_services": [],
         "lags": [],
-        "lines": 13,
-        "objects": 13,
+        "lines": 14,
+        "objects": 14,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -1132,26 +1369,32 @@
           {
             "address_families": [
               "l2vpn evpn",
-              "ipv6 unicast"
+              "ipv6 unicast",
+              "vpnv4 unicast",
+              "vpnv6 unicast"
             ],
             "ip": "2001:db8::1",
             "kind": "bgp",
             "name": "as64500",
             "peer_group": "CLIENTS",
             "remote_as": "64500",
-            "route_reflector_client": true
+            "route_reflector_client": true,
+            "vrf": null
           },
           {
             "address_families": [
               "l2vpn evpn",
-              "ipv6 unicast"
+              "ipv6 unicast",
+              "vpnv4 unicast",
+              "vpnv6 unicast"
             ],
             "ip": "2001:db8::2",
             "kind": "bgp",
             "name": "as64500",
             "peer_group": "CLIENTS",
             "remote_as": "64500",
-            "route_reflector_client": true
+            "route_reflector_client": true,
+            "vrf": null
           }
         ],
         "ports": {
@@ -1165,7 +1408,7 @@
           }
         },
         "pseudowires": [],
-        "recognised": 12,
+        "recognised": 13,
         "rings": [],
         "segment_routing": {
           "flex_algorithms": [
@@ -1219,16 +1462,19 @@
           }
         },
         "segments": [],
+        "static_routes": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
         "vlans": {},
+        "vrf_instances": [],
         "vrfs": []
       },
       "platform": "cn5164",
       "status": "ok",
       "templates": [
         "RR1.1-base.cfg",
-        "RR1.3-device.cfg"
+        "RR1.3-device.cfg",
+        "RR1.7-l3vpn.cfg"
       ],
       "type": "5164-10x"
     }
@@ -1236,7 +1482,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.8.0"
+    "version": "0.9.0"
   },
-  "schema_version": "1.6.0"
+  "schema_version": "1.7.0"
 }

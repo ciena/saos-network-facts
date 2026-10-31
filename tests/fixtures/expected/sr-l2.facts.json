@@ -10,7 +10,9 @@
               "as": "65000",
               "cluster_id": "192.0.2.1",
               "route_reflector": true,
-              "router_id": "192.0.2.1"
+              "router_id": "192.0.2.1",
+              "srv6_locator": null,
+              "srv6_locators": {}
             }
           ]
         },
@@ -180,7 +182,8 @@
             "name": "as65000",
             "peer_group": null,
             "remote_as": "65000",
-            "route_reflector_client": true
+            "route_reflector_client": true,
+            "vrf": null
           }
         ],
         "ports": {
@@ -270,6 +273,7 @@
           }
         },
         "segments": [],
+        "static_routes": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
         "vlans": {
@@ -279,6 +283,7 @@
             ]
           }
         },
+        "vrf_instances": [],
         "vrfs": []
       },
       "platform": "cn5164",
@@ -299,7 +304,9 @@
               "as": "65000",
               "cluster_id": null,
               "route_reflector": false,
-              "router_id": "192.0.2.2"
+              "router_id": "192.0.2.2",
+              "srv6_locator": null,
+              "srv6_locators": {}
             }
           ]
         },
@@ -465,7 +472,8 @@
             "name": "as65000",
             "peer_group": null,
             "remote_as": "65000",
-            "route_reflector_client": false
+            "route_reflector_client": false,
+            "vrf": null
           }
         ],
         "ports": {
@@ -532,6 +540,7 @@
           }
         },
         "segments": [],
+        "static_routes": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
         "vlans": {
@@ -541,6 +550,7 @@
             ]
           }
         },
+        "vrf_instances": [],
         "vrfs": []
       },
       "platform": "cn5162",
@@ -565,7 +575,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.8.0"
+    "version": "0.9.0"
   },
   "links": [
     {
@@ -589,5 +599,5 @@
       }
     }
   ],
-  "schema_version": "1.6.0"
+  "schema_version": "1.7.0"
 }

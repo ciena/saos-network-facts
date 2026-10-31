@@ -3987,6 +3987,178 @@
     }
    }
   },
+  "c13a33fc598f69cf4620fdae": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-bgp:bgp": {
+      "instance": [
+       {
+        "address-family": [
+         {
+          "afi": "vpnv4",
+          "safi": "unicast",
+          "segment-routing-srv6": {
+           "locator": "LOC"
+          }
+         },
+         {
+          "afi": "vpnv6",
+          "safi": "unicast",
+          "segment-routing-srv6": {
+           "locator": "LOC"
+          }
+         }
+        ],
+        "as": 64500,
+        "peer-group": [
+         {
+          "address-family": [
+           {
+            "activate": true,
+            "afi": "vpnv4",
+            "safi": "unicast"
+           },
+           {
+            "activate": true,
+            "afi": "vpnv6",
+            "safi": "unicast"
+           }
+          ],
+          "name": "RR"
+         }
+        ],
+        "vrf": [
+         {
+          "name": "CUST-A",
+          "route-distinguisher": "0:64500:2",
+          "route-target": [
+           {
+            "direction": "both",
+            "id": "0:64500:1"
+           }
+          ],
+          "vrf-address-family": [
+           {
+            "afi": "ipv4",
+            "peer": [
+             {
+              "activate": true,
+              "address": "203.0.113.1",
+              "remote-as": 64511
+             }
+            ],
+            "safi": "unicast"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 300
+           }
+          ]
+         }
+        ],
+        "name": "VLAN300"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-CE-300"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "VLAN300"
+        ],
+        "fd-name": "FD-CE-300",
+        "logical-port": "5",
+        "name": "FP-CE-300"
+       }
+      ]
+     },
+     "ciena-rib:rib": {
+      "vrf": [
+       {
+        "ipv4": [
+         {
+          "destination-prefix": "203.0.113.128/25",
+          "next-hop": [
+           {
+            "address": "203.0.113.1",
+            "route-preference": 10
+           }
+          ]
+         },
+         {
+          "destination-prefix": "203.0.113.64/26",
+          "outgoing-interface": [
+           {
+            "description": "CE-B discard",
+            "name": "Null0"
+           }
+          ]
+         }
+        ],
+        "name": "CUST-A"
+       }
+      ]
+     },
+     "ciena-vrf:vrf": [
+      {
+       "description": "L3VPN service A",
+       "vrfName": "CUST-A"
+      }
+     ],
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "203.0.113.0",
+             "prefix-length": 31
+            },
+            "ip": "203.0.113.0"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-openconfig-interfaces:vrfName": "CUST-A",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-CE-300"
+          }
+         },
+         "name": "CE-B"
+        },
+        "name": "CE-B"
+       }
+      ]
+     }
+    }
+   }
+  },
   "c66a8024b75c9a7401d54bd3": {
    "pivot": {
     "yuma-netconf:config": {
@@ -4549,6 +4721,246 @@
          "name": "lo0"
         },
         "name": "lo0"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "dc3b695cef06c1bf3bf1b324": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-bgp:bgp": {
+      "instance": [
+       {
+        "address-family": [
+         {
+          "afi": "vpnv4",
+          "route-reflector": true,
+          "safi": "unicast"
+         },
+         {
+          "afi": "vpnv6",
+          "route-reflector": true,
+          "safi": "unicast"
+         }
+        ],
+        "as": 64500,
+        "peer-group": [
+         {
+          "address-family": [
+           {
+            "activate": true,
+            "afi": "vpnv4",
+            "route-reflector-client": true,
+            "safi": "unicast"
+           },
+           {
+            "activate": true,
+            "afi": "vpnv6",
+            "route-reflector-client": true,
+            "safi": "unicast"
+           }
+          ],
+          "name": "CLIENTS"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  "e732f1a4820eaad217c1ebe6": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-bgp:bgp": {
+      "instance": [
+       {
+        "address-family": [
+         {
+          "afi": "vpnv4",
+          "safi": "unicast",
+          "segment-routing-srv6": {
+           "locator": "LOC"
+          }
+         },
+         {
+          "afi": "vpnv6",
+          "safi": "unicast",
+          "segment-routing-srv6": {
+           "locator": "LOC"
+          }
+         }
+        ],
+        "as": 64500,
+        "peer-group": [
+         {
+          "address-family": [
+           {
+            "activate": true,
+            "afi": "vpnv4",
+            "safi": "unicast"
+           },
+           {
+            "activate": true,
+            "afi": "vpnv6",
+            "safi": "unicast"
+           }
+          ],
+          "name": "RR"
+         }
+        ],
+        "vrf": [
+         {
+          "name": "CUST-A",
+          "route-distinguisher": "0:64500:1",
+          "route-target": [
+           {
+            "direction": "both",
+            "id": "0:64500:1"
+           }
+          ],
+          "vrf-address-family": [
+           {
+            "afi": "ipv4",
+            "peer": [
+             {
+              "activate": true,
+              "address": "198.51.100.1",
+              "remote-as": 64510
+             }
+            ],
+            "safi": "unicast"
+           },
+           {
+            "afi": "ipv6",
+            "peer": [
+             {
+              "activate": true,
+              "address": "2001:db8:100::1",
+              "remote-as": 64510
+             }
+            ],
+            "route-target": [
+             {
+              "direction": "import",
+              "id": "0:64500:6"
+             }
+            ],
+            "safi": "unicast",
+            "segment-routing-srv6": {
+             "locator": "LOC-ALGO128"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 300
+           }
+          ]
+         }
+        ],
+        "name": "VLAN300"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-CE-300"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "VLAN300"
+        ],
+        "fd-name": "FD-CE-300",
+        "logical-port": "5",
+        "name": "FP-CE-300"
+       }
+      ]
+     },
+     "ciena-rib:rib": {
+      "vrf": [
+       {
+        "ipv4": [
+         {
+          "destination-prefix": "198.51.100.128/25",
+          "next-hop": [
+           {
+            "address": "198.51.100.1",
+            "description": "CE-A site LAN"
+           }
+          ]
+         }
+        ],
+        "name": "CUST-A"
+       }
+      ]
+     },
+     "ciena-vrf:vrf": [
+      {
+       "description": "L3VPN service A",
+       "vrfName": "CUST-A"
+      }
+     ],
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.0",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.0"
+           }
+          ]
+         }
+        },
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8:100::",
+             "prefix-length": 127
+            },
+            "ip": "2001:db8:100::"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-openconfig-interfaces:vrfName": "CUST-A",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-CE-300"
+          }
+         },
+         "name": "CE-A"
+        },
+        "name": "CE-A"
        }
       ]
      }

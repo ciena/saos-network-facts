@@ -316,3 +316,40 @@ def test_srv6_evpn_lab_per_node():
     loc = {l["name"]: l for l in by["PE1"]["segment_routing"]["srv6"]["locators"]}
     assert loc["LOC-ALGO128"]["algorithm"] == "128" and loc["LOC-ALGO128"]["instances"] == ["CORE"]
     assert [p["peer_group"] for p in by["RR1"]["peers"]] == ["CLIENTS", "CLIENTS"]
+
+
+def test_vrf_fields_are_optional():
+    # a file before schema 1.7 (no VRF instances, static routes, peer VRFs or BGP SRv6 locators)
+    # still validates against 1.7
+    doc = json.loads((EXPECTED / "srv6-evpn.facts.json").read_text())
+    for record in doc["devices"]:
+        facts = record["facts"]
+        facts.pop("vrf_instances")
+        facts.pop("static_routes")
+        facts["peers"] = [p for p in facts["peers"] if p.pop("vrf", None) is None]
+        for instance in facts["bgp"]["instances"]:
+            instance.pop("srv6_locator")
+            instance.pop("srv6_locators")
+    doc["schema_version"] = "1.6.0"
+    assert schema.errors(doc) == []
+    doc["devices"][1]["facts"]["vrf_instances"] = [{"name": "V"}]
+    assert schema.errors(doc)  # a VRF instance carries every field
+    doc["devices"][1]["facts"]["vrf_instances"] = []
+    doc["devices"][1]["facts"]["static_routes"] = [{"vrf": "V", "prefix": "198.51.100.0/24"}]
+    assert schema.errors(doc)  # so does a static route
+
+
+def test_srv6_evpn_lab_l3vpn():
+    # the srv6-evpn lab's L3VPN layer: VRF CUST-A over SRv6 on PE1 and PE2, reflected by RR1
+    doc = json.loads((EXPECTED / "srv6-evpn.facts.json").read_text())
+    facts = {r["device"]: r["facts"] for r in doc["devices"]}
+    pe1, pe2 = facts["PE1"]["vrf_instances"][0], facts["PE2"]["vrf_instances"][0]
+    assert (pe1["name"], pe1["route_distinguisher"], pe2["route_distinguisher"]) == ("CUST-A", "0:64500:1", "0:64500:2")
+    assert pe1["srv6_locators"] == {"ipv4 unicast": "LOC", "ipv6 unicast": "LOC-ALGO128"}  # the VRF AF's own wins
+    assert pe2["srv6_locators"] == {"ipv4 unicast": "LOC"}  # from the instance's vpnv4 unicast
+    assert (pe1["interfaces"], pe2["interfaces"]) == (["CE-A"], ["CE-B"])
+    assert [(p["ip"], p["remote_as"]) for p in facts["PE1"]["peers"] if p["vrf"] == "CUST-A"] == [
+        ("198.51.100.1", "64510"), ("2001:db8:100::1", "64510")]
+    assert [r["prefix"] for r in facts["PE2"]["static_routes"]] == ["203.0.113.128/25", "203.0.113.64/26"]
+    assert all("vpnv4 unicast" in p["address_families"] for p in facts["RR1"]["peers"])
+    assert facts["P1"]["vrf_instances"] == []

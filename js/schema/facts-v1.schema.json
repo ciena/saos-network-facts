@@ -220,7 +220,7 @@
             "string",
             "null"
           ],
-          "description": "SAOS 10: the VRF the interface is in."
+          "description": "SAOS 10: the VRF the interface is in (`vrfName`, see `vrf_instances`); null for the default VRF."
         },
         "description": {
           "type": [
@@ -693,6 +693,13 @@
             "null"
           ],
           "description": "`bgp` (SAOS 10): the peer group the neighbour is configured in (`peer <ip> peer-group <name>`); null when none. Optional: absent in files before schema 1.6. Since schema 1.6."
+        },
+        "vrf": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`bgp` (SAOS 10): the VRF the neighbour is configured in (`bgp instance <as> vrf <name> vrf-address-family <afi> <safi> peer <address>`, a CE neighbour of an L3VPN, see `vrf_instances`); null for a neighbour of the global table. A VRF neighbour has no peer group; its `address_families` are the VRF address families it is configured in. Optional: absent in files before schema 1.7. Since schema 1.7."
         }
       },
       "required": [
@@ -1173,6 +1180,20 @@
         "route_reflector": {
           "type": "boolean",
           "description": "The device reflects routes: at least one neighbour of the instance is a route-reflector client."
+        },
+        "srv6_locator": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SRv6 locator the instance allocates its service SIDs from (`segment-routing srv6 locator`); null when not set. An address family's locator (`srv6_locators`) and a VRF address family's own win over it. Optional: absent in files before schema 1.7. Since schema 1.7."
+        },
+        "srv6_locators": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The SRv6 locator per address family of the instance (`address-family <afi> <safi> segment-routing-srv6 locator`), by `<afi> <safi>` (`vpnv4 unicast`, `vpnv6 unicast`); empty when none. Optional: absent in files before schema 1.7. Since schema 1.7."
         }
       },
       "required": [
@@ -1642,7 +1663,7 @@
           "items": {
             "type": "string"
           },
-          "description": "SAOS 10 VRF names."
+          "description": "SAOS 10 VRF names (the `vrf` list). Since schema 1.7 `vrf_instances` carries each VRF's settings."
         },
         "segments": {
           "type": "array",
@@ -1679,6 +1700,20 @@
             "$ref": "#/$defs/EvpnInstance"
           },
           "description": "SAOS 10 EVPN instances (EVPN-VPLS, EVPN-VPWS, FXC). Optional: absent in files before schema 1.6. Since schema 1.6."
+        },
+        "vrf_instances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/VrfInstance"
+          },
+          "description": "SAOS 10 VRFs (L3VPN / VRF-Lite / management VRFs) with their route distinguisher, route targets, address families, SRv6 locators and bound interfaces: the VRFs the `vrf` list defines, then any that only BGP names. Optional: absent in files before schema 1.7. Since schema 1.7."
+        },
+        "static_routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StaticRoute"
+          },
+          "description": "SAOS 10 static routes (`rib vrf <name> ipv4|ipv6 <prefix>`), one entry per next hop, in configuration order; `vrf` is `default` for the global table. Optional: absent in files before schema 1.7. Since schema 1.7."
         }
       },
       "required": [
@@ -2430,6 +2465,221 @@
         "route_targets",
         "srv6_locator",
         "sr_policy_color"
+      ]
+    },
+    "VrfRouteTarget": {
+      "title": "VrfRouteTarget",
+      "type": "object",
+      "description": "A route target of a VRF (`bgp instance <as> vrf <name> route-target <id> direction ...`, or under a `vrf-address-family`). Since schema 1.7.",
+      "properties": {
+        "route_target": {
+          "type": "string",
+          "description": "The route target as written (`0:64500:1`)."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`import`, `export` or `both`; null when not configured."
+        },
+        "address_family": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The VRF address family the target is set under (`ipv4 unicast`, `ipv6 unicast`); null when the VRF sets it for every address family."
+        }
+      },
+      "required": [
+        "route_target",
+        "type",
+        "address_family"
+      ]
+    },
+    "VrfInstance": {
+      "title": "VrfInstance",
+      "type": "object",
+      "description": "A SAOS 10 VRF: the `vrf` list entry (description, role, SRv6 and SR policy settings) merged with what BGP (`bgp instance <as> vrf <name>`) and MPLS label management say about it. Since schema 1.7.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The VRF name (`vrfName`)."
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Description; null when not configured."
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`data` or `management` (a management VRF); null when not configured (the default is `data`)."
+        },
+        "bgp_as": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The BGP instance (local AS) that carries the VRF (`bgp instance <as> vrf <name>`); null when BGP does not name the VRF."
+        },
+        "route_distinguisher": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The route distinguisher as written (`0:64500:1`); null when not configured."
+        },
+        "address_families": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The VRF address families BGP runs, `<afi> <safi>` (`ipv4 unicast`, `ipv6 unicast`), in configuration order."
+        },
+        "route_targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/VrfRouteTarget"
+          },
+          "description": "Route targets: those with a null `address_family` apply to every address family of the VRF."
+        },
+        "srv6_locators": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Per VRF address family, the SRv6 locator its L3 service SIDs (End.DT4 / End.DT6) come from: the address family's own (`vrf-address-family <afi> <safi> segment-routing-srv6 locator`), else the BGP instance's `vpnv4 unicast` / `vpnv6 unicast` locator, else the instance's locator. Empty when the VRF does not run over SRv6 (an L3VPN over MPLS / SR-MPLS, a VRF-Lite or management VRF)."
+        },
+        "srv6_locator_address": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SRv6 locator address the VRF itself sets (`vrf <name> segment-routing-srv6 locator <ipv6>`); null when not configured."
+        },
+        "srv6_sid_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SID type that goes with `srv6_locator_address`: `u-sid` or `uncompressed-sid`; null when not configured."
+        },
+        "sr_policy_color": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SR policy color that steers the VRF's traffic (`vrf <name> sr-policy color`); null when not configured."
+        },
+        "label_allocation": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The VPN label allocation mode per address family type (`mpls label-management allocation-mode vrf <name> address-family ipv4|ipv6 mode per-vrf|per-prefix`), by `ipv4` / `ipv6`: an L3VPN over MPLS or SR-MPLS. Empty when not configured."
+        },
+        "redistribute": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": "Per VRF address family, the protocols BGP redistributes into the VRF (`connected`, `static`, `isis`, `ospf`, ...); address families without any are left out."
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The interfaces bound to the VRF (`interfaces[].vrf`), in interface order."
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "role",
+        "bgp_as",
+        "route_distinguisher",
+        "address_families",
+        "route_targets",
+        "srv6_locators",
+        "srv6_locator_address",
+        "srv6_sid_type",
+        "sr_policy_color",
+        "label_allocation",
+        "redistribute",
+        "interfaces"
+      ]
+    },
+    "StaticRoute": {
+      "title": "StaticRoute",
+      "type": "object",
+      "description": "A SAOS 10 static route through one next hop (`rib vrf <name> ipv4|ipv6 <prefix> next-hop <address>` or `outgoing-interface <name>`). Since schema 1.7.",
+      "properties": {
+        "vrf": {
+          "type": "string",
+          "description": "The VRF of the route (see `vrf_instances`); `default` for the global table."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "The destination prefix as written (`198.51.100.128/25`)."
+        },
+        "family": {
+          "type": "string",
+          "description": "`ipv4` or `ipv6`."
+        },
+        "next_hop": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The next-hop address (or `blackhole`); null for a route through an outgoing interface alone."
+        },
+        "interface": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The outgoing interface (`outgoing-interface-name` of a next hop, or the `outgoing-interface` of the route; `Null0` discards); null when not configured."
+        },
+        "preference": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The route preference (administrative distance, 1-255) as written; null when not configured."
+        },
+        "tag": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The route tag; null when not configured."
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Description; null when not configured."
+        }
+      },
+      "required": [
+        "vrf",
+        "prefix",
+        "family",
+        "next_hop",
+        "interface",
+        "preference",
+        "tag",
+        "description"
       ]
     }
   }

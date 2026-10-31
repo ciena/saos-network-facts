@@ -101,8 +101,10 @@ def test_bgp_route_reflector_and_peer_merge():
         {"afi": "vpnv4", "safi": "unicast", "route-reflector-client": True}]}]}]}}
     f = run(first, later)
     assert f["peers"] == [{"kind": "bgp", "name": "as65000", "ip": "192.0.2.2", "remote_as": "65000",
-                           "route_reflector_client": True, "address_families": ["vpnv4 unicast"], "peer_group": None}]
-    assert f["bgp"]["instances"] == [{"as": "65000", "router_id": "192.0.2.1", "cluster_id": "192.0.2.1", "route_reflector": True}]
+                           "route_reflector_client": True, "address_families": ["vpnv4 unicast"], "peer_group": None,
+                           "vrf": None}]
+    assert f["bgp"]["instances"] == [{"as": "65000", "router_id": "192.0.2.1", "cluster_id": "192.0.2.1", "route_reflector": True,
+                                      "srv6_locator": None, "srv6_locators": {}}]
 
 
 def test_pseudowire_service_and_cfm_mep_port():
@@ -148,6 +150,108 @@ def test_pseudowire_steered_onto_an_sr_policy():
 def test_top_level_vrf_list():
     f = run({"ciena-vrf:vrf": [{"vrfName": "A"}, {"vrfName": "B"}]}, {"ciena-vrf:vrf": [{"vrfName": "A", "__operation__": "remove"}]})
     assert f["vrfs"] == ["B"]
+
+
+def _bgp(*vrfs, **instance):
+    return {"ciena-bgp:bgp": {"instance": [dict({"as": 64500, "vrf": list(vrfs)}, **instance)]}}
+
+
+def test_vrf_instance_rd_rt_address_families_and_interfaces():
+    f = run({"ciena-vrf:vrf": [{"vrfName": "BLUE", "description": "tenant", "role": "data"}]},
+            {"openconfig-interfaces:interfaces": {"interface": [
+                {"name": "ce1", "config": {"name": "ce1", "type": "ip", "vrfName": "BLUE"}},
+                {"name": "core", "config": {"name": "core", "type": "ip"}}]}},
+            _bgp({"name": "BLUE", "route-distinguisher": "0:64500:7", "route-target": [{"id": "0:64500:7", "direction": "both"}],
+                  "vrf-address-family": [
+                      {"afi": "ipv4", "safi": "unicast", "redistribute": [{"protocol": "connected"}, {"protocol": "static"}],
+                       "route-target": [{"id": "0:64500:4", "direction": "export"}],
+                       "peer": [{"address": "198.51.100.1", "remote-as": 64510, "activate": True}]},
+                      {"afi": "ipv6", "safi": "unicast", "peer": [{"address": "198.51.100.1", "remote-as": 64510}]}]}))
+    (vrf,) = f["vrf_instances"]
+    assert vrf == {"name": "BLUE", "description": "tenant", "role": "data", "srv6_locator_address": None, "srv6_sid_type": None,
+                   "sr_policy_color": None, "bgp_as": "64500", "route_distinguisher": "0:64500:7",
+                   "address_families": ["ipv4 unicast", "ipv6 unicast"],
+                   "route_targets": [{"route_target": "0:64500:7", "type": "both", "address_family": None},
+                                     {"route_target": "0:64500:4", "type": "export", "address_family": "ipv4 unicast"}],
+                   "srv6_locators": {}, "redistribute": {"ipv4 unicast": ["connected", "static"]}, "label_allocation": {},
+                   "interfaces": ["ce1"]}
+    # one CE neighbour in both address families, bound to the VRF, never confused with a global peer
+    assert [(p["ip"], p["vrf"], p["remote_as"], p["address_families"], p["peer_group"]) for p in f["peers"]] == [
+        ("198.51.100.1", "BLUE", "64510", ["ipv4 unicast", "ipv6 unicast"], None)]
+
+
+def test_vrf_only_named_by_bgp_and_srv6_locator_precedence():
+    f = run(_bgp({"name": "RED", "vrf-address-family": [
+                     {"afi": "ipv4", "safi": "unicast", "segment-routing-srv6": {"locator": "OWN"}},
+                     {"afi": "ipv6", "safi": "unicast"}]},
+                 {"name": "GREEN", "vrf-address-family": [{"afi": "ipv4", "safi": "unicast"}]},
+                 **{"segment-routing": {"srv6": {"locator": "INSTANCE"}},
+                    "address-family": [{"afi": "vpnv6", "safi": "unicast", "segment-routing-srv6": {"locator": "AF6"}}]}))
+    red, green = f["vrf_instances"]
+    assert f["vrfs"] == []  # the vrf list defines none
+    assert red["srv6_locators"] == {"ipv4 unicast": "OWN", "ipv6 unicast": "AF6"}
+    assert green["srv6_locators"] == {"ipv4 unicast": "INSTANCE"}
+    assert f["bgp"]["instances"][0]["srv6_locator"] == "INSTANCE"
+    assert f["bgp"]["instances"][0]["srv6_locators"] == {"vpnv6 unicast": "AF6"}
+
+
+def test_vrf_level_srv6_sr_policy_management_role_and_label_allocation():
+    f = run({"ciena-vrf:vrf": [{"vrfName": "MGMT", "role": "management", "isolate-mgmt": True},
+                               {"vrfName": "V", "segment-routing-srv6": {"locator": "2001:db8:f0:1::", "sid-type": "u-sid"},
+                                "sr-policy": {"color": 100}}]},
+            {"ciena-mpls:mpls": {"label-management": {"allocation-mode": {"vrf": [
+                {"name": "V", "address-family": [{"af-type": "ipv4", "mode": "per-vrf"}, {"af-type": "ipv6", "mode": "per-prefix"}]}]}}}})
+    mgmt, v = f["vrf_instances"]
+    assert (mgmt["role"], mgmt["bgp_as"], mgmt["address_families"]) == ("management", None, [])
+    assert (v["srv6_locator_address"], v["srv6_sid_type"], v["sr_policy_color"]) == ("2001:db8:f0:1::", "u-sid", "100")
+    assert v["label_allocation"] == {"ipv4": "per-vrf", "ipv6": "per-prefix"}
+    assert "_vrf_settings" not in f
+
+
+def test_vrf_edits_across_files():
+    f = run({"ciena-vrf:vrf": [{"vrfName": "V", "description": "old"}]},
+            _bgp({"name": "V", "route-distinguisher": "0:64500:1", "route-target": [{"id": "0:64500:1", "direction": "both"},
+                                                                                   {"id": "0:64500:2", "direction": "import"}],
+                  "vrf-address-family": [
+                      {"afi": "ipv4", "safi": "unicast", "peer": [{"address": "198.51.100.1", "remote-as": 64510}]},
+                      {"afi": "ipv6", "safi": "unicast", "peer": [{"address": "2001:db8:100::1", "remote-as": 64510}]}]}),
+            # translator 4.2.1: `no vrf V description`, `no bgp instance 64500 vrf V route-distinguisher`, ...
+            {"ciena-vrf:vrf": [{"vrfName": "V", "__operation__": "none", "__remove__": {"description": []}}]},
+            _bgp({"name": "V", "__operation__": "none", "__remove__": {"route-distinguisher": []},
+                  "route-target": [{"id": "0:64500:2", "__operation__": "remove"}],
+                  "vrf-address-family": [{"afi": "ipv6", "safi": "unicast", "__operation__": "remove"}]}))
+    (vrf,) = f["vrf_instances"]
+    assert (vrf["description"], vrf["route_distinguisher"], vrf["address_families"]) == (None, None, ["ipv4 unicast"])
+    assert [t["route_target"] for t in vrf["route_targets"]] == ["0:64500:1"]
+    assert [p["ip"] for p in f["peers"]] == ["198.51.100.1"]
+    f = run({"ciena-vrf:vrf": [{"vrfName": "V"}]}, _bgp({"name": "V", "route-distinguisher": "0:64500:1"}),
+            {"ciena-vrf:vrf": [{"vrfName": "V", "__operation__": "remove"}]},
+            _bgp({"name": "V", "__operation__": "remove"}))
+    assert (f["vrfs"], f["vrf_instances"]) == ([], [])
+
+
+def test_static_routes_per_vrf_and_next_hop():
+    f = run({"ciena-rib:rib": {"vrf": [
+                {"name": "default", "ipv4": [
+                    {"destination-prefix": "0.0.0.0/0", "next-hop": [{"address": "192.0.2.254", "route-preference": 10}]}]},
+                {"name": "V", "ipv4": [{"destination-prefix": "198.51.100.128/25", "next-hop": [
+                    {"address": "198.51.100.1", "outgoing-interface-name": "ce1", "tag": 5, "description": "lan"},
+                    {"address": "198.51.100.3"}]},
+                    {"destination-prefix": "198.51.100.64/26", "outgoing-interface": [{"name": "Null0"}]}],
+                 "ipv6": [{"destination-prefix": "2001:db8:200::/48", "next-hop": [{"address": "2001:db8:100::1"}]}]}]}},
+            {"ciena-rib:rib": {"vrf": [{"name": "V", "ipv4": [
+                {"destination-prefix": "198.51.100.128/25", "next-hop": [{"address": "198.51.100.3", "__operation__": "remove"}]},
+                {"destination-prefix": "198.51.100.128/25", "next-hop": [{"address": "198.51.100.1", "route-preference": 200}]}]}]}})
+    assert [(r["vrf"], r["family"], r["prefix"], r["next_hop"], r["interface"], r["preference"], r["tag"], r["description"])
+            for r in f["static_routes"]] == [
+        ("default", "ipv4", "0.0.0.0/0", "192.0.2.254", None, "10", None, None),
+        ("V", "ipv4", "198.51.100.128/25", "198.51.100.1", "ce1", "200", "5", "lan"),
+        ("V", "ipv4", "198.51.100.64/26", None, "Null0", None, None, None),
+        ("V", "ipv6", "2001:db8:200::/48", "2001:db8:100::1", None, None, None, None)]
+    f = run({"ciena-rib:rib": {"vrf": [{"name": "V", "ipv4": [
+                {"destination-prefix": "198.51.100.0/24", "next-hop": [{"address": "192.0.2.9"}]}]}]}},
+            {"ciena-rib:rib": {"vrf": [{"name": "V", "ipv4": [{"destination-prefix": "198.51.100.0/24", "__operation__": "remove"}]}]}})
+    assert f["static_routes"] == []
 
 
 def test_ospf_areas_interfaces_and_merge():

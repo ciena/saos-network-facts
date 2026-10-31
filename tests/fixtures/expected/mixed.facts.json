@@ -337,9 +337,28 @@
           }
         },
         "segments": [],
+        "static_routes": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
         "vlans": {},
+        "vrf_instances": [
+          {
+            "address_families": [],
+            "bgp_as": null,
+            "description": null,
+            "interfaces": [],
+            "label_allocation": {},
+            "name": "CUST-A",
+            "redistribute": {},
+            "role": null,
+            "route_distinguisher": null,
+            "route_targets": [],
+            "sr_policy_color": null,
+            "srv6_locator_address": null,
+            "srv6_locators": {},
+            "srv6_sid_type": null
+          }
+        ],
         "vrfs": [
           "CUST-A"
         ]
@@ -364,7 +383,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.8.0"
+    "version": "0.9.0"
   },
-  "schema_version": "1.6.0"
+  "schema_version": "1.7.0"
 }
