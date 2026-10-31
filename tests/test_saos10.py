@@ -305,3 +305,104 @@ def test_g8032_merge_across_files_and_removal():
            '<ring-name>ring_1</ring-name></g8032-ring></g8032-rings></config>')
     assert saos10.removed_objects(xml) == {("g8032-ring", "ring_1")}
     assert saos10.apply_removals(run(first), {("g8032-ring", "ring_1")})["rings"] == []
+
+
+def iface(name, config=None, v4=None, v6=None, **extra):
+    entry = {"name": name, **extra}
+    if config is not None:
+        entry["config"] = dict(config, name=name)
+    for family, addresses in (("ipv4", v4), ("ipv6", v6)):
+        if addresses:
+            entry[family] = {"addresses": {"address": [{"ip": ip, "config": {"prefix-length": n}} for ip, n in addresses]}}
+    return {"openconfig-interfaces:interfaces": {"interface": [entry]}}
+
+
+def test_an_interface_in_a_later_file_keeps_the_earlier_leaves():
+    # base layer types the loopback, the device layer adds its addresses, the services layer its MTU
+    f = run(iface("lo0", {"type": "loopback", "description": "router id"}),
+            iface("lo0", v4=[("192.0.2.1", 32)], v6=[("2001:db8::1", 128)]),
+            iface("lo0", {"mtu": 1500}, v6=[("2001:db8:1::1", 128)]),
+            {"ciena-sr:segment-routing": {"connected-prefix-sid-map": [
+                {"prefix": "2001:db8::1/128", "interface": "lo0", "start-sid": 1, "value-type": "index"}]}})
+    assert f["interfaces"] == [{"name": "lo0", "kind": "loopback", "ip": "192.0.2.1/32", "ipv4": ["192.0.2.1/32"],
+                                "ipv6": ["2001:db8::1/128", "2001:db8:1::1/128"], "vlan": None, "vs": None, "fd": None,
+                                "vrf": None, "description": "router id", "mtu": "1500"}]
+    assert f["segment_routing"]["prefix_sids"][0]["node"] is True
+    assert [i["name"] for i in saos10.loopbacks(f)] == ["lo0"]
+
+
+def test_a_later_file_sets_a_leaf_again_and_can_still_remove_the_interface():
+    f = run(iface("core", {"type": "ip", "mtu": 9000, "description": "old"}), iface("core", {"description": "new"}))
+    assert (f["interfaces"][0]["kind"], f["interfaces"][0]["mtu"], f["interfaces"][0]["description"]) == ("ip", "9000", "new")
+    gone = run(iface("core", {"type": "ip"}), iface("core", __operation__="remove"))
+    assert gone["interfaces"] == []
+
+
+def test_a_port_and_a_lag_merge_across_files():
+    f = run(iface("1", {"type": "ettp", "description": "uplink"}), iface("1", {"port-speed": "10G"}),
+            iface("agg1", {"type": "lag", "agg": {"member-ports": [{"member-port": "1"}]}}),
+            iface("agg1", {"mtu": 9000, "agg": {"member-ports": [{"member-port": "2"}]}}))
+    assert [i["name"] for i in f["interfaces"]] == ["agg1"]
+    assert (f["ports"]["1"]["description"], f["ports"]["1"]["port_speed"], f["ports"]["1"]["lag"]) == ("uplink", "10G", "agg1")
+    assert f["lags"] == [{"name": "agg1", "members": ["1", "2"]}]
+
+
+def test_flow_points_domains_classifiers_meps_and_sids_merge_across_files():
+    md = {"id": "MD5", "md-level": 5, "maintenance-association": [{"id": "MA1", "ccm-interval": "10ms",
+          "maintenance-association-end-point": [{"mep-identifier": 1, "interface": "FP1", "direction": "up"}]}]}
+    f = run({"ciena-mef-fd:fds": {"fd": [{"name": "FD1", "mode": "vpls"}]},
+             "ciena-mef-classifier:classifiers": {"classifier": [{"name": "C", "filter-entry": [
+                 {"vtags": [{"tag": 1, "vlan-id": 100}]}]}]},
+             "ciena-mef-fp:fps": {"fp": [{"name": "FP1", "fd-name": "FD1", "logical-port": "3", "classifier-list": ["C"]}]},
+             "mef-cfm:maintenance-domain": [md],
+             "ciena-sr:segment-routing": {"connected-prefix-sid-map": [
+                 {"prefix": "192.0.2.1/32", "interface": "lb0", "start-sid": 1, "value-type": "index"}]}},
+            {"ciena-mef-fd:fds": {"fd": [{"name": "FD1", "description": "x"}]},
+             "ciena-mef-classifier:classifiers": {"classifier": [{"name": "C", "filter-entry": [
+                 {"vtags": [{"tag": 2, "vlan-id": 200}]}]}]},
+             "ciena-mef-fp:fps": {"fp": [{"name": "FP1", "description": "x"}]},
+             "mef-cfm:maintenance-domain": [{"id": "MD5", "maintenance-association": [{"id": "MA1",
+                 "maintenance-association-end-point": [{"mep-identifier": 1, "priority": 7}]}]}],
+             "ciena-sr:segment-routing": {"connected-prefix-sid-map": [{"prefix": "192.0.2.1/32", "start-sid": 5}]}})
+    assert f["fds"] == [{"name": "FD1", "mode": "vpls"}]
+    assert f["classifiers"] == {"C": ["100", "200"]}
+    assert f["fps"] == [{"name": "FP1", "fd": "FD1", "logical_port": "3", "classifiers": ["C"]}]
+    (mep,) = f["cfm"]["meps"]
+    assert (mep["level"], mep["direction"], mep["interface"], mep["ccm_interval"], mep["port"]) == ("5", "up", "FP1", "10ms", "3")
+    assert f["segment_routing"]["prefix_sids"] == [{"prefix": "192.0.2.1/32", "interface": "lb0", "sid": "5",
+                                                    "value_type": "index", "node": False}]
+
+
+def bgp(*items, **instance):
+    return {"ciena-bgp:bgp": {"instance": [{"as": 64500, **instance, **dict(items)}]}}
+
+
+def af(afi, safi, **leaves):
+    return {"afi": afi, "safi": safi, **leaves}
+
+
+def test_bgp_peers_inherit_their_peer_group():
+    group = {"name": "CLIENTS", "remote-as": 64500, "update-source-interface": "lo0",
+             "address-family": [af("l2vpn", "evpn", **{"route-reflector-client": True}), af("ipv6", "unicast")]}
+    f = run(bgp(("peer", [{"address": "2001:db8::1", "peer-group": "CLIENTS"},
+                          {"address": "2001:db8::2", "peer-group": "CLIENTS", "remote-as": 64501,
+                           "address-family": [af("l2vpn", "evpn", **{"route-reflector-client": False}), af("vpnv4", "unicast")]},
+                          {"address": "2001:db8::3", "remote-as": 64502}]),
+                ("peer-group", [group]), **{"router-id": "192.0.2.4"}))
+    assert [(p["ip"], p["remote_as"], p["address_families"], p["route_reflector_client"]) for p in f["peers"]] == [
+        ("2001:db8::1", "64500", ["l2vpn evpn", "ipv6 unicast"], True),
+        # the peer's own remote AS and route-reflector-client setting win over the group's
+        ("2001:db8::2", "64501", ["l2vpn evpn", "ipv6 unicast", "vpnv4 unicast"], False),
+        ("2001:db8::3", "64502", [], False)]
+    assert f["bgp"]["instances"][0]["route_reflector"] is True
+    assert "_bgp_settings" not in f
+
+
+def test_bgp_peer_group_from_another_file_removal_and_unknown_group():
+    group = bgp(("peer-group", [{"name": "RR", "remote-as": 64500, "address-family": [af("l2vpn", "evpn")]}]))
+    peer = bgp(("peer", [{"address": "2001:db8::4", "peer-group": "RR"}, {"address": "2001:db8::5", "peer-group": "NONE"}]))
+    f = run(peer, group)  # the group may be defined after the peer that names it
+    assert [(p["remote_as"], p["address_families"]) for p in f["peers"]] == [("64500", ["l2vpn evpn"]), (None, [])]
+    f = run(group, peer, bgp(("peer-group", [{"name": "RR", "__operation__": "remove"}]),
+                             ("peer", [{"address": "2001:db8::5", "__operation__": "remove"}])))
+    assert [(p["ip"], p["remote_as"]) for p in f["peers"]] == [("2001:db8::4", None)]

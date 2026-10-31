@@ -36,7 +36,8 @@ REMOVAL_KINDS = {"interface": "interfaces", "fp": "fps", "fd": "fds", "logical-p
 def new_facts():
     facts = _base_facts()
     facts.update({"fds": [], "fps": [], "classifiers": {}, "vrfs": [], "segments": [], "objects": 0,
-                  "ospf": {"instances": [], "interfaces": []}, "tp_corouted_tunnels": [], "l2vpn_services": []})
+                  "ospf": {"instances": [], "interfaces": []}, "tp_corouted_tunnels": [], "l2vpn_services": [],
+                  BGP_SETTINGS: {}})
     return facts
 
 
@@ -47,6 +48,9 @@ def local(key):
 
 
 OPERATION = "__operation__"
+# BGP peer and peer-group settings while a device's files are folded in, keyed (as, "peer" | "group",
+# address | name); ``finish`` resolves the inheritance and drops them (they are not facts of their own).
+BGP_SETTINGS = "_bgp_settings"
 EDIT_PATH = "__edit_path__"
 REMOVE = "__remove__"
 # List keys (and the leaves naming an entry) that a leaf delete repeats on its path.
@@ -163,7 +167,27 @@ def _drop(facts, kind, name):
     apply_removals(facts, {(kind, name)})
 
 
+def _set(current, key, value):
+    """Set a fact from a leaf this pivot carries; a leaf the pivot leaves out keeps the earlier value."""
+    if value is not None:
+        current[key] = value
+
+
+def _ettp(facts, name, config):
+    """A physical port (``type ettp``): its description, PTP id, speed and auto-negotiation, under ``ports``."""
+    port = _port(facts, name)
+    port["description"] = text(get(config, "description")) or port["description"]
+    for leaf in ("ptp-id", "port-speed", "auto-negotiation"):
+        value = get(config, leaf)
+        if value is not None:
+            port[leaf.replace("-", "_")] = text(value)
+
+
 def _interfaces(facts, container):
+    """``openconfig-interfaces:interfaces``. A device's files are applied in order and each one adds
+    to what the earlier ones configured (a base file sets ``type loopback``, a device file its
+    address): an interface a later file mentions again keeps the leaves it does not set, and its
+    addresses are added to the earlier ones."""
     if removed(container):
         facts["interfaces"], facts["lags"] = [], []
         return
@@ -175,32 +199,34 @@ def _interfaces(facts, container):
         if path_only(interface):
             continue
         config = get(interface, "config") or {}
-        kind = text(get(config, "type")) or "unknown"
-        if kind == "ettp":
-            port = _port(facts, name)
-            port["description"] = text(get(config, "description")) or port["description"]
-            for leaf in ("ptp-id", "port-speed", "auto-negotiation"):
-                value = get(config, leaf)
-                if value is not None:
-                    port[leaf.replace("-", "_")] = text(value)
+        kind = text(get(config, "type"))
+        current = next((i for i in facts["interfaces"] if i["name"] == name), None)
+        if kind == "ettp" or (kind is None and current is None and name in facts["ports"]):
+            # a port's leaves, or a later file adding to a port an earlier file typed ettp
+            _ettp(facts, name, config)
             continue
-        ipv4 = _addresses(interface, "ipv4")
-        ipv6 = _addresses(interface, "ipv6")
-        entry = {
-            "name": name, "kind": kind, "ip": ipv4[0] if ipv4 else None, "ipv4": ipv4, "ipv6": ipv6,
-            "vlan": None, "vs": None,
-            "fd": text(get(get(get(config, "underlay-binding"), "config"), "fd")),
-            "vrf": text(get(config, "vrfName")),
-            "description": text(get(config, "description")),
-            "mtu": text(get(config, "mtu")),
-        }
-        facts["interfaces"] = [i for i in facts["interfaces"] if i["name"] != name] + [entry]
-        if kind == "lag":
+        if current is None:
+            current = {"name": name, "kind": "unknown", "ip": None, "ipv4": [], "ipv6": [], "vlan": None, "vs": None,
+                       "fd": None, "vrf": None, "description": None, "mtu": None}
+            facts["interfaces"].append(current)
+        _set(current, "kind", kind)
+        for family in ("ipv4", "ipv6"):
+            for address in _addresses(interface, family):
+                _add(current[family], address)
+        current["ip"] = current["ipv4"][0] if current["ipv4"] else None
+        _set(current, "fd", text(get(get(get(config, "underlay-binding"), "config"), "fd")))
+        for key, leaf in (("vrf", "vrfName"), ("description", "description"), ("mtu", "mtu")):
+            _set(current, key, text(get(config, leaf)))
+        if current["kind"] == "lag":
             members = [text(get(m, "member-port")) for m in entries(get(config, "agg"), "member-ports")]
-            members = [m for m in members if m]
-            facts["lags"] = [l for l in facts["lags"] if l["name"] != name] + [{"name": name, "members": members}]
+            lag = next((l for l in facts["lags"] if l["name"] == name), None)
+            if lag is None:
+                lag = {"name": name, "members": []}
+                facts["lags"].append(lag)
             for member in members:
-                _port(facts, member)["lag"] = name
+                if member:
+                    _add(lag["members"], member)
+                    _port(facts, member)["lag"] = name
 
 
 def _classifiers(facts, container):
@@ -214,13 +240,12 @@ def _classifiers(facts, container):
             continue
         if path_only(classifier):
             continue
-        vlans = []
+        vlans = facts["classifiers"].setdefault(name, [])  # a later file adds to an earlier classifier
         for entry in entries(classifier, "filter-entry"):
             for vtag in entries(entry, "vtags"):
                 vlan = text(get(vtag, "vlan-id"))
                 if vlan:
                     _add(vlans, vlan)
-        facts["classifiers"][name] = vlans
 
 
 def _fds(facts, container):
@@ -234,7 +259,11 @@ def _fds(facts, container):
             continue
         if path_only(fd):
             continue
-        facts["fds"] = [f for f in facts["fds"] if f["name"] != name] + [{"name": name, "mode": text(get(fd, "mode"))}]
+        current = next((f for f in facts["fds"] if f["name"] == name), None)
+        if current is None:
+            current = {"name": name, "mode": None}
+            facts["fds"].append(current)
+        _set(current, "mode", text(get(fd, "mode")))
 
 
 def _fps(facts, container):
@@ -248,9 +277,14 @@ def _fps(facts, container):
             continue
         if path_only(fp):
             continue
-        classifiers = [text(c) for c in as_list(get(fp, "classifier-list") or None)]
-        entry = {"name": name, "fd": text(get(fp, "fd-name")), "logical_port": text(get(fp, "logical-port")), "classifiers": classifiers}
-        facts["fps"] = [f for f in facts["fps"] if f["name"] != name] + [entry]
+        current = next((f for f in facts["fps"] if f["name"] == name), None)
+        if current is None:
+            current = {"name": name, "fd": None, "logical_port": None, "classifiers": []}
+            facts["fps"].append(current)
+        _set(current, "fd", text(get(fp, "fd-name")))
+        _set(current, "logical_port", text(get(fp, "logical-port")))
+        for classifier in as_list(get(fp, "classifier-list") or None):
+            _add(current["classifiers"], text(classifier))
 
 
 def _logical_ports(facts, container):
@@ -321,33 +355,65 @@ def _isis(facts, container):
                 set_isis_metric(current, level, **{k: v for k, v in values.items() if v is not None})
 
 
+def _bgp_settings(store, entry):
+    """The neighbour settings a ``peer`` or ``peer-group`` entry sets, into ``store``: remote AS,
+    address families and, per address family, whether the neighbour is a route-reflector client
+    (an explicit ``false`` is kept, so a peer can override its group)."""
+    if get(entry, "remote-as") is not None:
+        store["remote_as"] = text(get(entry, "remote-as"))
+    for af in entries(entry, "address-family"):
+        name = " ".join(x for x in (text(get(af, "afi")), text(get(af, "safi"))) if x)
+        if not name:
+            continue
+        _add(store["address_families"], name)
+        if get(af, "route-reflector-client") is not None:
+            store["rr_clients"][name] = bool(flag(get(af, "route-reflector-client")))
+
+
+def _new_settings():
+    return {"remote_as": None, "address_families": [], "rr_clients": {}, "group": None}
+
+
 def _bgp_peer(facts, asn, peer):
     ip = text(get(peer, "address"))
     current = next((p for p in facts["peers"] if p["kind"] == "bgp" and p["ip"] == ip and p["name"] == f"as{asn}"), None)
+    if removed(peer):
+        facts["peers"] = [p for p in facts["peers"] if p is not current]
+        facts[BGP_SETTINGS].pop((asn, "peer", ip), None)
+        return
+    if path_only(peer):
+        return
     if current is None:
         current = {"kind": "bgp", "name": f"as{asn}", "ip": ip, "remote_as": None,
                    "route_reflector_client": False, "address_families": []}
         facts["peers"].append(current)
-    if get(peer, "remote-as") is not None:
-        current["remote_as"] = text(get(peer, "remote-as"))
-    for af in entries(peer, "address-family"):
-        name = " ".join(x for x in (text(get(af, "afi")), text(get(af, "safi"))) if x)
-        if name:
-            _add(current["address_families"], name)
-        if flag(get(af, "route-reflector-client")):
-            current["route_reflector_client"] = True
+    settings = facts[BGP_SETTINGS].setdefault((asn, "peer", ip), _new_settings())
+    if get(peer, "peer-group") is not None:
+        settings["group"] = text(get(peer, "peer-group"))
+    _bgp_settings(settings, peer)
+
+
+def _bgp_group(facts, asn, group):
+    """A ``peer-group``: settings its member peers inherit (``finish`` resolves them)."""
+    name = text(get(group, "name"))
+    if removed(group):
+        facts[BGP_SETTINGS].pop((asn, "group", name), None)
+    elif not path_only(group):
+        _bgp_settings(facts[BGP_SETTINGS].setdefault((asn, "group", name), _new_settings()), group)
 
 
 def _bgp(facts, container):
     if removed(container):
         facts["peers"] = [p for p in facts["peers"] if p["kind"] != "bgp"]
         facts["bgp"]["instances"] = []
+        facts[BGP_SETTINGS] = {}
         return
     for instance in entries(container, "instance"):
         asn = text(get(instance, "as"))
         if removed(instance):
-            facts["peers"] = [p for p in facts["peers"] if p["kind"] != "bgp"]
+            facts["peers"] = [p for p in facts["peers"] if not (p["kind"] == "bgp" and p["name"] == f"as{asn}")]
             facts["bgp"]["instances"] = [i for i in facts["bgp"]["instances"] if i["as"] != asn]
+            facts[BGP_SETTINGS] = {k: v for k, v in facts[BGP_SETTINGS].items() if k[0] != asn}
             continue
         current = next((i for i in facts["bgp"]["instances"] if i["as"] == asn), None)
         if current is None:
@@ -356,10 +422,29 @@ def _bgp(facts, container):
         for key, leaf in (("router_id", "router-id"), ("cluster_id", "cluster-id")):
             if get(instance, leaf) is not None:
                 current[key] = text(get(instance, leaf))
+        for group in entries(instance, "peer-group"):
+            _bgp_group(facts, asn, group)
         for peer in entries(instance, "peer"):
-            if removed(peer) or path_only(peer):
-                continue
             _bgp_peer(facts, asn, peer)
+
+
+def _bgp_resolve(facts):
+    """Each BGP peer with what it inherits from its ``peer-group``: the peer's own remote AS and
+    route-reflector-client setting per address family win over the group's; the address families
+    are the group's and the peer's. A peer is a route-reflector client when it is one in at least
+    one address family."""
+    settings = facts.pop(BGP_SETTINGS, {})
+    for peer in facts["peers"]:
+        if peer["kind"] != "bgp":
+            continue
+        asn = peer["name"][2:]
+        own = settings.get((asn, "peer", peer["ip"]), _new_settings())
+        group = settings.get((asn, "group", own["group"]), _new_settings()) if own["group"] else _new_settings()
+        peer["remote_as"] = own["remote_as"] or group["remote_as"]
+        peer["address_families"] = list(group["address_families"])
+        for af in own["address_families"]:
+            _add(peer["address_families"], af)
+        peer["route_reflector_client"] = any({**group["rr_clients"], **own["rr_clients"]}.values())
 
 
 def _vrfs(facts, container):
@@ -471,11 +556,15 @@ def _segment_routing(facts, container):
         prefix = text(get(item, "prefix"))
         if not prefix:
             continue
-        sr["prefix_sids"] = [p for p in sr["prefix_sids"] if p["prefix"] != prefix]
+        current = next((p for p in sr["prefix_sids"] if p["prefix"] == prefix), None)
         if removed(item):
+            sr["prefix_sids"] = [p for p in sr["prefix_sids"] if p is not current]
             continue
-        sr["prefix_sids"].append({"prefix": prefix, "interface": text(get(item, "interface")), "sid": text(get(item, "start-sid")),
-                                  "value_type": text(get(item, "value-type")), "node": False})
+        if current is None:
+            current = {"prefix": prefix, "interface": None, "sid": None, "value_type": None, "node": False}
+            sr["prefix_sids"].append(current)
+        for key, leaf in (("interface", "interface"), ("sid", "start-sid"), ("value_type", "value-type")):
+            _set(current, key, text(get(item, leaf)))
 
 
 def _sid(segment):
@@ -708,12 +797,18 @@ def _cfm(facts, container):
             fd = next((text(get(c, "fd-name")) for c in entries(ma, "component-list") if get(c, "fd-name") is not None), None)
             for mep in entries(ma, "maintenance-association-end-point"):
                 mep_id = text(get(mep, "mep-identifier"))
-                facts["cfm"]["meps"] = meps = [m for m in meps if (m["md"], m["ma"], m["mep_id"]) != (md_id, ma_id, mep_id)]
+                current = next((m for m in meps if (m["md"], m["ma"], m["mep_id"]) == (md_id, ma_id, mep_id)), None)
                 if removed(mep) or removed(ma):
+                    facts["cfm"]["meps"] = meps = [m for m in meps if m is not current]
                     continue
-                meps.append({"md": md_id, "ma": ma_id, "mep_id": mep_id, "level": text(get(md, "md-level")),
-                             "direction": text(get(mep, "direction")), "interface": text(get(mep, "interface")),
-                             "port": None, "vlan": None, "service": fd, "ccm_interval": text(get(ma, "ccm-interval"))})
+                if current is None:
+                    current = {"md": md_id, "ma": ma_id, "mep_id": mep_id, "level": None, "direction": None, "interface": None,
+                               "port": None, "vlan": None, "service": None, "ccm_interval": None}
+                    meps.append(current)
+                # a later file that mentions the MEP again keeps the leaves it does not set
+                for key, value in (("level", get(md, "md-level")), ("direction", get(mep, "direction")),
+                                   ("interface", get(mep, "interface")), ("service", fd), ("ccm_interval", get(ma, "ccm-interval"))):
+                    _set(current, key, text(value))
 
 
 def _ring_instance(facts, ring, instance):
@@ -861,6 +956,7 @@ def finish(facts):
     loopbacks = {i["name"] for i in facts["interfaces"] if i["kind"] == "loopback"}
     for sid in facts["segment_routing"]["prefix_sids"]:
         sid["node"] = sid["interface"] in loopbacks and _host_prefix(sid["prefix"])
+    _bgp_resolve(facts)
     for instance in facts["bgp"]["instances"]:
         instance["route_reflector"] = any(p["route_reflector_client"] for p in facts["peers"]
                                           if p["kind"] == "bgp" and p["name"] == f"as{instance['as']}")

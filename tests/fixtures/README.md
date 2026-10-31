@@ -33,6 +33,13 @@ documentation ranges) and services are made up.
   on its east port), A2 on the major ring, S1 and S2 on the sub-ring (S1 owns the sub-ring's RPL; S2 is
   SAOS 8 and protects a virtual switch instead of VLANs); A2 writes its virtual-ring commands in the CLI's
   short form (`ring virtual-ring ...`, partial command recognition); `platform-map.yaml` gives the device types.
+- `labs/srv6-evpn/`: a configs directory of four SAOS 10 devices (PE1 - P1 - PE2, RR1 off P1) running
+  IS-IS with SR over IPv6 links, each device split into layered files that share its name up to the
+  first dot (`PE1.1-base.cfg`, `PE1.3-device.cfg`, `PE1.6-services.cfg`): the base layer types `lo0`
+  as a loopback, the device layer adds its addresses and the services layer its MTU. RR1 reflects
+  for PE1 and PE2 through the peer group `CLIENTS` (remote AS, address families, route-reflector
+  client) and the PEs reach it through the peer group `RR`; RR1 turns route-reflector-client off for
+  PE2 in `ipv6 unicast` only. No VRFs and no Linux hosts; `platform-map.yaml` gives the device types.
 - `cases.yaml`: the extraction cases the tests run; `expected/`: their facts files.
 - `pivots.json`: the translator's recorded replies for every SAOS 10 file (`scripts/record_pivots.py`),
   all recorded with translator 4.2.1.
