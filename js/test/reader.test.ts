@@ -4,7 +4,8 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   bgpPeers, ccmIntervalMs, devicesByName, evpnInstances, evpnMembers, FactsFormatError, flexAlgorithms, interfacesOnPort, isisArea, isisAreaId,
-  isisMetric, isisSystemId, isRouted, loopbacks, parseFacts, readFacts, ringMembers, ringsOf, srv6Locators,
+  isisMetric, isisSystemId, isRouted, loopbacks, parseFacts, readFacts, ringMembers, ringsOf, srv6Locators, staticRoutes, vrfInstances,
+  vrfMembers, vrfRouteTargets,
 } from "../src/node.ts";
 import type { DeviceFacts, Interface } from "../src/generated/facts.ts";
 
@@ -43,7 +44,7 @@ test("SAOS 6: the IP interface on a VLAN the port's LAG carries", () => {
 test("loopbacks and BGP peers", () => {
   const pe1 = devicesByName(srl2).get("PE1")!;
   assert.deepEqual(loopbacks(pe1), [{ name: "lb0", ip: "192.0.2.1/32", isis: "CORE" }]);
-  assert.deepEqual(bgpPeers(pe1), [{ ip: "192.0.2.2", remoteAs: 65000, routeReflectorClient: true, peerGroup: null }]);
+  assert.deepEqual(bgpPeers(pe1), [{ ip: "192.0.2.2", remoteAs: 65000, routeReflectorClient: true, peerGroup: null, vrf: null }]);
 });
 
 test("BGP peers: a missing route-reflector-client flag stays unknown", () => {
@@ -52,8 +53,8 @@ test("BGP peers: a missing route-reflector-client flag stays unknown", () => {
     { kind: "bgp", name: "as65000", ip: "192.0.2.4", remote_as: null, route_reflector_client: false },
   ];
   assert.deepEqual(bgpPeers({ peers } as unknown as DeviceFacts), [
-    { ip: "192.0.2.3", remoteAs: 65000, routeReflectorClient: null, peerGroup: null },
-    { ip: "192.0.2.4", remoteAs: null, routeReflectorClient: false, peerGroup: null },
+    { ip: "192.0.2.3", remoteAs: 65000, routeReflectorClient: null, peerGroup: null, vrf: null },
+    { ip: "192.0.2.4", remoteAs: null, routeReflectorClient: false, peerGroup: null, vrf: null },
   ]);
 });
 
@@ -166,4 +167,34 @@ test("evpnMembers: the two ends of an EVPN-VPWS mirror their service ids; the VP
   ]);
   assert.deepEqual(evpnInstances(devicesByName(srv6).get("P1")), []);
   assert.deepEqual(evpnMembers(srv6, 999), []);
+});
+
+test("vrfInstances, vrfMembers and vrfRouteTargets: the L3VPN VRF over SRv6 on both PEs (schema 1.7)", () => {
+  const members = vrfMembers(srv6, "CUST-A");
+  assert.deepEqual(members.map((m) => [m.device, m.instance.route_distinguisher, m.instance.interfaces, m.instance.srv6_locators]), [
+    ["PE1", "0:64500:1", ["CE-A"], { "ipv4 unicast": "LOC", "ipv6 unicast": "LOC-ALGO128" }],
+    ["PE2", "0:64500:2", ["CE-B"], { "ipv4 unicast": "LOC" }],
+  ]);
+  const pe1 = members[0]!.instance;
+  assert.deepEqual(vrfRouteTargets(pe1, "ipv6 unicast", "import"), ["0:64500:1", "0:64500:6"]);
+  assert.deepEqual(vrfRouteTargets(pe1, "ipv6 unicast", "export"), ["0:64500:1"]);
+  assert.deepEqual(vrfRouteTargets(pe1, "ipv4 unicast", "import"), ["0:64500:1"]);
+  assert.deepEqual(vrfInstances(devicesByName(srv6).get("P1")), []);
+  assert.deepEqual(vrfInstances({ hostname: "x" } as unknown as DeviceFacts), []);
+  assert.deepEqual(vrfMembers(srv6, "NONE"), []);
+});
+
+test("staticRoutes and VRF BGP peers (schema 1.7)", () => {
+  const pe2 = srv6.devices.find((d) => d.device === "PE2");
+  assert.deepEqual(staticRoutes(pe2, "CUST-A").map((r) => [r.prefix, r.next_hop, r.interface, r.preference]), [
+    ["203.0.113.128/25", "203.0.113.1", null, "10"],
+    ["203.0.113.64/26", null, "Null0", null],
+  ]);
+  assert.deepEqual(staticRoutes(pe2, "default"), []);
+  assert.deepEqual(staticRoutes(null), []);
+  assert.deepEqual(bgpPeers(devicesByName(srv6).get("PE1")!).map((p) => [p.ip, p.vrf, p.remoteAs]), [
+    ["2001:db8::4", null, 64500],
+    ["198.51.100.1", "CUST-A", 64510],
+    ["2001:db8:100::1", "CUST-A", 64510],
+  ]);
 });

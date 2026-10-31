@@ -106,8 +106,8 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 
 ```json
 {
-  "schema_version": "1.6.0",
-  "generator": {"name": "saos-network-facts", "version": "0.8.0", "translator": "translator 4.2.1 (mcp, https://...)"},
+  "schema_version": "1.7.0",
+  "generator": {"name": "saos-network-facts", "version": "0.9.0", "translator": "translator 4.2.1 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -143,15 +143,17 @@ The full schema, with a description on every field, is
 Facts (all devices): `hostname`, `interfaces`, `gateway`, `vlans`, `ports`, `lags`, `sub_ports`,
 `rings` (G.8032 rings, since schema 1.5 with `ring_id`, `ports` and protection `instances`; see
 [Rings](#rings)), `peers` (MPLS VCs, MPLS-TP tunnel ends, BGP neighbours with `route_reflector_client`;
-what a SAOS 10 neighbour inherits from its `peer-group` is resolved into it),
+what a SAOS 10 neighbour inherits from its `peer-group` is resolved into it; since schema 1.7 a BGP
+neighbour carries its `vrf`, set for the CE neighbours of an L3VPN VRF),
 `isis` (`instances` with `level`, `nets`, `net`, `area_id`, `system_id`, `sr_enabled` and, SAOS 10
 since schema 1.6, `address_families`, `multi_topology`, `srv6_enabled`, `srv6_locators`; `interfaces`
 with `level`, `type`, since schema 1.3 `metrics` (per level the narrow `metric` and `wide_metric`)
 and, SAOS 10 since schema 1.6, `address_families`), `segment_routing` (`srgb`, `prefix_sids`,
 `policies`, `segment_lists`; SAOS 10 since schema 1.6 `srv6.locators` and `flex_algorithms`, see
 [SRv6, Flex-Algo and EVPN](#srv6-flex-algo-and-evpn)),
-`bgp` (`instances` with `router_id`, `cluster_id`, `route_reflector`; BGP `peers` carry `peer_group`
-since schema 1.6), `pseudowires` (`peer`,
+`bgp` (`instances` with `router_id`, `cluster_id`, `route_reflector` and, SAOS 10 since schema 1.7,
+`srv6_locator` / `srv6_locators` per address family; BGP `peers` carry `peer_group` since schema
+1.6), `pseudowires` (`peer`,
 `pw_id`, labels, `mode`, `tunnel_type` and `tunnel_color` since schema 1.1, `service`,
 `service_type`), `cfm` (`meps` with `md`, `ma`, `mep_id`, `level`, `direction`, `port`, `vlan` and,
 since schema 1.4, `ccm_interval` as written, null when the MA leaves the default),
@@ -161,8 +163,9 @@ since schema 1.4, `ccm_interval` as written, null when the MA leaves the default
 `type`, `metric`, timers, `passive`, `bfd`), `tp_corouted_tunnels` (each node's segment of a static
 MPLS-TP co-routed tunnel: `source`, `destination`, `type` ingress / transit / egress, `role`,
 `primary` of a backup, forward and reverse in / out labels, next / previous hop, LSP `bfd`) and
-`l2vpn_services` (`fd`, `pseudowires`, `mtu`, `signaling_type`), and since schema 1.6
-`evpn_instances`.
+`l2vpn_services` (`fd`, `pseudowires`, `mtu`, `signaling_type`), since schema 1.6
+`evpn_instances`, and since schema 1.7 `vrf_instances` and `static_routes` (see
+[VRFs and static routes](#vrfs-and-static-routes)).
 
 Values read from a configuration are text as written (`"mtu": "9000"`); flags the extractor derives
 are booleans. Segment routing, BGP, OSPF and MPLS-TP tunnels are extracted from SAOS 10 only.
@@ -200,7 +203,41 @@ address families and the EVPN instances (all optional fields: older files stay v
   IGP reads `["ipv6 unicast"]`.
 - `evpn_instances[].type` is `vpls`, `vpws` or `fxc` (VLAN-aware flexible cross-connect); the two ends
   of an EVPN-VPWS share the EVI and mirror `local_service_id` / `remote_service_id`. VRFs (L3VPN) are
-  not part of these facts.
+  in `vrf_instances` (schema 1.7, below).
+
+### VRFs and static routes
+
+Since schema 1.7, SAOS 10 devices also carry their VRFs and static routes (optional fields: older
+files stay valid). A VRF merges the `vrf` list entry with what BGP (`bgp instance <as> vrf <name>`)
+and MPLS label management say about it; existing objects are bound to it rather than repeated:
+interfaces by their `vrf`, CE neighbours as BGP `peers` with `vrf` set, static routes by `vrf`.
+
+```json
+{
+  "vrf_instances": [{"name": "CUST-A", "description": "L3VPN service A", "role": null, "bgp_as": "64500",
+                     "route_distinguisher": "0:64500:1", "address_families": ["ipv4 unicast", "ipv6 unicast"],
+                     "route_targets": [{"route_target": "0:64500:1", "type": "both", "address_family": null},
+                                       {"route_target": "0:64500:6", "type": "import", "address_family": "ipv6 unicast"}],
+                     "srv6_locators": {"ipv4 unicast": "LOC", "ipv6 unicast": "LOC-ALGO128"},
+                     "srv6_locator_address": null, "srv6_sid_type": null, "sr_policy_color": null,
+                     "label_allocation": {}, "redistribute": {}, "interfaces": ["CE-A"]}],
+  "static_routes": [{"vrf": "CUST-A", "prefix": "198.51.100.128/25", "family": "ipv4", "next_hop": "198.51.100.1",
+                     "interface": null, "preference": null, "tag": null, "description": "CE-A site LAN"}],
+  "peers": [{"kind": "bgp", "name": "as64500", "ip": "198.51.100.1", "remote_as": "64510", "vrf": "CUST-A",
+             "address_families": ["ipv4 unicast"], "route_reflector_client": false, "peer_group": null}]
+}
+```
+
+- A route target with a null `address_family` applies to every address family of the VRF; `type` is
+  `import`, `export` or `both`.
+- `srv6_locators` gives, per VRF address family, the locator its L3 service SIDs (End.DT4 / End.DT6)
+  come from: the address family's own, else the BGP instance's `vpnv4 unicast` / `vpnv6 unicast`
+  locator, else the instance's `segment-routing srv6 locator` (the device's order of precedence). It
+  is empty for a VRF that does not run over SRv6: an L3VPN over MPLS or SR-MPLS shows its VPN label
+  mode in `label_allocation` (`{"ipv4": "per-vrf"}`), a management VRF has `role` `management`.
+- `static_routes` holds one entry per next hop of each `rib vrf <name> ipv4|ipv6 <prefix>`; `vrf` is
+  `default` for the global table, and a route through an interface alone (`Null0`) has a null
+  `next_hop`.
 
 ### Rings
 

@@ -17,6 +17,39 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-31
+
+### Added
+
+- **Schema 1.7.0: VRFs (L3VPN), static routes, BGP VRF neighbours and SRv6 locators (SAOS 10)** — all
+  new fields are optional, so 1.6 files stay valid. `vrf_instances[]`: each VRF (the `vrf` list, and
+  any VRF only BGP names) with its `description`, `role` (`management` for a management VRF), the
+  BGP instance that carries it (`bgp_as`), `route_distinguisher`, `address_families` (`ipv4 unicast`,
+  `ipv6 unicast`), `route_targets` (import / export / both, VRF-wide or per address family), per
+  address family the `srv6_locators` its L3 service SIDs come from (the VRF address family's own, else
+  the instance's `vpnv4` / `vpnv6 unicast` locator, else the instance's), the VRF's own
+  `srv6_locator_address` / `srv6_sid_type`, `sr_policy_color`, the MPLS VPN `label_allocation`
+  (`per-vrf` / `per-prefix`), `redistribute` per address family, and the `interfaces` bound to it.
+  `static_routes[]`: each next hop of `rib vrf <name> ipv4|ipv6 <prefix>` (`vrf` `default` for the
+  global table) with `next_hop`, outgoing `interface`, `preference`, `tag` and `description`. BGP
+  peers gain `vrf` (CE neighbours of `bgp instance <as> vrf <name> vrf-address-family ... peer`;
+  null for the global table) and BGP instances `srv6_locator` / `srv6_locators` per address family.
+- **npm reader** — `vrfInstances(device)`, `staticRoutes(device, vrf?)` (empty for older files and SAOS
+  6 / 8 devices), `vrfMembers(file, name)`, `vrfRouteTargets(vrf, addressFamily, direction)`, and `vrf`
+  on `bgpPeers(facts)`.
+- **Fixtures** — `labs/srv6-evpn` gains an L3VPN layer: VRF `CUST-A` over SRv6 on PE1 and PE2 with
+  route distinguisher and route targets, a CE-facing interface, VRF static routes and an eBGP CE
+  neighbour, VPNv4 / VPNv6 towards the route reflector; its new files are recorded with translator
+  4.2.1 (the earlier pivots are unchanged) and the expected facts and the example regenerated (the
+  example's CE1 gains its static route). The other expected files only gain the new empty fields.
+
+### Changed
+
+- **Viewer** — a BGP neighbour in a VRF (an L3VPN CE) is no longer taken for an iBGP session of the
+  core, so it draws no edge and no "no device of this file" warning.
+- **`recognised`** — also counts an SAOS 10 `rib` object (static routes) and an `mpls` object that sets
+  a VPN label allocation mode (the rest of `mpls` is still not a fact).
+
 ## [0.8.0] - 2026-10-31
 
 ### Added

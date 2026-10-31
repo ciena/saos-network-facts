@@ -330,7 +330,8 @@ function buildBgp(devices, owner, report) {
   let asn = null;
   for (const [name, f] of devices) {
     asn ??= num(f.bgp?.instances?.[0]?.as);
-    for (const p of (f.peers ?? []).filter((x) => x.kind === 'bgp')) {
+    // a VRF neighbour (schema 1.7: a CE of an L3VPN) is no iBGP session of the core
+    for (const p of (f.peers ?? []).filter((x) => x.kind === 'bgp' && !x.vrf)) {
       const peer = owner.get(p.ip);
       if (!peer) {
         report.warn(`${name}: BGP neighbour ${p.ip} is no device of this file`);

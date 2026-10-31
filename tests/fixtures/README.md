@@ -46,7 +46,14 @@ documentation ranges) and services are made up.
   (`2001:db8:f8:<n>::/64`, algorithm 128, restricted to `CORE`) and, in the services layer, EVPN
   instance 100 (EVPN-VPLS on `FD-EVPN-100`, control word on, over `LOC`, route distinguisher per PE) and 200 (EVPN-VPWS
   on `FD-VPWS-200`, service ids 1 / 2 mirrored, control word off, over `LOC-ALGO128`).
-  No VRFs and no Linux hosts; `platform-map.yaml` gives the device types.
+  An L3VPN layer (`PE1.7-l3vpn.cfg`, `PE2.7-l3vpn.cfg`, `RR1.7-l3vpn.cfg`) adds VRF `CUST-A` over SRv6
+  on the PEs: route distinguisher `0:64500:<n>`, route target `0:64500:1` both ways (PE1 also imports
+  `0:64500:6` in `ipv6 unicast`), a CE-facing interface on VLAN 300 of port 5 (PE1 `CE-A`
+  198.51.100.0/31 and 2001:db8:100::/127, PE2 `CE-B` 203.0.113.0/31), an eBGP CE neighbour in the VRF
+  (AS 64510 / 64511), VRF static routes (`rib vrf CUST-A ...`, PE2 also a `Null0` discard route), the
+  instance's `vpnv4` / `vpnv6 unicast` locator `LOC` with PE1 overriding `ipv6 unicast` to
+  `LOC-ALGO128` in the VRF; the PEs and RR1 activate VPNv4 / VPNv6 towards the route reflector, which
+  reflects them. No Linux hosts; `platform-map.yaml` gives the device types.
 - `cases.yaml`: the extraction cases the tests run; `expected/`: their facts files.
 - `pivots.json`: the translator's recorded replies for every SAOS 10 file (`scripts/record_pivots.py`),
   all recorded with translator 4.2.1.

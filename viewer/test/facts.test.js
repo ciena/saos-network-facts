@@ -153,6 +153,18 @@ describe('importing other facts files', () => {
     expect(net.vpws.pseudowires[0].state).toBe('Up');
   });
 
+  test('a VRF neighbour (a CE of an L3VPN, schema 1.7) is no iBGP session and no warning', () => {
+    const ibgp = (ip) => ({ kind: 'bgp', name: 'as64500', ip, remote_as: '64500', route_reflector_client: false, vrf: null });
+    const imp = importFacts(file([
+      device('R1', '192.0.2.1', [['a', '198.51.100.0/31', '1']], {
+        peers: [ibgp('192.0.2.2'), { kind: 'bgp', name: 'as64500', ip: '203.0.113.1', remote_as: '64510', vrf: 'CUST-A' }],
+      }),
+      device('R2', '192.0.2.2', [['a', '198.51.100.1/31', '1']], { peers: [ibgp('192.0.2.1')] }),
+    ]));
+    expect(buildNetwork(imp.topology, { labelMode: imp.labelMode }).bgp.sessions.map((s) => [s.a, s.b])).toEqual([['R1', 'R2']]);
+    expect(imp.report.warnings).toEqual([]);
+  });
+
   test('a pre-schema bare list is read; another schema major is refused', () => {
     expect(importFacts([device('R1', '192.0.2.1')]).topology.nodes).toHaveLength(1);
     expect(() => importFacts({ schema_version: '2.0.0', devices: [] })).toThrow(/schema_version/);

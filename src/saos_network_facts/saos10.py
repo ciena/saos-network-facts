@@ -5,8 +5,9 @@ The translator turns a CLI or XML configuration into one JSON document keyed by 
 (``openconfig-interfaces:interfaces``, ``ciena-mef-fp:fps``, ...). This module walks that document
 for the facts and returns the same dict shape as ``saos6`` (hostname, interfaces, loopbacks, VLANs,
 ports, LAGs, peers, IS-IS, segment routing, BGP, pseudowires, CFM, G.8032 rings), extended with the
-SAOS 10 objects that carry the same information: forwarding domains, flow points, classifiers, VRFs,
-EVPN segments, OSPF, MPLS-TP co-routed tunnels and L2VPN services.
+SAOS 10 objects that carry the same information: forwarding domains, flow points, classifiers, VRFs
+(with their BGP route distinguisher, route targets, CE neighbours and SRv6 locators), static routes,
+EVPN segments and instances, OSPF, MPLS-TP co-routed tunnels and L2VPN services.
 
 Two translator quirks are handled here:
 
@@ -37,7 +38,8 @@ def new_facts():
     facts = _base_facts()
     facts.update({"fds": [], "fps": [], "classifiers": {}, "vrfs": [], "segments": [], "objects": 0,
                   "ospf": {"instances": [], "interfaces": []}, "tp_corouted_tunnels": [], "l2vpn_services": [],
-                  "evpn_instances": [], BGP_SETTINGS: {}})
+                  "evpn_instances": [], "vrf_instances": [], "static_routes": [], BGP_SETTINGS: {},
+                  VRF_SETTINGS: {"bgp": {}, "labels": {}}})
     facts["segment_routing"].update({"srv6": {"locators": []}, "flex_algorithms": []})
     return facts
 
@@ -52,11 +54,15 @@ OPERATION = "__operation__"
 # BGP peer and peer-group settings while a device's files are folded in, keyed (as, "peer" | "group",
 # address | name); ``finish`` resolves the inheritance and drops them (they are not facts of their own).
 BGP_SETTINGS = "_bgp_settings"
+# What BGP (``bgp instance <as> vrf <name>``) and MPLS label management say about each VRF, while a
+# device's files are folded in; ``finish`` merges it into ``vrf_instances`` and drops it.
+VRF_SETTINGS = "_vrf_settings"
 EDIT_PATH = "__edit_path__"
 REMOVE = "__remove__"
 # List keys (and the leaves naming an entry) that a leaf delete repeats on its path.
 KEYS = {"name", "tag", "id", "ptp-id", "xcvr-id", "source-ip", "destination-ip", "vrfName", "prefix", "address",
-        "as", "color", "endpoint", "mep-identifier", "ring-name", "instance-name", "port-id"}
+        "as", "color", "endpoint", "mep-identifier", "ring-name", "instance-name", "port-id",
+        "destination-prefix", "afi", "safi", "af-type"}
 
 
 def clean(obj):
@@ -93,6 +99,12 @@ def _sets_leaf(obj, top=True):
         elif not isinstance(value, dict) or _sets_leaf(value, top=False):
             return True
     return False
+
+
+def removed_leaves(obj):
+    """The local names of the leaves a leaf delete (``no <path> <leaf>``) removes from this entry."""
+    marks = obj.get(REMOVE) if isinstance(obj, dict) else None
+    return {local(str(k)) for k in (marks if isinstance(marks, (dict, list)) else [marks] if marks else [])}
 
 
 def path_only(obj):
@@ -405,7 +417,8 @@ def _new_settings():
 
 def _bgp_peer(facts, asn, peer):
     ip = text(get(peer, "address"))
-    current = next((p for p in facts["peers"] if p["kind"] == "bgp" and p["ip"] == ip and p["name"] == f"as{asn}"), None)
+    current = next((p for p in facts["peers"] if p["kind"] == "bgp" and p["ip"] == ip and p["name"] == f"as{asn}"
+                    and p.get("vrf") is None), None)
     if removed(peer):
         facts["peers"] = [p for p in facts["peers"] if p is not current]
         facts[BGP_SETTINGS].pop((asn, "peer", ip), None)
@@ -414,7 +427,7 @@ def _bgp_peer(facts, asn, peer):
         return
     if current is None:
         current = {"kind": "bgp", "name": f"as{asn}", "ip": ip, "remote_as": None,
-                   "route_reflector_client": False, "address_families": [], "peer_group": None}
+                   "route_reflector_client": False, "address_families": [], "peer_group": None, "vrf": None}
         facts["peers"].append(current)
     settings = facts[BGP_SETTINGS].setdefault((asn, "peer", ip), _new_settings())
     if get(peer, "peer-group") is not None:
@@ -436,6 +449,7 @@ def _bgp(facts, container):
         facts["peers"] = [p for p in facts["peers"] if p["kind"] != "bgp"]
         facts["bgp"]["instances"] = []
         facts[BGP_SETTINGS] = {}
+        facts[VRF_SETTINGS]["bgp"] = {}
         return
     for instance in entries(container, "instance"):
         asn = text(get(instance, "as"))
@@ -443,18 +457,154 @@ def _bgp(facts, container):
             facts["peers"] = [p for p in facts["peers"] if not (p["kind"] == "bgp" and p["name"] == f"as{asn}")]
             facts["bgp"]["instances"] = [i for i in facts["bgp"]["instances"] if i["as"] != asn]
             facts[BGP_SETTINGS] = {k: v for k, v in facts[BGP_SETTINGS].items() if k[0] != asn}
+            facts[VRF_SETTINGS]["bgp"] = {k: v for k, v in facts[VRF_SETTINGS]["bgp"].items() if k[0] != asn}
             continue
         current = next((i for i in facts["bgp"]["instances"] if i["as"] == asn), None)
         if current is None:
-            current = {"as": asn, "router_id": None, "cluster_id": None, "route_reflector": False}
+            current = {"as": asn, "router_id": None, "cluster_id": None, "route_reflector": False,
+                       "srv6_locator": None, "srv6_locators": {}}
             facts["bgp"]["instances"].append(current)
         for key, leaf in (("router_id", "router-id"), ("cluster_id", "cluster-id")):
             if get(instance, leaf) is not None:
                 current[key] = text(get(instance, leaf))
+        _bgp_srv6_locators(current, instance)
         for group in entries(instance, "peer-group"):
             _bgp_group(facts, asn, group)
         for peer in entries(instance, "peer"):
             _bgp_peer(facts, asn, peer)
+        for vrf in entries(instance, "vrf"):
+            _bgp_vrf(facts, asn, vrf)
+
+
+def _af_name(entry, afi="afi", safi="safi"):
+    """``<afi> <safi>`` of an address-family entry (``ipv4 unicast``, ``vpnv6 unicast``), or None."""
+    return " ".join(x for x in (text(get(entry, afi)), text(get(entry, safi))) if x) or None
+
+
+def _bgp_srv6_locators(current, instance):
+    """The SRv6 locators a BGP instance allocates its service SIDs from: ``segment-routing srv6 locator``
+    for the whole instance and ``address-family <afi> <safi> segment-routing-srv6 locator`` per address
+    family (``vpnv4 unicast``, ``vpnv6 unicast``). A VRF address family's own locator wins over the
+    instance's address family, which wins over the instance (``finish`` applies that to each VRF)."""
+    srv6 = get(get(instance, "segment-routing"), "srv6")
+    if removed(srv6) or removed(get(srv6, "locator")):
+        current["srv6_locator"] = None
+    elif get(srv6, "locator") is not None:
+        current["srv6_locator"] = text(get(srv6, "locator"))
+    for af in entries(instance, "address-family"):
+        name = _af_name(af)
+        if not name:
+            continue
+        sr = get(af, "segment-routing-srv6")
+        if removed(af) or removed(sr):
+            current["srv6_locators"].pop(name, None)
+        elif get(sr, "locator") is not None:
+            current["srv6_locators"][name] = text(get(sr, "locator"))
+
+
+def _new_bgp_vrf():
+    return {"route_distinguisher": None, "route_targets": [], "address_families": [], "srv6_locators": {},
+            "redistribute": {}}
+
+
+def _route_targets(store, entries_, af):
+    """``route-target <id> direction import|export|both`` entries into ``store`` (one per id and address
+    family; ``af`` None for the targets the VRF sets for every address family)."""
+    for target in entries_:
+        value = text(get(target, "id"))
+        if not value:
+            continue
+        old = next((t for t in store if t["route_target"] == value and t["address_family"] == af), None)
+        if removed(target):
+            store[:] = [t for t in store if t is not old]
+        elif old is None:
+            store.append({"route_target": value, "type": text(get(target, "direction")), "address_family": af})
+        elif get(target, "direction") is not None:
+            old["type"] = text(get(target, "direction"))
+
+
+def _bgp_vrf(facts, asn, vrf):
+    """``bgp instance <as> vrf <name>``: the BGP side of an L3VPN VRF (RFC 4364): its route
+    distinguisher, its route targets (for every address family, and per ``vrf-address-family``), the
+    address families it runs (``ipv4 unicast``, ``ipv6 unicast``), per address family the SRv6 locator
+    its service SIDs come from (End.DT4 / End.DT6, ``segment-routing-srv6 locator``) and the protocols
+    it redistributes, and the CE neighbours (``vrf-address-family <afi> <safi> peer <address>``), which
+    become BGP ``peers`` with ``vrf`` set."""
+    name = text(get(vrf, "name"))
+    if not name:
+        return
+    store = facts[VRF_SETTINGS]["bgp"]
+    if removed(vrf):
+        store.pop((asn, name), None)
+        facts["peers"] = [p for p in facts["peers"] if not (p["kind"] == "bgp" and p["name"] == f"as{asn}" and p.get("vrf") == name)]
+        return
+    if path_only(vrf) and (asn, name) not in store:
+        return
+    current = store.setdefault((asn, name), _new_bgp_vrf())
+    rd = get(vrf, "route-distinguisher")
+    if isinstance(rd, dict) and removed(rd):
+        current["route_distinguisher"] = None
+    elif rd is not None and not isinstance(rd, dict):
+        current["route_distinguisher"] = text(rd)
+    if "route-distinguisher" in removed_leaves(vrf):
+        current["route_distinguisher"] = None
+    _route_targets(current["route_targets"], entries(vrf, "route-target"), None)
+    for af in entries(vrf, "vrf-address-family"):
+        af_name = _af_name(af)
+        if not af_name:
+            continue
+        if removed(af):
+            current["address_families"] = [a for a in current["address_families"] if a != af_name]
+            current["route_targets"] = [t for t in current["route_targets"] if t["address_family"] != af_name]
+            current["srv6_locators"].pop(af_name, None)
+            current["redistribute"].pop(af_name, None)
+            for peer in facts["peers"]:
+                if peer["kind"] == "bgp" and peer["name"] == f"as{asn}" and peer.get("vrf") == name:
+                    peer["address_families"] = [a for a in peer["address_families"] if a != af_name]
+            facts["peers"] = [p for p in facts["peers"] if not (p.get("vrf") == name and p["kind"] == "bgp"
+                                                               and p["name"] == f"as{asn}" and not p["address_families"])]
+            continue
+        _add(current["address_families"], af_name)
+        _route_targets(current["route_targets"], entries(af, "route-target"), af_name)
+        sr = get(af, "segment-routing-srv6")
+        if removed(sr):
+            current["srv6_locators"].pop(af_name, None)
+        elif get(sr, "locator") is not None:
+            current["srv6_locators"][af_name] = text(get(sr, "locator"))
+        for item in entries(af, "redistribute"):
+            protocol = text(get(item, "protocol"))
+            protocols = current["redistribute"].setdefault(af_name, [])
+            if removed(item):
+                current["redistribute"][af_name] = [x for x in protocols if x != protocol]
+            elif protocol:
+                _add(protocols, protocol)
+        for peer in entries(af, "peer"):
+            _bgp_vrf_peer(facts, asn, name, af_name, peer)
+
+
+def _bgp_vrf_peer(facts, asn, vrf, af, peer):
+    """A CE neighbour of a VRF (``vrf-address-family <afi> <safi> peer <address>``): one BGP peer per
+    address, with ``vrf`` set and the VRF address families it is configured in."""
+    ip = text(get(peer, "address"))
+    current = next((p for p in facts["peers"] if p["kind"] == "bgp" and p["ip"] == ip and p["name"] == f"as{asn}"
+                    and p.get("vrf") == vrf), None)
+    if removed(peer):
+        if current is not None:
+            current["address_families"] = [a for a in current["address_families"] if a != af]
+            if not current["address_families"]:
+                facts["peers"] = [p for p in facts["peers"] if p is not current]
+        return
+    if current is None:
+        if path_only(peer):
+            return
+        current = {"kind": "bgp", "name": f"as{asn}", "ip": ip, "remote_as": None,
+                   "route_reflector_client": False, "address_families": [], "peer_group": None, "vrf": vrf}
+        facts["peers"].append(current)
+    _add(current["address_families"], af)
+    if get(peer, "remote-as") is not None:
+        current["remote_as"] = text(get(peer, "remote-as"))
+    if get(peer, "route-reflector-client") is not None:
+        current["route_reflector_client"] = bool(flag(get(peer, "route-reflector-client")))
 
 
 def _bgp_resolve(facts):
@@ -464,8 +614,8 @@ def _bgp_resolve(facts):
     one address family."""
     settings = facts.pop(BGP_SETTINGS, {})
     for peer in facts["peers"]:
-        if peer["kind"] != "bgp":
-            continue
+        if peer["kind"] != "bgp" or peer.get("vrf") is not None:
+            continue  # a VRF neighbour has no peer group: its own settings are already in place
         asn = peer["name"][2:]
         own = settings.get((asn, "peer", peer["ip"]), _new_settings())
         group = settings.get((asn, "group", own["group"]), _new_settings()) if own["group"] else _new_settings()
@@ -478,26 +628,120 @@ def _bgp_resolve(facts):
 
 
 def _vrfs(facts, container):
+    """A ``vrfs`` container of ``vrf`` entries keyed by ``name``; read like the ``vrf`` list."""
     if removed(container):
-        facts["vrfs"] = []
+        facts["vrfs"], facts["vrf_instances"] = [], []
         return
     for vrf in entries(container, "vrf"):
-        if removed(vrf):
-            _drop(facts, "vrf", text(get(vrf, "name")))
-        elif not path_only(vrf):
-            _add(facts["vrfs"], text(get(vrf, "name")))
+        _vrf_entry(facts, text(get(vrf, "name")), vrf)
 
 
 def _vrf_list(facts, container):
-    """``ciena-vrf:vrf``, the top-level VRF list keyed by ``vrfName`` (what NETCONF configs carry)."""
+    """``ciena-vrf:vrf``, the top-level VRF list keyed by ``vrfName``."""
     for vrf in as_list(container):
-        name = text(get(vrf, "vrfName"))
+        _vrf_entry(facts, text(get(vrf, "vrfName")), vrf)
+
+
+def _new_vrf(name):
+    return {"name": name, "description": None, "role": None, "srv6_locator_address": None, "srv6_sid_type": None,
+            "sr_policy_color": None}
+
+
+def _vrf_entry(facts, name, vrf):
+    """A VRF (a routing and forwarding instance of its own) with its description, its role (``data``,
+    or ``management`` for a management VRF), the SRv6 locator address and SID type it allocates its
+    service SIDs with (``segment-routing-srv6 locator <ipv6> sid-type u-sid``) and the SR policy color
+    that steers its traffic (``sr-policy color``)."""
+    if not name:
+        return
+    if removed(vrf):
+        _drop(facts, "vrf", name)
+        return
+    current = next((v for v in facts["vrf_instances"] if v["name"] == name), None)
+    if path_only(vrf) and current is None:
+        return
+    _add(facts["vrfs"], name)
+    if current is None:
+        current = _new_vrf(name)
+        facts["vrf_instances"].append(current)
+    for key, value in (("description", get(vrf, "description")), ("role", get(vrf, "role")),
+                       ("sr_policy_color", get(get(vrf, "sr-policy"), "color"))):
+        _set(current, key, text(value))
+    srv6 = get(vrf, "segment-routing-srv6")
+    if removed(srv6):
+        current["srv6_locator_address"] = current["srv6_sid_type"] = None
+    else:
+        _set(current, "srv6_locator_address", text(get(srv6, "locator")))
+        _set(current, "srv6_sid_type", text(get(srv6, "sid-type")))
+    for key in removed_leaves(vrf) & {"description", "role"}:
+        current[key] = None
+
+
+def _rib(facts, container):
+    """``ciena-rib:rib``: static routes per VRF (``rib vrf <name> ipv4|ipv6 <prefix>``; ``default`` is
+    the global table). Each next hop is one route: ``next-hop <address>`` (optionally through
+    ``outgoing-interface-name``) or ``outgoing-interface <name>`` alone (``Null0`` discards), with its
+    route preference (administrative distance), tag and description."""
+    routes = facts["static_routes"]
+    if removed(container):
+        facts["static_routes"] = []
+        return
+    for vrf in entries(container, "vrf"):
+        name = text(get(vrf, "name"))
+        if removed(vrf):
+            facts["static_routes"] = routes = [r for r in routes if r["vrf"] != name]
+            continue
+        for family in ("ipv4", "ipv6"):
+            for route in entries(vrf, family):
+                prefix = text(get(route, "destination-prefix"))
+                if removed(route):
+                    facts["static_routes"] = routes = [r for r in routes if not (r["vrf"] == name and r["prefix"] == prefix)]
+                    continue
+                for kind, leaf in (("next_hop", "address"), ("interface", "name")):
+                    for hop in entries(route, "next-hop" if kind == "next_hop" else "outgoing-interface"):
+                        value = text(get(hop, leaf))
+                        old = next((r for r in routes if r["vrf"] == name and r["prefix"] == prefix and r[kind] == value
+                                    and (kind == "next_hop" or r["next_hop"] is None)), None)
+                        if removed(hop):
+                            facts["static_routes"] = routes = [r for r in routes if r is not old]
+                            continue
+                        if old is None:
+                            if path_only(hop):
+                                continue
+                            old = {"vrf": name, "prefix": prefix, "family": family, "next_hop": None, "interface": None,
+                                   "preference": None, "tag": None, "description": None}
+                            old[kind] = value
+                            routes.append(old)
+                        for key, sub in (("preference", "route-preference"), ("tag", "tag"), ("description", "description")):
+                            _set(old, key, text(get(hop, sub)))
+                        if kind == "next_hop":
+                            _set(old, "interface", text(get(hop, "outgoing-interface-name")))
+
+
+def _mpls(facts, container):
+    """``mpls label-management allocation-mode vrf <name> address-family ipv4|ipv6 mode``: how an
+    L3VPN over MPLS / SR-MPLS allocates its VPN labels (``per-vrf`` or ``per-prefix``), per VRF. The
+    rest of ``mpls`` (interfaces, label blocks) is not a fact: returns False when there is none of this."""
+    labels = facts[VRF_SETTINGS]["labels"]
+    allocation = get(get(container, "label-management"), "allocation-mode")
+    if removed(container) or removed(get(container, "label-management")) or removed(allocation):
+        labels.clear()
+        return None
+    if allocation is None:
+        return False
+    for vrf in entries(allocation, "vrf"):
+        name = text(get(vrf, "name"))
         if not name:
             continue
         if removed(vrf):
-            _drop(facts, "vrf", name)
-        elif not path_only(vrf):
-            _add(facts["vrfs"], name)
+            labels.pop(name, None)
+            continue
+        for af in entries(vrf, "address-family"):
+            af_type = text(get(af, "af-type"))
+            if removed(af):
+                labels.get(name, {}).pop(af_type, None)
+            elif af_type and get(af, "mode") is not None:
+                labels.setdefault(name, {})[af_type] = text(get(af, "mode"))
 
 
 def _ptps(facts, container):
@@ -1089,6 +1333,8 @@ HANDLERS = {
     "bgp": _bgp,
     "vrfs": _vrfs,
     "vrf": _vrf_list,
+    "rib": _rib,
+    "mpls": _mpls,
     "ptps": _ptps,
     "xcvrs": _xcvrs,
     "evpn": _evpn,
@@ -1111,8 +1357,7 @@ def extract(pivot, facts=None):
             continue
         facts["objects"] += 1
         handler = HANDLERS.get(local(key))
-        if handler:
-            handler(facts, container)
+        if handler and handler(facts, container) is not False:  # False: the object carries no fact
             facts["recognised"] += 1
     facts["lines"] = facts["objects"]
     return facts
@@ -1157,6 +1402,7 @@ def finish(facts):
             pw["service_type"] = modes.get(svc["fd"]) if modes.get(svc["fd"]) in ("vpws", "vpls") else None
     _ospf_areas(facts)
     _isis_address_families(facts)
+    _vrf_instances(facts)
     fps = {fp["name"]: fp for fp in facts["fps"]}
     for mep in facts["cfm"]["meps"]:
         fp = fps.get(mep["interface"])
@@ -1168,6 +1414,37 @@ def finish(facts):
                 _add(_port(facts, mep["port"])["roles"], "cfm-mep")
     finish_rings(facts)
     return finish_isis(facts)
+
+
+def _vrf_instances(facts):
+    """Each VRF with what BGP and MPLS say about it: the VRFs the ``vrf`` list defines, then any that
+    only BGP names. Its address families, route distinguisher and route targets, the SRv6 locator each
+    address family takes its service SIDs from (its own, else the BGP instance's ``vpnv4 unicast`` /
+    ``vpnv6 unicast`` locator, else the instance's), the VPN label allocation, and the interfaces bound
+    to it (``vrfName``). A VRF in more than one BGP instance takes the first."""
+    settings = facts.pop(VRF_SETTINGS, {"bgp": {}, "labels": {}})
+    instances = {i["as"]: i for i in facts["bgp"]["instances"]}
+    vrfs = facts["vrf_instances"]
+    names = [v["name"] for v in vrfs]
+    for (_, name) in settings["bgp"]:
+        if name not in names:
+            names.append(name)
+            vrfs.append(_new_vrf(name))
+    for vrf in vrfs:
+        asn, bgp = next(((k[0], v) for k, v in settings["bgp"].items() if k[1] == vrf["name"]), (None, _new_bgp_vrf()))
+        instance = instances.get(asn) or {}
+        locators = {}
+        for af in bgp["address_families"]:
+            vpn = {"ipv4 unicast": "vpnv4 unicast", "ipv6 unicast": "vpnv6 unicast"}.get(af)
+            locator = (bgp["srv6_locators"].get(af) or (instance.get("srv6_locators") or {}).get(vpn)
+                       or instance.get("srv6_locator"))
+            if locator:
+                locators[af] = locator
+        vrf.update({"bgp_as": asn, "route_distinguisher": bgp["route_distinguisher"],
+                    "address_families": list(bgp["address_families"]), "route_targets": bgp["route_targets"],
+                    "srv6_locators": locators, "redistribute": {k: v for k, v in bgp["redistribute"].items() if v},
+                    "label_allocation": dict(settings["labels"].get(vrf["name"], {})),
+                    "interfaces": [i["name"] for i in facts["interfaces"] if i.get("vrf") == vrf["name"]]})
 
 
 def _isis_address_families(facts):
@@ -1253,6 +1530,7 @@ def apply_removals(facts, objects):
             facts["classifiers"].pop(name, None)
         elif kind == "vrf":
             facts["vrfs"] = [v for v in facts["vrfs"] if v != name]
+            facts["vrf_instances"] = [v for v in facts.get("vrf_instances", []) if v["name"] != name]
         elif kind == "ethernet-segment":
             facts["segments"] = [s for s in facts.get("segments", []) if s["name"] != name]
         elif kind == "pseudowire":
