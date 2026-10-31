@@ -19,6 +19,11 @@ export const LABS = [
     title: 'G.8032 two-ring lab (fixture, links from --clab)',
     source: '../tests/fixtures/expected/g8032-two-ring.facts.json',
   },
+  {
+    id: 'g8032-by-name',
+    title: 'G.8032 ring without ring ids (fixture, joined by name)',
+    source: '../tests/fixtures/expected/g8032-by-name.facts.json',
+  },
 ];
 
 // The files to stage: labs/index.json and one facts.json per lab, as { path: text }.

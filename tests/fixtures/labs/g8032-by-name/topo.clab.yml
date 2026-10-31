@@ -1,0 +1,25 @@
+# A G.8032 major ring on SAOS 10 configured in the CLI's nested form without a ring-id (the YANG
+# key is the ring name; ring-id is optional and defaults to 1): AR_1 - AR_2 - AR_3 - AR_4, the RPL
+# between AR_2 (owner) and AR_3 (neighbour). The devices' rings can only be joined by their name.
+name: g8032-by-name
+topology:
+  defaults:
+    kind: ciena_saos
+  nodes:
+    AR_1:
+      type: '5162'
+      startup-config: configs/AR_1.cfg
+    AR_2:
+      type: '5162'
+      startup-config: configs/AR_2.cfg
+    AR_3:
+      type: '5162'
+      startup-config: configs/AR_3.cfg
+    AR_4:
+      type: '5162'
+      startup-config: configs/AR_4.cfg
+  links:
+    - endpoints: ["AR_1:2", "AR_2:1"]
+    - endpoints: ["AR_2:2", "AR_3:1"]
+    - endpoints: ["AR_3:2", "AR_4:1"]
+    - endpoints: ["AR_4:2", "AR_1:1"]

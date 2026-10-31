@@ -360,8 +360,8 @@ def apply(facts, line):
         _pseudowire(facts, str(kv["mpls-vc"]))["service"] = _s(kv["vs"])
         return True
 
-    if t[0] == "ring-protection" and len(t) > 2:
-        return _ring_protection(facts, t, head)
+    if len(t) > 2 and _abbreviates(t[0], "ring-protection"):
+        return _ring_protection(facts, t)
 
     if t[0] == "mpls" and len(t) > 3 and t[1] == "l2-vpn" and t[2] == "create" and t[3] in ("static-vc", "dynamic-vc"):
         name = after(t, t[3])
@@ -448,12 +448,26 @@ def _cfm_service(facts, name):
     return facts.setdefault("_cfm_services", {}).setdefault(name, {})
 
 
-def _ring_protection(facts, t, head):
+def _abbreviates(word, *commands):
+    """The command ``word`` stands for under the CLI's partial command recognition (the first
+    characters that identify a command are enough: ``ring virtual-ring add`` is
+    ``ring-protection virtual-ring add``), or None when it is none of ``commands`` or too short
+    (fewer than four characters) to be read as one."""
+    word = word.lower()
+    full = [c for c in commands if c.startswith(word)]
+    return full[0] if len(word) >= 4 and len(full) == 1 else None
+
+
+def _ring_protection(facts, t):
     """``ring-protection logical-ring ...`` (a G.8032 ring: its two ports, ring id and timers) and
     ``ring-protection virtual-ring ...`` (a protection instance on a logical ring: R-APS VID, MEG
     level, sub-ring termination, RPL owner, revertive, and the VLANs (SAOS 6) or virtual switches
     (SAOS 8) it protects). Timers are configured on the logical ring and reported on each of its
-    instances in ``finish``; port hold-off stays on the ring port."""
+    instances in ``finish``; port hold-off stays on the ring port. Abbreviated command words
+    (``ring virtual-ring add ...``) are read as the full ones; ``delete`` removes the ring or the
+    instance (a config that deletes before it creates must not double them)."""
+    t = ["ring-protection", _abbreviates(t[1], "logical-ring", "virtual-ring") or t[1], *t[2:]]
+    head = " ".join(t[:3])
     kv = _lower_keys(pairs(t[3:]))
     if head == "ring-protection logical-ring create" and _s(kv.get("logical-ring-name")):
         ring = _ring(facts, _s(kv["logical-ring-name"]))
@@ -468,6 +482,16 @@ def _ring_protection(facts, t, head):
         return True
     if head == "ring-protection logical-ring set" and _s(kv.get("ring")):
         _ring_timers(facts, _ring(facts, _s(kv["ring"])), kv)
+        return True
+    if head == "ring-protection logical-ring delete" and _s(kv.get("ring")):
+        ring = next((r for r in facts["rings"] if r["name"] == _s(kv["ring"])), None)
+        if ring is None:
+            return False
+        facts["rings"].remove(ring)
+        facts.get("_ring_timers", {}).pop(ring["name"], None)
+        for port in (ring["west"], ring["east"]):
+            if port and port in facts["ports"] and "ring" in facts["ports"][port]["roles"]:
+                facts["ports"][port]["roles"].remove("ring")
         return True
     if head == "ring-protection virtual-ring create" and _s(kv.get("virtual-ring-name")) and _s(kv.get("logical-ring")):
         instance = new_ring_instance(_s(kv["virtual-ring-name"]))
@@ -491,6 +515,11 @@ def _ring_protection(facts, t, head):
         for port in ("west", "east"):
             if _s(kv.get(f"{port}-port-rpl")):
                 set_rpl(instance, port, _s(kv[f"{port}-port-rpl"]))
+        return True
+    if head == "ring-protection virtual-ring delete":
+        for ring in facts["rings"]:
+            if instance in ring["instances"]:
+                ring["instances"].remove(instance)
         return True
     if head == "ring-protection virtual-ring unset":
         flags = {x.lower() for x in t[5:]}

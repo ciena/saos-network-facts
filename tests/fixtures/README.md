@@ -23,10 +23,16 @@ documentation ranges) and services are made up.
   port1, neighbour RM_1 port0) and a sub-ring RM_1 - RS_1 - RS_2 - RM_4 without a virtual channel (ring
   id 2, VID 4089, RPL owner RM_1 port1, neighbour RS_1 port0), both protecting the VPLS forwarding
   domain `ring_1-fd`; CE_1..3 hang off RM_2, RM_3 and RS_1 with no rings.
+- `labs/g8032-by-name/`: a G.8032 major ring on four SAOS 10 devices (5162s, a containerlab topology with
+  its links) written in the CLI's nested form with quoted names and **no ring-id**, as SAOS 10 CLI configs
+  usually are (the YANG key is the ring name; ring-id is optional): ring `RING_A` AR_1 - AR_2 - AR_3 - AR_4,
+  instance `VR_A` (R-APS VID 4000, level 1, WTR 1 min, RPL owner AR_2 port1, neighbour AR_3 port0)
+  protecting the VPLS forwarding domain `ring-fd`. The viewer joins the devices' rings by name.
 - `labs/g8032-saos6/`: a configs directory of three SAOS 6 devices and one SAOS 8 device:
   interconnection node A1 (major ring `lr1` with RPL owner on its east port, sub-ring `lr2` terminating
   on its east port), A2 on the major ring, S1 and S2 on the sub-ring (S1 owns the sub-ring's RPL; S2 is
-  SAOS 8 and protects a virtual switch instead of VLANs); `platform-map.yaml` gives the device types.
+  SAOS 8 and protects a virtual switch instead of VLANs); A2 writes its virtual-ring commands in the CLI's
+  short form (`ring virtual-ring ...`, partial command recognition); `platform-map.yaml` gives the device types.
 - `cases.yaml`: the extraction cases the tests run; `expected/`: their facts files.
 - `pivots.json`: the translator's recorded replies for every SAOS 10 file (`scripts/record_pivots.py`),
   all recorded with translator 4.2.1.

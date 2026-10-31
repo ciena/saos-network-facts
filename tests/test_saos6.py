@@ -169,3 +169,41 @@ def test_virtual_ring_pass_through_node_unset_and_saos8_virtual_switch_members()
     assert vr2["rpl"] == [] and vr2["revertive"] is None
     assert vr2["timers"] == {"wtr": None, "guard": "500", "hold_off": None}
     assert (f["lines"], f["recognised"]) == (8, 6)  # the unknown ring and the show command produce nothing
+
+
+def test_virtual_ring_commands_in_the_clis_short_form_and_deletes():
+    """Partial command recognition: ``ring virtual-ring add`` is ``ring-protection virtual-ring add``
+    (and ``ring logical-ring``, ``ring-prot``); a delete removes the instance or the ring, so a config
+    that deletes before it creates does not double them. A word shorter than ``ring`` is not read."""
+    f = facts(
+        "ring virtual-ring delete ring vr1",  # nothing to delete yet
+        "ring logical-ring delete ring lr1",
+        "ring-prot logical-ring create logical-ring-name lr1 ring-id 1 west-port 24 east-port 23",
+        "ring-protection virtual-ring create virtual-ring-name vr1 logical-ring lr1 raps-vid 4081 mel 0",
+        "ring virtual-ring add ring vr1 vid 1000",
+        "ring virtual add ring vr1 vid 1001",
+        "RING VIRTUAL-RING set ring vr1 west-port-rpl owner",
+        "rin virtual-ring add ring vr1 vid 1002",
+    )
+    (lr1,) = f["rings"]
+    assert (lr1["name"], lr1["ring_id"], lr1["west"], lr1["east"]) == ("lr1", "1", "24", "23")
+    (vr1,) = lr1["instances"]
+    assert vr1["members"] == ["1000", "1001"]
+    assert vr1["rpl"] == [{"port": "west", "interface": "24", "role": "owner"}]
+    assert (f["lines"], f["recognised"]) == (8, 5)  # the two deletes of nothing and the 3-letter word are not recognised
+
+    g = facts(
+        "ring-protection logical-ring create logical-ring-name lr1 ring-id 1 west-port 24 east-port 23",
+        "ring-protection virtual-ring create virtual-ring-name vr1 logical-ring lr1 raps-vid 4081 mel 0",
+        "ring virtual-ring add ring vr1 vid 1000",
+        "ring virtual-ring delete ring vr1",
+        "ring logical-ring delete ring lr1",
+        "ring-protection logical-ring create logical-ring-name lr1 ring-id 1 west-port 24 east-port 23",
+        "ring-protection virtual-ring create virtual-ring-name vr1 logical-ring lr1 raps-vid 4081 mel 0",
+    )
+    (lr1,) = g["rings"]
+    assert [i["name"] for i in lr1["instances"]] == ["vr1"]
+    assert g["ports"]["24"]["roles"] == ["ring"] and g["recognised"] == 7
+    h = facts("ring-protection logical-ring create logical-ring-name lr1 ring-id 1 west-port 24 east-port 23",
+              "ring logical-ring delete ring lr1")
+    assert h["rings"] == [] and h["ports"]["24"]["roles"] == []

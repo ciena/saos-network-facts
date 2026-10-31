@@ -161,3 +161,97 @@ describe('a pure L2 ring lab placed by the facts file\'s links[]', () => {
     expect(buildNetwork(two.topology, { labelMode: two.labelMode }).g8032.rings.map((r) => r.state)).toEqual(['idle', 'idle']);
   });
 });
+
+describe('a SAOS 10 CLI ring without ring ids, joined by name', () => {
+  // SAOS 10 CLI configs normally leave `ring-id` out (the YANG key is the ring name): the four
+  // devices' rings carry ring_id null and are one ring, RING_A, by their name.
+  const file = readFileSync(new URL('../../tests/fixtures/expected/g8032-by-name.facts.json', import.meta.url), 'utf8');
+  const named = importFacts(file);
+  const topo4 = named.topology;
+
+  test('one ring across the four devices, with its RPL and path', () => {
+    expect(topo4.rings).toHaveLength(1);
+    const [ring] = topo4.rings;
+    expect(ring).toMatchObject({ id: 'name:RING_A', ringId: null, joinedBy: 'name', name: 'RING_A', type: 'major', rapsVid: 4000, level: 1, wtrMin: 1, members: ['ring-fd'] });
+    expect(ring.nodes.map((n) => [n.node, n.rpl])).toEqual([['AR_1', null], ['AR_2', 'owner'], ['AR_3', 'neighbor'], ['AR_4', null]]);
+    expect(ring.rpl).toEqual({ link: 'AR_2-AR_3', owner: 'AR_2', neighbor: 'AR_3' });
+    expect(ring.path).toEqual({ nodes: ['AR_2', 'AR_1', 'AR_4', 'AR_3'], links: ['AR_1-AR_2', 'AR_4-AR_1', 'AR_3-AR_4', 'AR_2-AR_3'], closed: true });
+    expect(named.report.warnings).toEqual([]);
+    expect(named.report.gaps.ring.map((i) => [i.source, i.item])).toEqual([
+      ['facts', '1 G.8032 rings'], ['derived', 'ring links'], ['derived', 'rings joined by name'], ['default', 'protection timers'],
+    ]);
+    expect(named.report.gaps.ring[2].detail).toMatch(/^RING_A: no device configures a ring id/);
+  });
+
+  test('idle state and a failure replay on the name-joined ring: the RPL blocks, R-APS uses the default ring id 1', () => {
+    const net4 = buildNetwork(topo4, { labelMode: named.labelMode });
+    expect(net4.g8032.rings[0]).toMatchObject({ state: 'idle', blocked: [{ node: 'AR_2', link: 'AR_2-AR_3', why: 'RPL' }, { node: 'AR_3', link: 'AR_2-AR_3', why: 'RPL' }] });
+    const s = replayFailure(topo4, 'AR_4-AR_1', { labelMode: named.labelMode, detection: 'los' });
+    const sf = s.replay.steps.find((x) => x.title === 't=10 ms: RING_A R-APS(SF) AR_1 -> AR_2');
+    expect(sf.actions).toContain('RPL owner: unblock the RPL port on AR_2-AR_3');
+    expect(sf.headers[0].fields).toMatchObject({ dst: '01:19:a7:00:00:01', 'VLAN (R-APS)': 4000 });
+    const prot = s.replay.steps.find((x) => x.title === 't=30 ms: RING_A: protection state');
+    expect(prot.actions[0]).toBe('RPL AR_2-AR_3 forwarding (unblocked by AR_2 and AR_3); AR_4-AR_1 blocked at AR_4 and AR_1');
+    expect(titles(s).at(-1)).toBe('t=120.03 s: RING_A: idle state restored');
+  });
+
+  // Hand-made files for the join rules: a ring id wins over the name; an id-less ring joins the one
+  // ring id its name has elsewhere; two ids under one name leave the id-less ring alone.
+  const ring = (ringName, ringId, rapsVid, ports, rpl = []) => ({
+    name: ringName, ring_id: ringId, west: ports[0], east: ports[1], ports: [{ name: 'port0', interface: ports[0] }, { name: 'port1', interface: ports[1] }],
+    instances: [{ name: `${ringName}-i`, type: 'major', raps_vid: rapsVid, raps_level: 7, virtual_channel: null, termination: null, sub_ring_of: null, revertive: null, timers: {}, members: [], rpl }],
+  });
+  const dev = (name, rings) => ({ device: name, type: '5162', status: 'ok', facts: { hostname: name, interfaces: [], fps: [], ports: {}, isis: { instances: [], interfaces: [] }, peers: [], pseudowires: [], cfm: { meps: [] }, rings } });
+  const square = (a, b, c, d) => [{ a: { device: a, port: '2' }, b: { device: b, port: '1' } }, { a: { device: b, port: '2' }, b: { device: c, port: '1' } }, { a: { device: c, port: '2' }, b: { device: d, port: '1' } }, { a: { device: d, port: '2' }, b: { device: a, port: '1' } }];
+  const fileOf = (devices, links) => JSON.stringify({ schema_version: '1.5.0', generator: { name: 'test', version: '0' }, links, devices });
+
+  test('join rules: ring id first, then the one id a name has, else the name; two ids under one name is an ambiguity', () => {
+    // X and Y configure ring id 5 as "R"; Z writes "R" with no id: it joins ring 5
+    const one = importFacts(fileOf([dev('X', [ring('R', '5', 100, ['1', '2'], [{ port: 'port1', interface: '2', role: 'owner' }])]), dev('Y', [ring('R', '5', 100, ['1', '2'])]), dev('Z', [ring('R', null, 100, ['1', '2'])])], square('X', 'Y', 'Z', 'X')));
+    expect(one.topology.rings.map((r) => [r.id, r.ringId, r.joinedBy, r.nodes.map((n) => n.node)])).toEqual([['5', '5', 'id', ['X', 'Y', 'Z']]]);
+    expect(one.report.warnings.filter((w) => /join/.test(w))).toEqual([]);
+    // "R" is ring id 5 on X and ring id 6 on Y: Z's id-less "R" could be either
+    const two = importFacts(fileOf([dev('X', [ring('R', '5', 100, ['1', '2'])]), dev('Y', [ring('R', '6', 100, ['1', '2'])]), dev('Z', [ring('R', null, 100, ['1', '2'])])], []));
+    expect(two.topology.rings.map((r) => [r.id, r.joinedBy, r.nodes.map((n) => n.node)])).toEqual([['5', 'id', ['X']], ['6', 'id', ['Y']], ['Z:R', 'device', ['Z']]]);
+    expect(two.report.warnings).toContain('Z: ring R has no ring id and R is ring id 5 and 6 on other devices; it cannot be joined with either');
+    // two id-less rings named "R" with different R-APS VIDs join by name, with the one warning that says why that may be wrong
+    const vid = importFacts(fileOf([dev('X', [ring('R', null, 100, ['1', '2'])]), dev('Y', [ring('R', null, 101, ['1', '2'])])], []));
+    expect(vid.topology.rings.map((r) => [r.id, r.nodes.length])).toEqual([['name:R', 2]]);
+    expect(vid.report.warnings.filter((w) => /joined by name/.test(w))).toEqual(['ring R (joined by name, no ring id): R-APS VID 100 on X and 101 on Y; the two may be different rings']);
+  });
+});
+
+describe('a subnet over the ring VLAN does not take the ring ports from the file\'s links[]', () => {
+  // X - Y - Z is a cabled ring (links[]); X and Y also have a routed interface in one subnet on a
+  // VLAN around the ring, on X port 1 (cabled to Z) and Y port 1 (cabled to X port 2). The subnet is
+  // an L3 adjacency over the ring, not a cable: the cabled links keep the ports and carry the ring.
+  const ring = (ports, rpl = []) => ({
+    name: 'RING', ring_id: null, west: ports[0], east: ports[1], ports: [{ name: 'port0', interface: ports[0] }, { name: 'port1', interface: ports[1] }],
+    instances: [{ name: 'RING-i', type: 'major', raps_vid: 4000, raps_level: 7, virtual_channel: null, termination: null, sub_ring_of: null, revertive: null, timers: {}, members: ['ring-fd'], rpl }],
+  });
+  const dev = (name, ip) => ({
+    device: name, type: '5162', status: 'ok',
+    facts: {
+      hostname: name,
+      interfaces: ip ? [{ name: 'svc', kind: 'ip', ip, ipv4: [ip], fd: 'svc-fd' }] : [],
+      fps: ip ? [{ name: 'svc-fp', fd: 'svc-fd', logical_port: '1', classifiers: [] }] : [],
+      ports: { 1: { roles: ['ring'], vlans: [], lag: null }, 2: { roles: ['ring'], vlans: [], lag: null } },
+      isis: { instances: [], interfaces: [] }, peers: [], pseudowires: [], cfm: { meps: [] },
+      rings: [ring(['1', '2'], name === 'Y' ? [{ port: 'port1', interface: '2', role: 'owner' }] : name === 'Z' ? [{ port: 'port0', interface: '1', role: 'neighbor' }] : [])],
+    },
+  });
+  const links = [{ a: { device: 'X', port: '2' }, b: { device: 'Y', port: '1' } }, { a: { device: 'Y', port: '2' }, b: { device: 'Z', port: '1' } }, { a: { device: 'Z', port: '2' }, b: { device: 'X', port: '1' } }];
+  const imp = importFacts(JSON.stringify({ schema_version: '1.5.0', generator: { name: 'test', version: '0' }, links, devices: [dev('X', '10.0.0.1/30'), dev('Y', '10.0.0.2/30'), dev('Z', null)] }));
+
+  test('the subnet is a link without ports, the cables are L2 links, the ring is closed with its RPL', () => {
+    expect(imp.topology.links.map((l) => [l.id, l.kind, l.a.port ?? null, l.b.port ?? null])).toEqual([
+      ['X-Y', 'access', null, null], ['X-Y 2/1', 'l2', '2', '1'], ['Y-Z', 'l2', '2', '1'], ['Z-X', 'l2', '2', '1'],
+    ]);
+    const [r] = imp.topology.rings;
+    expect(r.path).toMatchObject({ closed: true, links: expect.arrayContaining(['X-Y 2/1', 'Y-Z', 'Z-X']) });
+    expect(r.rpl).toEqual({ link: 'Y-Z', owner: 'Y', neighbor: 'Z' });
+    expect(imp.report.warnings.filter((w) => /ring/.test(w))).toEqual([]);
+    const item = imp.report.gaps.physical.find((i) => /bridged domain/.test(i.item));
+    expect(item.detail).toMatch(/^X-Y \(10\.0\.0\.0\/30\): X svc \(port 1, cabled to Z port 2\), Y svc \(port 1, cabled to X port 2\): the file's links\[\] cable those ports to other devices/);
+  });
+});

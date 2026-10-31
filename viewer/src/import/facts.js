@@ -279,8 +279,23 @@ function buildLinks(devices, nodes, igp, isisLevel, report) {
 // The topology's own links (top-level `links[]`, written by the extractor from a containerlab file)
 // that no addressed link already joins at either port: plain L2 links between two shown devices,
 // with no subnet, so an IGP never runs on them. They place the ring ports of a pure L2 ring.
+// The file's links are the cabling: an addressed link whose port the file cables to some other
+// device is a subnet over a bridged domain (a VLAN around a ring, a service across the network),
+// not that cable; it keeps its two interfaces and loses its ports, which the cabled links take.
 function topologyLinks(file, links, nodes, report) {
   const shown = new Set(nodes.map((n) => n.id));
+  const cabled = new Map(); // `${device}|${port}` -> `${far device}|${far port}`, from links[]
+  for (const l of file.links ?? []) {
+    cabled.set(`${l.a.device}|${l.a.port}`, `${l.b.device}|${l.b.port}`);
+    cabled.set(`${l.b.device}|${l.b.port}`, `${l.a.device}|${l.a.port}`);
+  }
+  const elsewhere = (e, far) => e.port && cabled.has(`${e.node}|${e.port}`) && cabled.get(`${e.node}|${e.port}`) !== `${far.node}|${far.port}`;
+  const bridged = links.filter((l) => !l.lag && (elsewhere(l.a, l.b) || elsewhere(l.b, l.a)));
+  for (const l of bridged) {
+    l.bridged = [l.a, l.b].map((e) => `${e.node} ${e.if} (port ${e.port ?? '?'}, cabled to ${(cabled.get(`${e.node}|${e.port}`) ?? '?').replace('|', ' port ')})`).join(', ');
+    for (const e of [l.a, l.b]) delete e.port;
+  }
+  if (bridged.length) report.add('physical', 'derived', `${bridged.length} subnets over a bridged domain`, `${bridged.map((l) => `${l.id} (${l.subnet}): ${l.bridged}`).join('; ')}: the file's links[] cable those ports to other devices, so the subnet is an L3 adjacency over a bridged domain (a ring VLAN, a service), drawn as a link with no ports; the cables are drawn as L2 links`);
   const taken = (node, port) => links.some((l) => (l.a.node === node && l.a.port === port) || (l.b.node === node && l.b.port === port));
   const ids = new Set(links.map((l) => l.id));
   let added = 0;
@@ -592,24 +607,51 @@ function instancePorts(ring, inst) {
   return ring.ports;
 }
 
-// G.8032 rings (schema 1.5 `rings[]`, SAOS 10 and SAOS 6 / 8 alike), one per ring id across the file:
-// the ring's links are the topology links whose two ends are ring ports of the ring on their devices;
-// the RPL is the link of the port the owner configures `rpl owner` on. A device ring without a ring
-// id is a ring of its own (nothing says which other device's ring it is).
+const hasRingId = (r) => r.ring_id !== null && r.ring_id !== undefined && r.ring_id !== '';
+
+// Which ring of the file a device's ring belongs to: the ring id when the device configures one
+// (SAOS 6 / 8 always do, SAOS 10 XML usually does); without one, the ring of that name. A SAOS 10
+// CLI config normally leaves `ring-id` out (the YANG key is the ring name, the id defaults to 1),
+// so its devices' rings join by name; a name-only ring joins a ring id when exactly one device
+// gives that name an id. Two different ring ids under one name say nothing about which of them an
+// id-less ring means: that ring stays on its own device, with a warning.
+function ringKeys(devices, report) {
+  const idsByName = new Map(); // ring name -> the ring ids configured under it
+  for (const [, f] of devices) for (const r of ringsOf(f)) if (hasRingId(r)) idsByName.set(r.name, new Set([...(idsByName.get(r.name) ?? []), String(r.ring_id)]));
+  return (device, r) => {
+    if (hasRingId(r)) return { key: String(r.ring_id), ringId: String(r.ring_id), joinedBy: 'id' };
+    const ids = idsByName.get(r.name);
+    if (!ids) return { key: `name:${r.name}`, ringId: null, joinedBy: 'name' };
+    if (ids.size === 1) return { key: [...ids][0], ringId: [...ids][0], joinedBy: 'id' };
+    report.warn(`${device}: ring ${r.name} has no ring id and ${r.name} is ring id ${[...ids].join(' and ')} on other devices; it cannot be joined with either`);
+    return { key: `${device}:${r.name}`, ringId: null, joinedBy: 'device' };
+  };
+}
+
+// G.8032 rings (schema 1.5 `rings[]`, SAOS 10 and SAOS 6 / 8 alike), one per ring across the file
+// (joined by ring id, or by ring name where no device gives the ring an id, see ringKeys): the
+// ring's links are the topology links whose two ends are ring ports of the ring on their devices;
+// the RPL is the link of the port the owner configures `rpl owner` on.
 function buildRings(devices, links, report) {
   const linkOf = (node, port) => links.find((l) => (l.a.node === node && l.a.port === port) || (l.b.node === node && l.b.port === port)) ?? null;
-  const groups = new Map(); // ring id -> ring
-  const byDevice = new Map(); // `${device}|${ring name}` -> ring id
+  const keyOf = ringKeys(devices, report);
+  const groups = new Map(); // ring key -> ring
+  const byDevice = new Map(); // `${device}|${ring name}` -> ring key
   for (const [name, f] of devices) {
     for (const r of ringsOf(f)) {
       const inst = r.instances[0] ?? null;
       if (r.instances.length > 1) report.warn(`${name}: ring ${r.name} has ${r.instances.length} protection instances; the view shows the first (${inst.name})`);
-      const key = r.ring_id !== null && r.ring_id !== undefined ? String(r.ring_id) : `${name}:${r.name}`;
-      if (!r.ring_id && r.ring_id !== 0) report.warn(`${name}: ring ${r.name} has no ring id; it cannot be joined with the other devices' rings`);
+      const { key, ringId, joinedBy } = keyOf(name, r);
       byDevice.set(`${name}|${r.name}`, key);
-      if (!groups.has(key)) groups.set(key, { id: key, ringId: r.ring_id ?? null, name: r.name, type: inst?.type ?? null, rapsVid: num(inst?.raps_vid), level: num(inst?.raps_level), virtualChannel: inst?.virtual_channel ?? null, revertive: inst?.revertive ?? null, wtrMin: num(inst?.timers?.wtr), guardMs: num(inst?.timers?.guard), holdOffMs: num(inst?.timers?.hold_off), members: [], nodes: [], links: [], rpl: null, subRingOf: null, interconnect: [] });
+      if (!groups.has(key)) groups.set(key, { id: key, ringId, joinedBy, name: r.name, type: inst?.type ?? null, rapsVid: num(inst?.raps_vid), level: num(inst?.raps_level), virtualChannel: inst?.virtual_channel ?? null, revertive: inst?.revertive ?? null, wtrMin: num(inst?.timers?.wtr), guardMs: num(inst?.timers?.guard), holdOffMs: num(inst?.timers?.hold_off), members: [], nodes: [], links: [], rpl: null, subRingOf: null, interconnect: [] });
       const g = groups.get(key);
       if (g.name !== r.name) report.warn(`ring id ${key}: named ${g.name} on ${g.nodes[0]?.node} and ${r.name} on ${name}`);
+      if (g.joinedBy === 'name' && inst && g.nodes.length) {
+        // joined by name only: a different R-APS VID or ring type on one device is the one sign that two rings share the name
+        const first = g.nodes[0].node;
+        if (num(inst.raps_vid) !== null && g.rapsVid !== null && num(inst.raps_vid) !== g.rapsVid) report.warn(`ring ${r.name} (joined by name, no ring id): R-APS VID ${g.rapsVid} on ${first} and ${inst.raps_vid} on ${name}; the two may be different rings`);
+        if (inst.type && g.type && inst.type !== g.type) report.warn(`ring ${r.name} (joined by name, no ring id): a ${g.type} ring on ${first} and a ${inst.type} ring on ${name}; the two may be different rings`);
+      }
       for (const m of inst?.members ?? []) if (!g.members.includes(m)) g.members.push(m);
       const ports = (inst ? instancePorts(r, inst) : r.ports).map((p) => {
         const link = p.interface ? linkOf(name, p.interface) : null;
@@ -651,7 +693,9 @@ function buildRings(devices, links, report) {
   if (rings.length) {
     const major = rings.filter((r) => r.type === 'major').length;
     report.add('ring', 'facts', `${rings.length} G.8032 rings`, `${major} major, ${rings.length - major} sub-ring; ring ports, R-APS VID and level, RPL owner / neighbour, protected forwarding domains and timers as configured`);
-    report.add('ring', 'derived', 'ring links', 'a link whose two ends are ring ports of the same ring id on their devices (an addressed link, or one of the links[] in the file); a ring port on neither cannot be placed');
+    report.add('ring', 'derived', 'ring links', 'a link whose two ends are ring ports of the same ring on their devices (an addressed link, or one of the links[] in the file); a ring port on neither cannot be placed');
+    const byName = rings.filter((r) => r.joinedBy === 'name');
+    if (byName.length) report.add('ring', 'derived', 'rings joined by name', `${byName.map((r) => r.name).join(', ')}: no device configures a ring id (a SAOS 10 CLI config leaves ring-id out; the YANG default is 1), so the devices' rings of that name are one ring and its R-APS group MAC uses ring id 1`);
     const sub = rings.filter((r) => r.type === 'sub');
     if (sub.length) report.add('ring', 'derived', 'interconnection nodes', 'a node where a sub-ring instance names one port (SAOS 10) or terminates on a port (SAOS 6 / 8); the sub-ring is attached to the ring that shares its other port');
     const defaults = rings.filter((r) => r.wtrMin === null || r.guardMs === null || r.holdOffMs === null || r.revertive === null);
