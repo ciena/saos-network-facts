@@ -193,6 +193,7 @@
         "classifiers": {
           "UNTAGGED": []
         },
+        "evpn_instances": [],
         "fds": [
           {
             "mode": "vpls",
@@ -248,20 +249,29 @@
         "isis": {
           "instances": [
             {
+              "address_families": [
+                "ipv4 unicast"
+              ],
               "area": "49.0002.2030.0011.3030.00",
               "area_id": "49.0002",
               "level": "level-2",
+              "multi_topology": null,
               "name": "CORE",
               "net": "49.0002.2030.0011.3030.00",
               "nets": [
                 "49.0002.2030.0011.3030.00"
               ],
               "sr_enabled": true,
+              "srv6_enabled": false,
+              "srv6_locators": [],
               "system_id": "2030.0011.3030"
             }
           ],
           "interfaces": [
             {
+              "address_families": [
+                "ipv4 unicast"
+              ],
               "instance": "CORE",
               "interface": "core1",
               "level": "level-2",
@@ -269,6 +279,9 @@
               "type": "point-to-point"
             },
             {
+              "address_families": [
+                "ipv4 unicast"
+              ],
               "instance": "CORE",
               "interface": "lb0",
               "level": null,
@@ -300,6 +313,7 @@
         "recognised": 10,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [
             {
@@ -317,7 +331,10 @@
               "lower": "17000",
               "upper": "17999"
             }
-          ]
+          ],
+          "srv6": {
+            "locators": []
+          }
         },
         "segments": [],
         "sub_ports": [],
@@ -347,7 +364,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.7.2"
+    "version": "0.8.0"
   },
-  "schema_version": "1.5.0"
+  "schema_version": "1.6.0"
 }

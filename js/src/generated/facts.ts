@@ -189,6 +189,10 @@ export interface DeviceFacts {
    * SAOS 10 L2VPN services. Since schema 1.2.
    */
   l2vpn_services?: L2VpnService[];
+  /**
+   * SAOS 10 EVPN instances (EVPN-VPLS, EVPN-VPWS, FXC). Optional: absent in files before schema 1.6. Since schema 1.6.
+   */
+  evpn_instances?: EvpnInstance[];
 }
 /**
  * A layer-3 interface: loopback, IP interface, management interface (SAOS 6), or any SAOS 10 openconfig interface that is not a physical port.
@@ -531,6 +535,10 @@ export interface Peer {
    * `bgp`: the neighbour's address families, `<afi> <safi>` (`vpnv4 unicast`, `l2vpn evpn`).
    */
   address_families?: string[];
+  /**
+   * `bgp` (SAOS 10): the peer group the neighbour is configured in (`peer <ip> peer-group <name>`); null when none. Optional: absent in files before schema 1.6. Since schema 1.6.
+   */
+  peer_group?: string | null;
 }
 /**
  * IS-IS instances and their interfaces.
@@ -587,6 +595,22 @@ export interface IsisInstance {
    * SAOS 10: segment routing is enabled on the instance; null when not configured.
    */
   sr_enabled: boolean | null;
+  /**
+   * SAOS 10: the address families the instance runs, the union over its interfaces (`ipv4 unicast`, `ipv6 unicast`): IPv4 unicast runs on an interface unless `ipv4-unicast-default-disable`, IPv6 unicast where `address-family ipv6 unicast` is configured. An IPv6-only IGP lists only `ipv6 unicast`. Optional: absent in files before schema 1.6. Since schema 1.6.
+   */
+  address_families?: string[];
+  /**
+   * SAOS 10: multi-topology routing (RFC 5120, IPv6 in its own topology) is on: `multi-topology-mode enable` or the deprecated `multi-topology <level>`; null when not configured (single topology). Optional: absent in files before schema 1.6. Since schema 1.6.
+   */
+  multi_topology?: boolean | null;
+  /**
+   * SAOS 10: the instance advertises at least one SRv6 locator (see `srv6_locators`). Optional: absent in files before schema 1.6. Since schema 1.6.
+   */
+  srv6_enabled?: boolean;
+  /**
+   * SAOS 10: names of the SRv6 locators (`segment_routing.srv6.locators`) the instance advertises: those whose `instances` name it, and those that name no instance (advertised in every instance). Optional: absent in files before schema 1.6. Since schema 1.6.
+   */
+  srv6_locators?: string[];
 }
 /**
  * An interface attached to an IS-IS instance.
@@ -615,6 +639,10 @@ export interface IsisInterface {
    * The metrics configured on the interface, one entry per level in configuration order (SAOS 10 `level-1` / `level-2` `metric` and `wide-metric`; SAOS 6 / 8 `isis interface-level set ... level L1|L2 wide-metric`). An empty list when the configuration sets no metric (the interface advertises its default). Optional: absent in files before schema 1.3. Since schema 1.3.
    */
   metrics?: IsisMetric[];
+  /**
+   * SAOS 10: the address families the interface runs: `ipv4 unicast` unless `ipv4-unicast-default-disable true`, then each configured `address-families address-family <afi> <safi>` (`ipv6 unicast`). Optional: absent in files before schema 1.6. Since schema 1.6.
+   */
+  address_families?: string[];
 }
 /**
  * The metric an IS-IS interface advertises at one level. Values are text, as written. Since schema 1.3.
@@ -664,6 +692,11 @@ export interface SegmentRouting {
      */
     [k: string]: string[];
   };
+  srv6?: Srv6;
+  /**
+   * SAOS 10: Flex-Algo definitions, in configuration order. Optional: absent in files before schema 1.6. Since schema 1.6.
+   */
+  flex_algorithms?: FlexAlgorithm[];
 }
 /**
  * A segment-routing label block (SRGB).
@@ -772,6 +805,105 @@ export interface CandidatePath {
    * Names of the explicit segment lists (see `segment_lists`).
    */
   segment_lists: string[];
+}
+/**
+ * SAOS 10: SRv6 locators. Optional: absent in files before schema 1.6. Since schema 1.6.
+ */
+export interface Srv6 {
+  /**
+   * SRv6 locators, in configuration order.
+   */
+  locators: Srv6Locator[];
+}
+/**
+ * An SRv6 locator (`segment-routing srv6 locators locator`): the IPv6 prefix the node's SRv6 SIDs are allocated from. Since schema 1.6.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "Srv6Locator".
+ */
+export interface Srv6Locator {
+  /**
+   * Locator name (what EVPN instances and IS-IS refer to).
+   */
+  name: string;
+  /**
+   * The locator prefix (`2001:db8:0:1::/64`).
+   */
+  prefix: string | null;
+  /**
+   * The SID format: `u-sid` (compressed micro-SIDs) or `uncompressed-sid`; null when not configured.
+   */
+  sid_type: string | null;
+  /**
+   * The Flex-Algo (128-255) the locator belongs to (see `flex_algorithms`); null for algorithm 0 (SPF).
+   */
+  algorithm: string | null;
+  /**
+   * Length in bits of the SID locator block; null when not configured.
+   */
+  block_length: string | null;
+  /**
+   * Length in bits of the SID node part; null when not configured.
+   */
+  node_length: string | null;
+  /**
+   * Length in bits of the SID function part; null when not configured.
+   */
+  function_length: string | null;
+  /**
+   * The End behavior type as written (`End.PSP_USD`, `End_NEXT_CSID_PSP_USD`); null when not configured.
+   */
+  end_behavior: string | null;
+  /**
+   * IS-IS instances the locator is restricted to (`instances instance`); empty when every instance advertises it.
+   */
+  instances: string[];
+}
+/**
+ * A Flex-Algo definition (`segment-routing flex-algorithm`, RFC 9350). Since schema 1.6.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "FlexAlgorithm".
+ */
+export interface FlexAlgorithm {
+  /**
+   * The algorithm number (128-255).
+   */
+  algorithm: string;
+  /**
+   * The metric the computation minimises: `igp`, `latency` or `te`; null when not configured (IGP).
+   */
+  metric_type: string | null;
+  /**
+   * This node advertises the definition (`advertise-definition`); otherwise it only takes part in the algorithm and follows the highest-priority definition in the area.
+   */
+  advertise_definition: boolean;
+  /**
+   * The advertised definition's priority (0-255, highest wins); null when not configured.
+   */
+  priority: string | null;
+  admin_groups: FlexAlgoAdminGroups;
+  /**
+   * Shared risk link groups excluded from the computation (`srlg-exclude`).
+   */
+  srlg_exclude: string[];
+}
+/**
+ * Link affinities included or excluded.
+ */
+export interface FlexAlgoAdminGroups {
+  /**
+   * A link is used only if it has at least one of these groups (`include-any-admin-group`).
+   */
+  include_any: string[];
+  /**
+   * A link is used only if it has all of these groups (`include-all-admin-group`).
+   */
+  include_all: string[];
+  /**
+   * A link with any of these groups is not used (`exclude-any-admin-group`).
+   */
+  exclude_any: string[];
 }
 /**
  * BGP instances; the neighbours are `peers` of kind `bgp`.
@@ -1238,6 +1370,78 @@ export interface L2VpnService {
   signaling_type: string | null;
 }
 /**
+ * A SAOS 10 EVPN instance (`evpn evpn-instances evpn-instance`): binds a forwarding domain to the EVPN control plane. Since schema 1.6.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "EvpnInstance".
+ */
+export interface EvpnInstance {
+  /**
+   * The EVPN instance id (EVI).
+   */
+  evi: string;
+  /**
+   * Description; null when not configured.
+   */
+  description: string | null;
+  /**
+   * The service: `vpls` (EVPN-VPLS, `vpls-fd`), `vpws` (EVPN-VPWS, `vpws-cross-connect-fd`) or `fxc` (VLAN-aware flexible cross-connect); null when no forwarding domain is bound.
+   */
+  type: string | null;
+  /**
+   * The forwarding domain (see `fds`); the first one when the instance binds several.
+   */
+  fd: string | null;
+  /**
+   * Every forwarding domain the instance binds, in configuration order.
+   */
+  fds: string[];
+  /**
+   * EVPN-VPWS: the service id of the local attachment circuit; the remote end configures it as its `remote_service_id`.
+   */
+  local_service_id: string | null;
+  /**
+   * EVPN-VPWS: the service id of the remote end.
+   */
+  remote_service_id: string | null;
+  /**
+   * The control word setting of the forwarding domain binding; null when not configured (the default is on).
+   */
+  control_word: boolean | null;
+  /**
+   * The route distinguisher (`192.0.2.1:100`); null when not configured (auto).
+   */
+  route_distinguisher: string | null;
+  /**
+   * Route targets.
+   */
+  route_targets: RouteTarget[];
+  /**
+   * The SRv6 locator the instance's service SIDs come from (`segment-routing-srv6 locator`, see `segment_routing.srv6.locators`); null when it does not run over SRv6.
+   */
+  srv6_locator: string | null;
+  /**
+   * The SR policy color that steers the instance (`sr-policy color`); null when not configured.
+   */
+  sr_policy_color: string | null;
+}
+/**
+ * A route target of an EVPN instance (`vpn-target`). Since schema 1.6.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "RouteTarget".
+ */
+export interface RouteTarget {
+  /**
+   * The route target as written (`64496:100`).
+   */
+  route_target: string;
+  /**
+   * `import`, `export` or `both`; null when not configured.
+   */
+  type: string | null;
+}
+/**
  * A configuration file the SAOS 10 translator could not parse.
  *
  * This interface was referenced by `FactsFile`'s JSON-Schema
@@ -1278,4 +1482,36 @@ export interface LinkEnd {
    * The port on that device, as the topology names it (`2`, `eth1`).
    */
   port: string;
+}
+/**
+ * SRv6 configuration. Since schema 1.6.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "Srv6".
+ */
+export interface Srv61 {
+  /**
+   * SRv6 locators, in configuration order.
+   */
+  locators: Srv6Locator[];
+}
+/**
+ * The link affinities (admin groups, by name) a Flex-Algo computation uses. Since schema 1.6.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "AdminGroups".
+ */
+export interface FlexAlgoAdminGroups1 {
+  /**
+   * A link is used only if it has at least one of these groups (`include-any-admin-group`).
+   */
+  include_any: string[];
+  /**
+   * A link is used only if it has all of these groups (`include-all-admin-group`).
+   */
+  include_all: string[];
+  /**
+   * A link with any of these groups is not used (`exclude-any-admin-group`).
+   */
+  exclude_any: string[];
 }

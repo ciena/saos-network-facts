@@ -36,6 +36,7 @@
             "100"
           ]
         },
+        "evpn_instances": [],
         "fds": [
           {
             "mode": "vpls",
@@ -103,20 +104,29 @@
         "isis": {
           "instances": [
             {
+              "address_families": [
+                "ipv4 unicast"
+              ],
               "area": "49.0001.1920.0000.2001.00",
               "area_id": "49.0001",
               "level": "level-2",
+              "multi_topology": null,
               "name": "CORE",
               "net": "49.0001.1920.0000.2001.00",
               "nets": [
                 "49.0001.1920.0000.2001.00"
               ],
               "sr_enabled": true,
+              "srv6_enabled": false,
+              "srv6_locators": [],
               "system_id": "1920.0000.2001"
             }
           ],
           "interfaces": [
             {
+              "address_families": [
+                "ipv4 unicast"
+              ],
               "instance": "CORE",
               "interface": "lb0",
               "level": null,
@@ -124,6 +134,9 @@
               "type": "point-to-point"
             },
             {
+              "address_families": [
+                "ipv4 unicast"
+              ],
               "instance": "CORE",
               "interface": "PE1-PE2",
               "level": "level-2",
@@ -165,6 +178,7 @@
             "ip": "192.0.2.2",
             "kind": "bgp",
             "name": "as65000",
+            "peer_group": null,
             "remote_as": "65000",
             "route_reflector_client": true
           }
@@ -209,6 +223,7 @@
         "recognised": 12,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [],
           "policies": [
             {
               "candidate_paths": [
@@ -249,7 +264,10 @@
               "lower": "16000",
               "upper": "23999"
             }
-          ]
+          ],
+          "srv6": {
+            "locators": []
+          }
         },
         "segments": [],
         "sub_ports": [],
@@ -306,6 +324,7 @@
             "100"
           ]
         },
+        "evpn_instances": [],
         "fds": [
           {
             "mode": "vpls",
@@ -371,20 +390,29 @@
         "isis": {
           "instances": [
             {
+              "address_families": [
+                "ipv4 unicast"
+              ],
               "area": "49.0001.1920.0000.2002.00",
               "area_id": "49.0001",
               "level": "level-2",
+              "multi_topology": null,
               "name": "CORE",
               "net": "49.0001.1920.0000.2002.00",
               "nets": [
                 "49.0001.1920.0000.2002.00"
               ],
               "sr_enabled": true,
+              "srv6_enabled": false,
+              "srv6_locators": [],
               "system_id": "1920.0000.2002"
             }
           ],
           "interfaces": [
             {
+              "address_families": [
+                "ipv4 unicast"
+              ],
               "instance": "CORE",
               "interface": "lb0",
               "level": null,
@@ -392,6 +420,9 @@
               "type": "point-to-point"
             },
             {
+              "address_families": [
+                "ipv4 unicast"
+              ],
               "instance": "CORE",
               "interface": "PE2-PE1",
               "level": "level-2",
@@ -432,6 +463,7 @@
             "ip": "192.0.2.1",
             "kind": "bgp",
             "name": "as65000",
+            "peer_group": null,
             "remote_as": "65000",
             "route_reflector_client": false
           }
@@ -476,6 +508,7 @@
         "recognised": 11,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [
             {
@@ -493,7 +526,10 @@
               "lower": "16000",
               "upper": "23999"
             }
-          ]
+          ],
+          "srv6": {
+            "locators": []
+          }
         },
         "segments": [],
         "sub_ports": [],
@@ -529,7 +565,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.7.2"
+    "version": "0.8.0"
   },
   "links": [
     {
@@ -553,5 +589,5 @@
       }
     }
   ],
-  "schema_version": "1.5.0"
+  "schema_version": "1.6.0"
 }

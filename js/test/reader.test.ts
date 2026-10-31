@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import {
-  bgpPeers, ccmIntervalMs, devicesByName, FactsFormatError, interfacesOnPort, isisArea, isisAreaId, isisMetric, isisSystemId, isRouted, loopbacks,
-  parseFacts, readFacts, ringMembers, ringsOf,
+  bgpPeers, ccmIntervalMs, devicesByName, evpnInstances, evpnMembers, FactsFormatError, flexAlgorithms, interfacesOnPort, isisArea, isisAreaId,
+  isisMetric, isisSystemId, isRouted, loopbacks, parseFacts, readFacts, ringMembers, ringsOf, srv6Locators,
 } from "../src/node.ts";
 import type { DeviceFacts, Interface } from "../src/generated/facts.ts";
 
@@ -13,6 +13,7 @@ const srl2 = readFacts(path.join(expected, "sr-l2.facts.json"));
 const mixed = readFacts(path.join(expected, "mixed.facts.json"));
 const g8032 = readFacts(path.join(expected, "g8032-two-ring.facts.json"));
 const g8032saos6 = readFacts(path.join(expected, "g8032-saos6.facts.json"));
+const srv6 = readFacts(path.join(expected, "srv6-evpn.facts.json"));
 
 test("readFacts reads schema 1.x and keeps devices with facts", () => {
   assert.equal(srl2.schema_version.split(".")[0], "1");
@@ -42,7 +43,7 @@ test("SAOS 6: the IP interface on a VLAN the port's LAG carries", () => {
 test("loopbacks and BGP peers", () => {
   const pe1 = devicesByName(srl2).get("PE1")!;
   assert.deepEqual(loopbacks(pe1), [{ name: "lb0", ip: "192.0.2.1/32", isis: "CORE" }]);
-  assert.deepEqual(bgpPeers(pe1), [{ ip: "192.0.2.2", remoteAs: 65000, routeReflectorClient: true }]);
+  assert.deepEqual(bgpPeers(pe1), [{ ip: "192.0.2.2", remoteAs: 65000, routeReflectorClient: true, peerGroup: null }]);
 });
 
 test("BGP peers: a missing route-reflector-client flag stays unknown", () => {
@@ -51,8 +52,8 @@ test("BGP peers: a missing route-reflector-client flag stays unknown", () => {
     { kind: "bgp", name: "as65000", ip: "192.0.2.4", remote_as: null, route_reflector_client: false },
   ];
   assert.deepEqual(bgpPeers({ peers } as unknown as DeviceFacts), [
-    { ip: "192.0.2.3", remoteAs: 65000, routeReflectorClient: null },
-    { ip: "192.0.2.4", remoteAs: null, routeReflectorClient: false },
+    { ip: "192.0.2.3", remoteAs: 65000, routeReflectorClient: null, peerGroup: null },
+    { ip: "192.0.2.4", remoteAs: null, routeReflectorClient: false, peerGroup: null },
   ]);
 });
 
@@ -128,4 +129,41 @@ test("ringMembers: the devices on a ring id, with the RPL owner and the intercon
   assert.deepEqual(ringMembers(g8032saos6, 2).map((m) => [m.device, m.ring.name]), [["A1", "lr2"], ["S1", "lr2"], ["S2", "lr2"]]);
   assert.deepEqual(ringMembers(srl2, 1), []);
   assert.equal(g8032.links?.length, 10);
+});
+
+test("BGP peers carry their peer group (schema 1.6)", () => {
+  const rr1 = devicesByName(srv6).get("RR1")!;
+  assert.deepEqual(bgpPeers(rr1).map((p) => [p.ip, p.peerGroup, p.routeReflectorClient]), [
+    ["2001:db8::1", "CLIENTS", true],
+    ["2001:db8::2", "CLIENTS", true],
+  ]);
+});
+
+test("srv6Locators and flexAlgorithms: a device's SRv6 locators and Flex-Algo definitions; empty for older files", () => {
+  const pe1 = srv6.devices.find((d) => d.device === "PE1"); // a device record works too
+  assert.deepEqual(srv6Locators(pe1).map((l) => [l.name, l.prefix, l.algorithm, l.instances]), [
+    ["LOC", "2001:db8:f0:1::/64", null, []],
+    ["LOC-ALGO128", "2001:db8:f8:1::/64", "128", ["CORE"]],
+  ]);
+  const [algo] = flexAlgorithms(devicesByName(srv6).get("P1"));
+  assert.deepEqual([algo!.algorithm, algo!.metric_type, algo!.advertise_definition, algo!.priority, algo!.admin_groups.exclude_any],
+    ["128", "latency", true, "200", ["SLOW"]]);
+  assert.deepEqual(srv6Locators(devicesByName(g8032saos6).get("A1")), []);
+  assert.deepEqual(flexAlgorithms(null), []);
+  const old = { hostname: "x", segment_routing: { srgb: [], prefix_sids: [], policies: [], segment_lists: {} } } as unknown as DeviceFacts;
+  assert.deepEqual([srv6Locators(old), flexAlgorithms(old), evpnInstances(old)], [[], [], []]);
+});
+
+test("evpnMembers: the two ends of an EVPN-VPWS mirror their service ids; the VPLS PEs share the EVI", () => {
+  const vpws = evpnMembers(srv6, 200);
+  assert.deepEqual(vpws.map((m) => [m.device, m.instance.type, m.instance.local_service_id, m.instance.remote_service_id, m.instance.srv6_locator]), [
+    ["PE1", "vpws", "1", "2", "LOC-ALGO128"],
+    ["PE2", "vpws", "2", "1", "LOC-ALGO128"],
+  ]);
+  assert.deepEqual(evpnMembers(srv6, "100").map((m) => [m.device, m.instance.fd, m.instance.route_distinguisher]), [
+    ["PE1", "FD-EVPN-100", "192.0.2.1:100"],
+    ["PE2", "FD-EVPN-100", "192.0.2.2:100"],
+  ]);
+  assert.deepEqual(evpnInstances(devicesByName(srv6).get("P1")), []);
+  assert.deepEqual(evpnMembers(srv6, 999), []);
 });

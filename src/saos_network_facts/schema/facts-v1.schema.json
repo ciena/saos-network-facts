@@ -686,6 +686,13 @@
             "type": "string"
           },
           "description": "`bgp`: the neighbour's address families, `<afi> <safi>` (`vpnv4 unicast`, `l2vpn evpn`)."
+        },
+        "peer_group": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`bgp` (SAOS 10): the peer group the neighbour is configured in (`peer <ip> peer-group <name>`); null when none. Optional: absent in files before schema 1.6. Since schema 1.6."
         }
       },
       "required": [
@@ -754,6 +761,31 @@
             "null"
           ],
           "description": "SAOS 10: segment routing is enabled on the instance; null when not configured."
+        },
+        "address_families": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SAOS 10: the address families the instance runs, the union over its interfaces (`ipv4 unicast`, `ipv6 unicast`): IPv4 unicast runs on an interface unless `ipv4-unicast-default-disable`, IPv6 unicast where `address-family ipv6 unicast` is configured. An IPv6-only IGP lists only `ipv6 unicast`. Optional: absent in files before schema 1.6. Since schema 1.6."
+        },
+        "multi_topology": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "SAOS 10: multi-topology routing (RFC 5120, IPv6 in its own topology) is on: `multi-topology-mode enable` or the deprecated `multi-topology <level>`; null when not configured (single topology). Optional: absent in files before schema 1.6. Since schema 1.6."
+        },
+        "srv6_enabled": {
+          "type": "boolean",
+          "description": "SAOS 10: the instance advertises at least one SRv6 locator (see `srv6_locators`). Optional: absent in files before schema 1.6. Since schema 1.6."
+        },
+        "srv6_locators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SAOS 10: names of the SRv6 locators (`segment_routing.srv6.locators`) the instance advertises: those whose `instances` name it, and those that name no instance (advertised in every instance). Optional: absent in files before schema 1.6. Since schema 1.6."
         }
       },
       "required": [
@@ -803,6 +835,13 @@
             "$ref": "#/$defs/IsisMetric"
           },
           "description": "The metrics configured on the interface, one entry per level in configuration order (SAOS 10 `level-1` / `level-2` `metric` and `wide-metric`; SAOS 6 / 8 `isis interface-level set ... level L1|L2 wide-metric`). An empty list when the configuration sets no metric (the interface advertises its default). Optional: absent in files before schema 1.3. Since schema 1.3."
+        },
+        "address_families": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SAOS 10: the address families the interface runs: `ipv4 unicast` unless `ipv4-unicast-default-disable true`, then each configured `address-families address-family <afi> <safi>` (`ipv6 unicast`). Optional: absent in files before schema 1.6. Since schema 1.6."
         }
       },
       "required": [
@@ -1085,6 +1124,17 @@
             "description": "SIDs in order."
           },
           "description": "Explicit segment lists by name: the SIDs (labels or SRv6 SIDs) in order."
+        },
+        "srv6": {
+          "$ref": "#/$defs/Srv6",
+          "description": "SAOS 10: SRv6 locators. Optional: absent in files before schema 1.6. Since schema 1.6."
+        },
+        "flex_algorithms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FlexAlgorithm"
+          },
+          "description": "SAOS 10: Flex-Algo definitions, in configuration order. Optional: absent in files before schema 1.6. Since schema 1.6."
         }
       },
       "required": [
@@ -1622,6 +1672,13 @@
             "$ref": "#/$defs/L2vpnService"
           },
           "description": "SAOS 10 L2VPN services. Since schema 1.2."
+        },
+        "evpn_instances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvpnInstance"
+          },
+          "description": "SAOS 10 EVPN instances (EVPN-VPLS, EVPN-VPWS, FXC). Optional: absent in files before schema 1.6. Since schema 1.6."
         }
       },
       "required": [
@@ -2073,6 +2130,306 @@
       "required": [
         "a",
         "b"
+      ]
+    },
+    "Srv6Locator": {
+      "title": "Srv6Locator",
+      "type": "object",
+      "description": "An SRv6 locator (`segment-routing srv6 locators locator`): the IPv6 prefix the node's SRv6 SIDs are allocated from. Since schema 1.6.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Locator name (what EVPN instances and IS-IS refer to)."
+        },
+        "prefix": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The locator prefix (`2001:db8:0:1::/64`)."
+        },
+        "sid_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SID format: `u-sid` (compressed micro-SIDs) or `uncompressed-sid`; null when not configured."
+        },
+        "algorithm": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The Flex-Algo (128-255) the locator belongs to (see `flex_algorithms`); null for algorithm 0 (SPF)."
+        },
+        "block_length": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Length in bits of the SID locator block; null when not configured."
+        },
+        "node_length": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Length in bits of the SID node part; null when not configured."
+        },
+        "function_length": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Length in bits of the SID function part; null when not configured."
+        },
+        "end_behavior": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The End behavior type as written (`End.PSP_USD`, `End_NEXT_CSID_PSP_USD`); null when not configured."
+        },
+        "instances": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IS-IS instances the locator is restricted to (`instances instance`); empty when every instance advertises it."
+        }
+      },
+      "required": [
+        "name",
+        "prefix",
+        "sid_type",
+        "algorithm",
+        "block_length",
+        "node_length",
+        "function_length",
+        "end_behavior",
+        "instances"
+      ]
+    },
+    "Srv6": {
+      "title": "Srv6",
+      "type": "object",
+      "description": "SRv6 configuration. Since schema 1.6.",
+      "properties": {
+        "locators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Srv6Locator"
+          },
+          "description": "SRv6 locators, in configuration order."
+        }
+      },
+      "required": [
+        "locators"
+      ]
+    },
+    "AdminGroups": {
+      "title": "FlexAlgoAdminGroups",
+      "type": "object",
+      "description": "The link affinities (admin groups, by name) a Flex-Algo computation uses. Since schema 1.6.",
+      "properties": {
+        "include_any": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A link is used only if it has at least one of these groups (`include-any-admin-group`)."
+        },
+        "include_all": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A link is used only if it has all of these groups (`include-all-admin-group`)."
+        },
+        "exclude_any": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A link with any of these groups is not used (`exclude-any-admin-group`)."
+        }
+      },
+      "required": [
+        "include_any",
+        "include_all",
+        "exclude_any"
+      ]
+    },
+    "FlexAlgorithm": {
+      "title": "FlexAlgorithm",
+      "type": "object",
+      "description": "A Flex-Algo definition (`segment-routing flex-algorithm`, RFC 9350). Since schema 1.6.",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The algorithm number (128-255)."
+        },
+        "metric_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The metric the computation minimises: `igp`, `latency` or `te`; null when not configured (IGP)."
+        },
+        "advertise_definition": {
+          "type": "boolean",
+          "description": "This node advertises the definition (`advertise-definition`); otherwise it only takes part in the algorithm and follows the highest-priority definition in the area."
+        },
+        "priority": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The advertised definition's priority (0-255, highest wins); null when not configured."
+        },
+        "admin_groups": {
+          "$ref": "#/$defs/AdminGroups",
+          "description": "Link affinities included or excluded."
+        },
+        "srlg_exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Shared risk link groups excluded from the computation (`srlg-exclude`)."
+        }
+      },
+      "required": [
+        "algorithm",
+        "metric_type",
+        "advertise_definition",
+        "priority",
+        "admin_groups",
+        "srlg_exclude"
+      ]
+    },
+    "RouteTarget": {
+      "title": "RouteTarget",
+      "type": "object",
+      "description": "A route target of an EVPN instance (`vpn-target`). Since schema 1.6.",
+      "properties": {
+        "route_target": {
+          "type": "string",
+          "description": "The route target as written (`64496:100`)."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`import`, `export` or `both`; null when not configured."
+        }
+      },
+      "required": [
+        "route_target",
+        "type"
+      ]
+    },
+    "EvpnInstance": {
+      "title": "EvpnInstance",
+      "type": "object",
+      "description": "A SAOS 10 EVPN instance (`evpn evpn-instances evpn-instance`): binds a forwarding domain to the EVPN control plane. Since schema 1.6.",
+      "properties": {
+        "evi": {
+          "type": "string",
+          "description": "The EVPN instance id (EVI)."
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Description; null when not configured."
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The service: `vpls` (EVPN-VPLS, `vpls-fd`), `vpws` (EVPN-VPWS, `vpws-cross-connect-fd`) or `fxc` (VLAN-aware flexible cross-connect); null when no forwarding domain is bound."
+        },
+        "fd": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The forwarding domain (see `fds`); the first one when the instance binds several."
+        },
+        "fds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every forwarding domain the instance binds, in configuration order."
+        },
+        "local_service_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "EVPN-VPWS: the service id of the local attachment circuit; the remote end configures it as its `remote_service_id`."
+        },
+        "remote_service_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "EVPN-VPWS: the service id of the remote end."
+        },
+        "control_word": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "The control word setting of the forwarding domain binding; null when not configured (the default is on)."
+        },
+        "route_distinguisher": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The route distinguisher (`192.0.2.1:100`); null when not configured (auto)."
+        },
+        "route_targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RouteTarget"
+          },
+          "description": "Route targets."
+        },
+        "srv6_locator": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SRv6 locator the instance's service SIDs come from (`segment-routing-srv6 locator`, see `segment_routing.srv6.locators`); null when it does not run over SRv6."
+        },
+        "sr_policy_color": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SR policy color that steers the instance (`sr-policy color`); null when not configured."
+        }
+      },
+      "required": [
+        "evi",
+        "description",
+        "type",
+        "fd",
+        "fds",
+        "local_service_id",
+        "remote_service_id",
+        "control_word",
+        "route_distinguisher",
+        "route_targets",
+        "srv6_locator",
+        "sr_policy_color"
       ]
     }
   }

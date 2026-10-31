@@ -51,8 +51,9 @@ def test_isis_net_sr_and_merge_across_files():
     assert instance["level"] == "level-2" and instance["sr_enabled"] is True
     assert (instance["net"], instance["area_id"]) == ("49.0001.1920.0000.2001.00", "49.0001")
     assert f["isis"]["interfaces"] == [{"interface": "core", "instance": "CORE", "level": "level-2", "type": "point-to-point",
-                                        "metrics": []},
-                                       {"interface": "lb0", "instance": "CORE", "level": None, "type": None, "metrics": []}]
+                                        "metrics": [], "address_families": ["ipv4 unicast"]},
+                                       {"interface": "lb0", "instance": "CORE", "level": None, "type": None, "metrics": [],
+                                        "address_families": ["ipv4 unicast"]}]
     assert f["segment_routing"]["srgb"] == [{"instance": "CORE", "lower": "16000", "upper": "23999"}]
     assert f["interfaces"][1]["isis"] == "CORE"
 
@@ -100,7 +101,7 @@ def test_bgp_route_reflector_and_peer_merge():
         {"afi": "vpnv4", "safi": "unicast", "route-reflector-client": True}]}]}]}}
     f = run(first, later)
     assert f["peers"] == [{"kind": "bgp", "name": "as65000", "ip": "192.0.2.2", "remote_as": "65000",
-                           "route_reflector_client": True, "address_families": ["vpnv4 unicast"]}]
+                           "route_reflector_client": True, "address_families": ["vpnv4 unicast"], "peer_group": None}]
     assert f["bgp"]["instances"] == [{"as": "65000", "router_id": "192.0.2.1", "cluster_id": "192.0.2.1", "route_reflector": True}]
 
 
@@ -406,3 +407,141 @@ def test_bgp_peer_group_from_another_file_removal_and_unknown_group():
     f = run(group, peer, bgp(("peer-group", [{"name": "RR", "__operation__": "remove"}]),
                              ("peer", [{"address": "2001:db8::5", "__operation__": "remove"}])))
     assert [(p["ip"], p["remote_as"]) for p in f["peers"]] == [("2001:db8::4", None)]
+
+
+# ---------------------------------------------------------------- schema 1.6: SRv6, Flex-Algo, IS-IS AFs, EVPN instances
+# Pivot shapes as the translator (4.2.x, SAOS 10.12) writes them for the CLI in each comment.
+
+SR = {"ciena-sr:segment-routing": {
+    # segment-routing srv6 locators locator LOC-A sid-type u-sid prefix 2001:db8:a0:1::/64 algorithm 128
+    # segment-routing srv6 locators locator LOC-A instances instance CORE
+    "srv6": {"locators": {"locator": [
+        {"name": "LOC-A", "sid-type": "u-sid", "prefix": "2001:db8:a0:1::/64", "algorithm": 128,
+         "instances": {"instance": [{"instance": "CORE"}]}},
+        {"name": "LOC-B", "sid-type": "uncompressed-sid", "prefix": "2001:db8:b0:1::/64",
+         "block-length": 32, "node-length": 16, "function-length": 16},
+    ]}},
+    # segment-routing flex-algorithm 128 flex-algo-metric latency / advertise-definition priority 200 /
+    #   admin-group include-any-admin-group red green; flex-algorithm 129 admin-group exclude-any-admin-group blue
+    "flex-algorithm": [
+        {"algorithm": 128, "flex-algo-metric": "latency", "advertise-definition": {"priority": 200},
+         "admin-group": {"include-any-admin-group": ["red", "green"]}},
+        {"algorithm": 129, "admin-group": {"exclude-any-admin-group": ["blue"], "include-all": ["gold"]}},
+    ],
+}}
+
+ISIS = {"ciena-isis:isis": {"instance": [
+    {"tag": "CORE", "net": ["49.0001.0000.0000.0001.00"], "multi-topology-mode": {"enable": True},
+     "interfaces": {"interface": [
+         # isis instance CORE interfaces interface lb0 address-families address-family ipv6 unicast
+         {"name": "lb0", "address-families": {"address-family": [{"afi": "ipv6", "safi": "unicast"}]}},
+         # ... interface core ipv4-unicast-default-disable true + address-family ipv6 unicast: IPv6 only
+         {"name": "core", "ipv4-unicast-default-disable": True,
+          "address-families": {"address-family": [{"afi": "ipv6", "safi": "unicast"}]}},
+     ]}},
+    {"tag": "EDGE", "multi-topology": [{"level": "level-2"}], "interfaces": {"interface": [{"name": "edge"}]}},
+]}}
+
+EVPN = {"ciena-evpn:evpn": {"evpn-instances": {"evpn-instance": [
+    # evpn evpn-instances evpn-instance 101 vpls-fd fd-vpls-101 / vpn-target 64496:101 route-target-type both /
+    #   segment-routing-srv6 locator LOC-A / route-distinguisher ip-based value 192.0.2.1:101
+    {"id": 101, "vpls-fd": [{"forwarding-domain": "fd-vpls-101"}],
+     "vpn-target": [{"route-target": "64496:101", "route-target-type": "both"}],
+     "route-distinguisher": {"ip-based": {"value": "192.0.2.1:101"}},
+     "segment-routing-srv6": {"locator": "LOC-A"}},
+    # evpn evpn-instances evpn-instance 201 vpws-cross-connect-fd fd-vpws-201 local-service-id 1 remote-service-id 2 control-word false
+    {"id": 201, "vpws-cross-connect-fd": [{"forwarding-domain": "fd-vpws-201", "local-service-id": 1,
+                                           "remote-service-id": 2, "control-word": False}],
+     "vpn-target": [{"route-target": "64496:201", "route-target-type": "import"},
+                    {"route-target": "64496:202", "route-target-type": "export"}],
+     "sr-policy": {"color": 100}},
+]}}}
+
+
+def test_srv6_locators_and_flex_algorithms():
+    sr = run(SR)["segment_routing"]
+    assert sr["srv6"]["locators"] == [
+        {"name": "LOC-A", "prefix": "2001:db8:a0:1::/64", "sid_type": "u-sid", "algorithm": "128", "block_length": None,
+         "node_length": None, "function_length": None, "end_behavior": None, "instances": ["CORE"]},
+        {"name": "LOC-B", "prefix": "2001:db8:b0:1::/64", "sid_type": "uncompressed-sid", "algorithm": None,
+         "block_length": "32", "node_length": "16", "function_length": "16", "end_behavior": None, "instances": []},
+    ]
+    assert sr["flex_algorithms"] == [
+        {"algorithm": "128", "metric_type": "latency", "advertise_definition": True, "priority": "200",
+         "admin_groups": {"include_any": ["red", "green"], "include_all": [], "exclude_any": []}, "srlg_exclude": []},
+        {"algorithm": "129", "metric_type": None, "advertise_definition": False, "priority": None,
+         "admin_groups": {"include_any": [], "include_all": ["gold"], "exclude_any": ["blue"]}, "srlg_exclude": []},
+    ]
+
+
+def test_srv6_and_flex_algo_merge_across_files_and_removal():
+    later = {"ciena-sr:segment-routing": {
+        "srv6": {"locators": {"locator": [{"name": "LOC-A", "instances": {"instance": [{"instance": "EDGE"}]}},
+                                          {"name": "LOC-B", "__operation__": "remove"},
+                                          {"name": "LOC-C", "__edit_path__": ["x"]}]}},
+        "flex-algorithm": [{"algorithm": 128, "advertise-definition": {"__operation__": "remove"}},
+                           {"algorithm": 129, "__operation__": "remove"}]}}
+    sr = run(SR, later)["segment_routing"]
+    (loc,) = sr["srv6"]["locators"]
+    assert (loc["name"], loc["prefix"], loc["algorithm"], loc["instances"]) == ("LOC-A", "2001:db8:a0:1::/64", "128", ["CORE", "EDGE"])
+    (algo,) = sr["flex_algorithms"]
+    assert (algo["algorithm"], algo["metric_type"], algo["advertise_definition"], algo["priority"]) == ("128", "latency", False, None)
+    gone = run(SR, {"ciena-sr:segment-routing": {"__operation__": "remove"}})["segment_routing"]
+    assert gone["srv6"] == {"locators": []} and gone["flex_algorithms"] == []
+
+
+def test_isis_address_families_topology_and_srv6_binding():
+    f = run(IFACES, SR, ISIS)
+    instances = {i["name"]: i for i in f["isis"]["instances"]}
+    interfaces = {i["interface"]: i for i in f["isis"]["interfaces"]}
+    assert interfaces["lb0"]["address_families"] == ["ipv4 unicast", "ipv6 unicast"]
+    assert interfaces["core"]["address_families"] == ["ipv6 unicast"]
+    assert interfaces["edge"]["address_families"] == ["ipv4 unicast"]
+    assert not any(k.startswith("_") for i in f["isis"]["interfaces"] for k in i)
+    core, edge = instances["CORE"], instances["EDGE"]
+    assert (core["address_families"], core["multi_topology"]) == (["ipv4 unicast", "ipv6 unicast"], True)
+    # LOC-A names CORE, LOC-B names no instance: advertised in every instance
+    assert (core["srv6_locators"], core["srv6_enabled"]) == (["LOC-A", "LOC-B"], True)
+    assert (edge["address_families"], edge["multi_topology"], edge["srv6_locators"]) == (["ipv4 unicast"], True, ["LOC-B"])
+    plain = run(IFACES, {"ciena-isis:isis": {"instance": [{"tag": "X", "interfaces": {"interface": [{"name": "core"}]}}]}})
+    (x,) = plain["isis"]["instances"]
+    assert (x["multi_topology"], x["srv6_enabled"], x["srv6_locators"]) == (None, False, [])
+
+
+def test_isis_interface_af_removed_in_a_later_file():
+    later = {"ciena-isis:isis": {"instance": [{"tag": "CORE", "interfaces": {"interface": [
+        {"name": "lb0", "address-families": {"address-family": [{"afi": "ipv6", "safi": "unicast", "__operation__": "remove"}]}}]}}]}}
+    f = run(ISIS, later)
+    lb0 = next(i for i in f["isis"]["interfaces"] if i["interface"] == "lb0")
+    assert lb0["address_families"] == ["ipv4 unicast"]
+
+
+def test_evpn_instances_vpls_and_vpws():
+    vpls, vpws = run(EVPN)["evpn_instances"]
+    assert vpls == {"evi": "101", "description": None, "type": "vpls", "fd": "fd-vpls-101", "fds": ["fd-vpls-101"],
+                    "local_service_id": None, "remote_service_id": None, "control_word": None,
+                    "route_distinguisher": "192.0.2.1:101", "route_targets": [{"route_target": "64496:101", "type": "both"}],
+                    "srv6_locator": "LOC-A", "sr_policy_color": None}
+    assert (vpws["type"], vpws["fd"], vpws["local_service_id"], vpws["remote_service_id"], vpws["control_word"]) == (
+        "vpws", "fd-vpws-201", "1", "2", False)
+    assert vpws["route_targets"] == [{"route_target": "64496:201", "type": "import"}, {"route_target": "64496:202", "type": "export"}]
+    assert (vpws["srv6_locator"], vpws["sr_policy_color"]) == (None, "100")
+
+
+def test_evpn_instances_merge_remove_and_keep_segments():
+    segment = {"ciena-evpn:evpn": {"ethernet-segments": {"ethernet-segment": [{"name": "ES1", "logical-port": "LAG1"}]}}}
+    later = {"ciena-evpn:evpn": {"evpn-instances": {"evpn-instance": [
+        {"id": 101, "vpn-target": [{"route-target": "64496:101", "__operation__": "remove"}], "description": "blue"},
+        {"id": 201, "__operation__": "remove"},
+        {"id": 301, "__edit_path__": ["x"]}]}}}
+    f = run(EVPN, segment, later)
+    (evi,) = f["evpn_instances"]
+    assert (evi["evi"], evi["description"], evi["route_targets"], evi["srv6_locator"]) == ("101", "blue", [], "LOC-A")
+    assert [s["name"] for s in f["segments"]] == ["ES1"]
+    assert run(EVPN, {"ciena-evpn:evpn": {"__operation__": "remove"}})["evpn_instances"] == []
+
+
+def test_bgp_peer_group_name():
+    f = run({"ciena-bgp:bgp": {"instance": [{"as": 64496, "peer": [
+        {"address": "2001:db8::2", "peer-group": "RR-CLIENTS"}, {"address": "2001:db8::3", "remote-as": 64497}]}]}})
+    assert [(p["ip"], p["peer_group"]) for p in f["peers"]] == [("2001:db8::2", "RR-CLIENTS"), ("2001:db8::3", None)]

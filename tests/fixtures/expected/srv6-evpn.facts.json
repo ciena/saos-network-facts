@@ -13,6 +13,7 @@
         "classifiers": {
           "UNTAGGED": []
         },
+        "evpn_instances": [],
         "fds": [
           {
             "mode": "vpls",
@@ -126,20 +127,33 @@
         "isis": {
           "instances": [
             {
+              "address_families": [
+                "ipv4 unicast",
+                "ipv6 unicast"
+              ],
               "area": "49.0001.1920.0000.2003.00",
               "area_id": "49.0001",
               "level": "level-2",
+              "multi_topology": true,
               "name": "CORE",
               "net": "49.0001.1920.0000.2003.00",
               "nets": [
                 "49.0001.1920.0000.2003.00"
               ],
               "sr_enabled": true,
+              "srv6_enabled": true,
+              "srv6_locators": [
+                "LOC"
+              ],
               "system_id": "1920.0000.2003"
             }
           ],
           "interfaces": [
             {
+              "address_families": [
+                "ipv4 unicast",
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "lo0",
               "level": null,
@@ -147,6 +161,9 @@
               "type": "point-to-point"
             },
             {
+              "address_families": [
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "P1-PE1",
               "level": "level-2",
@@ -160,6 +177,9 @@
               "type": "point-to-point"
             },
             {
+              "address_families": [
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "P1-PE2",
               "level": "level-2",
@@ -173,6 +193,9 @@
               "type": "point-to-point"
             },
             {
+              "address_families": [
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "P1-RR1",
               "level": "level-2",
@@ -189,8 +212,8 @@
         },
         "l2vpn_services": [],
         "lags": [],
-        "lines": 9,
-        "objects": 9,
+        "lines": 11,
+        "objects": 11,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -223,9 +246,25 @@
           }
         },
         "pseudowires": [],
-        "recognised": 9,
+        "recognised": 10,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [
+            {
+              "admin_groups": {
+                "exclude_any": [
+                  "SLOW"
+                ],
+                "include_all": [],
+                "include_any": []
+              },
+              "advertise_definition": true,
+              "algorithm": "128",
+              "metric_type": "latency",
+              "priority": "200",
+              "srlg_exclude": []
+            }
+          ],
           "policies": [],
           "prefix_sids": [
             {
@@ -243,7 +282,22 @@
               "lower": "16000",
               "upper": "23999"
             }
-          ]
+          ],
+          "srv6": {
+            "locators": [
+              {
+                "algorithm": null,
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [],
+                "name": "LOC",
+                "node_length": null,
+                "prefix": "2001:db8:f0:3::/64",
+                "sid_type": "u-sid"
+              }
+            ]
+          }
         },
         "segments": [],
         "sub_ports": [],
@@ -280,16 +334,67 @@
           "UNTAGGED": [],
           "VLAN100": [
             "100"
+          ],
+          "VLAN200": [
+            "200"
           ]
         },
+        "evpn_instances": [
+          {
+            "control_word": true,
+            "description": null,
+            "evi": "100",
+            "fd": "FD-EVPN-100",
+            "fds": [
+              "FD-EVPN-100"
+            ],
+            "local_service_id": null,
+            "remote_service_id": null,
+            "route_distinguisher": "192.0.2.1:100",
+            "route_targets": [
+              {
+                "route_target": "0:64500:100",
+                "type": "both"
+              }
+            ],
+            "sr_policy_color": null,
+            "srv6_locator": "LOC",
+            "type": "vpls"
+          },
+          {
+            "control_word": false,
+            "description": null,
+            "evi": "200",
+            "fd": "FD-VPWS-200",
+            "fds": [
+              "FD-VPWS-200"
+            ],
+            "local_service_id": "1",
+            "remote_service_id": "2",
+            "route_distinguisher": null,
+            "route_targets": [
+              {
+                "route_target": "0:64500:200",
+                "type": "both"
+              }
+            ],
+            "sr_policy_color": null,
+            "srv6_locator": "LOC-ALGO128",
+            "type": "vpws"
+          }
+        ],
         "fds": [
           {
             "mode": "vpls",
             "name": "FD-PE1-P1"
           },
           {
-            "mode": "vpls",
+            "mode": "evpn-vpls",
             "name": "FD-EVPN-100"
+          },
+          {
+            "mode": "evpn-vpws",
+            "name": "FD-VPWS-200"
           }
         ],
         "fps": [
@@ -308,6 +413,14 @@
             "fd": "FD-EVPN-100",
             "logical_port": "5",
             "name": "FP-AC-100"
+          },
+          {
+            "classifiers": [
+              "VLAN200"
+            ],
+            "fd": "FD-VPWS-200",
+            "logical_port": "5",
+            "name": "FP-AC-200"
           }
         ],
         "gateway": null,
@@ -351,20 +464,34 @@
         "isis": {
           "instances": [
             {
+              "address_families": [
+                "ipv4 unicast",
+                "ipv6 unicast"
+              ],
               "area": "49.0001.1920.0000.2001.00",
               "area_id": "49.0001",
               "level": "level-2",
+              "multi_topology": true,
               "name": "CORE",
               "net": "49.0001.1920.0000.2001.00",
               "nets": [
                 "49.0001.1920.0000.2001.00"
               ],
               "sr_enabled": true,
+              "srv6_enabled": true,
+              "srv6_locators": [
+                "LOC",
+                "LOC-ALGO128"
+              ],
               "system_id": "1920.0000.2001"
             }
           ],
           "interfaces": [
             {
+              "address_families": [
+                "ipv4 unicast",
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "lo0",
               "level": null,
@@ -372,6 +499,9 @@
               "type": "point-to-point"
             },
             {
+              "address_families": [
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "PE1-P1",
               "level": "level-2",
@@ -388,8 +518,8 @@
         },
         "l2vpn_services": [],
         "lags": [],
-        "lines": 15,
-        "objects": 15,
+        "lines": 18,
+        "objects": 18,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -403,6 +533,7 @@
             "ip": "2001:db8::4",
             "kind": "bgp",
             "name": "as64500",
+            "peer_group": "RR",
             "remote_as": "64500",
             "route_reflector_client": false
           }
@@ -423,14 +554,31 @@
               "fp"
             ],
             "vlans": [
-              "100"
+              "100",
+              "200"
             ]
           }
         },
         "pseudowires": [],
-        "recognised": 15,
+        "recognised": 17,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [
+            {
+              "admin_groups": {
+                "exclude_any": [
+                  "SLOW"
+                ],
+                "include_all": [],
+                "include_any": []
+              },
+              "advertise_definition": false,
+              "algorithm": "128",
+              "metric_type": "latency",
+              "priority": null,
+              "srlg_exclude": []
+            }
+          ],
           "policies": [],
           "prefix_sids": [
             {
@@ -448,13 +596,46 @@
               "lower": "16000",
               "upper": "23999"
             }
-          ]
+          ],
+          "srv6": {
+            "locators": [
+              {
+                "algorithm": null,
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [],
+                "name": "LOC",
+                "node_length": null,
+                "prefix": "2001:db8:f0:1::/64",
+                "sid_type": "u-sid"
+              },
+              {
+                "algorithm": "128",
+                "block_length": "32",
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [
+                  "CORE"
+                ],
+                "name": "LOC-ALGO128",
+                "node_length": "16",
+                "prefix": "2001:db8:f8:1::/64",
+                "sid_type": "u-sid"
+              }
+            ]
+          }
         },
         "segments": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
         "vlans": {
           "100": {
+            "ports": [
+              "5"
+            ]
+          },
+          "200": {
             "ports": [
               "5"
             ]
@@ -492,16 +673,67 @@
           "UNTAGGED": [],
           "VLAN100": [
             "100"
+          ],
+          "VLAN200": [
+            "200"
           ]
         },
+        "evpn_instances": [
+          {
+            "control_word": true,
+            "description": null,
+            "evi": "100",
+            "fd": "FD-EVPN-100",
+            "fds": [
+              "FD-EVPN-100"
+            ],
+            "local_service_id": null,
+            "remote_service_id": null,
+            "route_distinguisher": "192.0.2.2:100",
+            "route_targets": [
+              {
+                "route_target": "0:64500:100",
+                "type": "both"
+              }
+            ],
+            "sr_policy_color": null,
+            "srv6_locator": "LOC",
+            "type": "vpls"
+          },
+          {
+            "control_word": false,
+            "description": null,
+            "evi": "200",
+            "fd": "FD-VPWS-200",
+            "fds": [
+              "FD-VPWS-200"
+            ],
+            "local_service_id": "2",
+            "remote_service_id": "1",
+            "route_distinguisher": null,
+            "route_targets": [
+              {
+                "route_target": "0:64500:200",
+                "type": "both"
+              }
+            ],
+            "sr_policy_color": null,
+            "srv6_locator": "LOC-ALGO128",
+            "type": "vpws"
+          }
+        ],
         "fds": [
           {
             "mode": "vpls",
             "name": "FD-PE2-P1"
           },
           {
-            "mode": "vpls",
+            "mode": "evpn-vpls",
             "name": "FD-EVPN-100"
+          },
+          {
+            "mode": "evpn-vpws",
+            "name": "FD-VPWS-200"
           }
         ],
         "fps": [
@@ -520,6 +752,14 @@
             "fd": "FD-EVPN-100",
             "logical_port": "5",
             "name": "FP-AC-100"
+          },
+          {
+            "classifiers": [
+              "VLAN200"
+            ],
+            "fd": "FD-VPWS-200",
+            "logical_port": "5",
+            "name": "FP-AC-200"
           }
         ],
         "gateway": null,
@@ -563,20 +803,34 @@
         "isis": {
           "instances": [
             {
+              "address_families": [
+                "ipv4 unicast",
+                "ipv6 unicast"
+              ],
               "area": "49.0001.1920.0000.2002.00",
               "area_id": "49.0001",
               "level": "level-2",
+              "multi_topology": true,
               "name": "CORE",
               "net": "49.0001.1920.0000.2002.00",
               "nets": [
                 "49.0001.1920.0000.2002.00"
               ],
               "sr_enabled": true,
+              "srv6_enabled": true,
+              "srv6_locators": [
+                "LOC",
+                "LOC-ALGO128"
+              ],
               "system_id": "1920.0000.2002"
             }
           ],
           "interfaces": [
             {
+              "address_families": [
+                "ipv4 unicast",
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "lo0",
               "level": null,
@@ -584,6 +838,9 @@
               "type": "point-to-point"
             },
             {
+              "address_families": [
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "PE2-P1",
               "level": "level-2",
@@ -600,8 +857,8 @@
         },
         "l2vpn_services": [],
         "lags": [],
-        "lines": 15,
-        "objects": 15,
+        "lines": 18,
+        "objects": 18,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -615,6 +872,7 @@
             "ip": "2001:db8::4",
             "kind": "bgp",
             "name": "as64500",
+            "peer_group": "RR",
             "remote_as": "64500",
             "route_reflector_client": false
           }
@@ -635,14 +893,31 @@
               "fp"
             ],
             "vlans": [
-              "100"
+              "100",
+              "200"
             ]
           }
         },
         "pseudowires": [],
-        "recognised": 15,
+        "recognised": 17,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [
+            {
+              "admin_groups": {
+                "exclude_any": [
+                  "SLOW"
+                ],
+                "include_all": [],
+                "include_any": []
+              },
+              "advertise_definition": false,
+              "algorithm": "128",
+              "metric_type": "latency",
+              "priority": null,
+              "srlg_exclude": []
+            }
+          ],
           "policies": [],
           "prefix_sids": [
             {
@@ -660,13 +935,46 @@
               "lower": "16000",
               "upper": "23999"
             }
-          ]
+          ],
+          "srv6": {
+            "locators": [
+              {
+                "algorithm": null,
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [],
+                "name": "LOC",
+                "node_length": null,
+                "prefix": "2001:db8:f0:2::/64",
+                "sid_type": "u-sid"
+              },
+              {
+                "algorithm": "128",
+                "block_length": "32",
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [
+                  "CORE"
+                ],
+                "name": "LOC-ALGO128",
+                "node_length": "16",
+                "prefix": "2001:db8:f8:2::/64",
+                "sid_type": "u-sid"
+              }
+            ]
+          }
         },
         "segments": [],
         "sub_ports": [],
         "tp_corouted_tunnels": [],
         "vlans": {
           "100": {
+            "ports": [
+              "5"
+            ]
+          },
+          "200": {
             "ports": [
               "5"
             ]
@@ -703,6 +1011,7 @@
         "classifiers": {
           "UNTAGGED": []
         },
+        "evpn_instances": [],
         "fds": [
           {
             "mode": "vpls",
@@ -760,20 +1069,33 @@
         "isis": {
           "instances": [
             {
+              "address_families": [
+                "ipv4 unicast",
+                "ipv6 unicast"
+              ],
               "area": "49.0001.1920.0000.2004.00",
               "area_id": "49.0001",
               "level": "level-2",
+              "multi_topology": true,
               "name": "CORE",
               "net": "49.0001.1920.0000.2004.00",
               "nets": [
                 "49.0001.1920.0000.2004.00"
               ],
               "sr_enabled": true,
+              "srv6_enabled": true,
+              "srv6_locators": [
+                "LOC"
+              ],
               "system_id": "1920.0000.2004"
             }
           ],
           "interfaces": [
             {
+              "address_families": [
+                "ipv4 unicast",
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "lo0",
               "level": null,
@@ -781,6 +1103,9 @@
               "type": "point-to-point"
             },
             {
+              "address_families": [
+                "ipv6 unicast"
+              ],
               "instance": "CORE",
               "interface": "RR1-P1",
               "level": "level-2",
@@ -797,8 +1122,8 @@
         },
         "l2vpn_services": [],
         "lags": [],
-        "lines": 11,
-        "objects": 11,
+        "lines": 13,
+        "objects": 13,
         "ospf": {
           "instances": [],
           "interfaces": []
@@ -812,6 +1137,7 @@
             "ip": "2001:db8::1",
             "kind": "bgp",
             "name": "as64500",
+            "peer_group": "CLIENTS",
             "remote_as": "64500",
             "route_reflector_client": true
           },
@@ -823,6 +1149,7 @@
             "ip": "2001:db8::2",
             "kind": "bgp",
             "name": "as64500",
+            "peer_group": "CLIENTS",
             "remote_as": "64500",
             "route_reflector_client": true
           }
@@ -838,9 +1165,25 @@
           }
         },
         "pseudowires": [],
-        "recognised": 11,
+        "recognised": 12,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [
+            {
+              "admin_groups": {
+                "exclude_any": [
+                  "SLOW"
+                ],
+                "include_all": [],
+                "include_any": []
+              },
+              "advertise_definition": false,
+              "algorithm": "128",
+              "metric_type": "latency",
+              "priority": null,
+              "srlg_exclude": []
+            }
+          ],
           "policies": [],
           "prefix_sids": [
             {
@@ -858,7 +1201,22 @@
               "lower": "16000",
               "upper": "23999"
             }
-          ]
+          ],
+          "srv6": {
+            "locators": [
+              {
+                "algorithm": null,
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [],
+                "name": "LOC",
+                "node_length": null,
+                "prefix": "2001:db8:f0:4::/64",
+                "sid_type": "u-sid"
+              }
+            ]
+          }
         },
         "segments": [],
         "sub_ports": [],
@@ -878,7 +1236,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.7.2"
+    "version": "0.8.0"
   },
-  "schema_version": "1.5.0"
+  "schema_version": "1.6.0"
 }

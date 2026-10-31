@@ -271,3 +271,48 @@ def test_ring_extras_and_links_are_optional():
     doc["devices"][0]["facts"]["rings"][0]["instances"] = []
     doc["links"] = [{"a": {"device": "A"}}]
     assert schema.errors(doc)  # a link has two ends with device and port
+
+
+def test_srv6_evpn_fields_are_optional():
+    # a file before schema 1.6 (no SRv6 locators, Flex-Algo, IS-IS address families, EVPN instances
+    # or peer groups) still validates against 1.6
+    doc = json.loads((EXPECTED / "srv6-evpn.facts.json").read_text())
+    for record in doc["devices"]:
+        facts = record["facts"]
+        facts.pop("evpn_instances")
+        facts["segment_routing"].pop("srv6")
+        facts["segment_routing"].pop("flex_algorithms")
+        for instance in facts["isis"]["instances"]:
+            for key in ("address_families", "multi_topology", "srv6_enabled", "srv6_locators"):
+                instance.pop(key)
+        for item in facts["isis"]["interfaces"]:
+            item.pop("address_families")
+        for peer in facts["peers"]:
+            peer.pop("peer_group", None)
+    doc["schema_version"] = "1.5.0"
+    assert schema.errors(doc) == []
+    doc["devices"][0]["facts"]["evpn_instances"] = [{"evi": "1"}]
+    assert schema.errors(doc)  # an EVPN instance carries every field
+    doc["devices"][0]["facts"]["evpn_instances"] = []
+    doc["devices"][0]["facts"]["segment_routing"]["srv6"] = {"locators": [{"name": "LOC"}]}
+    assert schema.errors(doc)  # so does a locator
+
+
+def test_srv6_evpn_lab_per_node():
+    by = {r["device"]: r["facts"] for r in json.loads((EXPECTED / "srv6-evpn.facts.json").read_text())["devices"]}
+    # the base layer's Flex-Algo 128 on every node; only P1 advertises the definition
+    assert [(n, [(a["algorithm"], a["advertise_definition"]) for a in f["segment_routing"]["flex_algorithms"]]) for n, f in by.items()] == [
+        ("P1", [("128", True)]), ("PE1", [("128", False)]), ("PE2", [("128", False)]), ("RR1", [("128", False)])]
+    for f in by.values():
+        (core,) = f["isis"]["instances"]
+        assert core["multi_topology"] and core["srv6_enabled"]
+        # core links run IPv6 only, the loopback both
+        assert {i["interface"]: i["address_families"] for i in f["isis"]["interfaces"]}["lo0"] == ["ipv4 unicast", "ipv6 unicast"]
+        assert all(i["address_families"] == ["ipv6 unicast"] for i in f["isis"]["interfaces"] if i["interface"] != "lo0")
+    pe1, pe2 = (by[n]["evpn_instances"] for n in ("PE1", "PE2"))
+    assert [(e["evi"], e["type"], e["fd"], e["srv6_locator"]) for e in pe1] == [
+        ("100", "vpls", "FD-EVPN-100", "LOC"), ("200", "vpws", "FD-VPWS-200", "LOC-ALGO128")]
+    assert (pe1[1]["local_service_id"], pe1[1]["remote_service_id"]) == (pe2[1]["remote_service_id"], pe2[1]["local_service_id"])
+    loc = {l["name"]: l for l in by["PE1"]["segment_routing"]["srv6"]["locators"]}
+    assert loc["LOC-ALGO128"]["algorithm"] == "128" and loc["LOC-ALGO128"]["instances"] == ["CORE"]
+    assert [p["peer_group"] for p in by["RR1"]["peers"]] == ["CLIENTS", "CLIENTS"]
