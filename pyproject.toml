@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "saos-network-facts"
-version = "0.7.0"
+version = "0.7.1"
 description = "Extract per-device network facts from SAOS 6/8/10 configurations into a versioned schema."
 readme = "README.md"
 license = "Apache-2.0"

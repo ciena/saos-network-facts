@@ -203,8 +203,10 @@ facts of a ten-device SAOS 10 lab (segment routing, SR policies, VPWS pseudowire
 reflection, a G.8032 major ring and sub-ring) in the [viewer](viewer/): one plane per layer over
 the topology, a panel per device and per service, packet walks and link-failure replays (a ring
 link's with the R-APS protection switch and the revert after the repair). The site also stages the
-`g8032-two-ring` fixture lab (a pure L2 ring lab, its links from the containerlab topology): pick it
-in the page's lab menu or open [`?lab=g8032-two-ring`](https://ciena.github.io/saos-network-facts/?lab=g8032-two-ring).
+`g8032-two-ring` fixture lab (a pure L2 ring lab, its links from the containerlab topology) and the
+`g8032-by-name` fixture lab (a SAOS 10 CLI ring without ring ids, joined by name): pick one in the
+page's lab menu or open [`?lab=g8032-two-ring`](https://ciena.github.io/saos-network-facts/?lab=g8032-two-ring)
+or [`?lab=g8032-by-name`](https://ciena.github.io/saos-network-facts/?lab=g8032-by-name).
 *Load your facts.json* there to see your own network; the file stays in your browser.
 
 ![The Adaptive-SR-CFM example in the viewer](docs/example.png)
@@ -220,7 +222,7 @@ cd ../../viewer && npm ci && npm run build      # the site, in dist/
 ```
 
 The build stages `labs/index.json` beside the page with the example (the default lab) and the
-`g8032-two-ring` fixture lab, from `viewer/labs.config.js`; the page opens that index as any staged
+`g8032-two-ring` and `g8032-by-name` fixture labs, from `viewer/labs.config.js`; the page opens that index as any staged
 site would (below).
 
 The site is built by `.github/workflows/pages.yml`, which deploys `main` to the `gh-pages` branch

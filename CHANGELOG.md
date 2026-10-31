@@ -17,6 +17,37 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-31
+
+### Fixed
+
+- **Viewer: rings without a ring id are joined by name** — a SAOS 10 CLI configuration normally
+  leaves `ring-id` out (the YANG key is the ring name; the id is optional and defaults to 1), so
+  every device's ring arrived with `ring_id` null and the viewer, which joined rings by id only,
+  drew one ring fragment per device with a warning and no RPL or replay. The import now joins a
+  device ring by its ring id when it has one, else by the one ring id its name carries on other
+  devices, else by its name; the ring layer, the RPL, the interconnection nodes and the R-APS
+  replay work on the joined ring (its group MAC uses the default ring id 1), and the Import tab
+  lists the rings joined by name. The only warnings left are real ambiguities: an id-less ring
+  whose name is two different ring ids elsewhere stays on its device, and two name-joined devices
+  that disagree on the R-APS VID or ring type are reported as possibly different rings.
+- **Viewer: the file's `links[]` win a port over a subnet guess** — two routed interfaces in one
+  subnet are drawn as a point-to-point link on their ports, which is wrong when the subnet rides a
+  VLAN around a ring (or a service across the network): the guessed link took the ring ports and
+  the cabled links from `links[]` were skipped, so the ring lost its RPL. An addressed link whose
+  port the file cables to another device now keeps its two interfaces and loses its ports (the
+  Import tab lists these subnets over a bridged domain), and the cables are drawn as L2 links.
+- **SAOS 6 / 8: the short form `ring virtual-ring add ...` is parsed** — the CLI's partial command
+  recognition lets a configuration write `ring` for `ring-protection` (and `virtual` for
+  `virtual-ring`); the parser only matched the full word, so the virtual ring's VLAN or
+  virtual-switch members came out empty. Abbreviated command words are read as the full ones;
+  `logical-ring delete` and `virtual-ring delete` remove the ring or the instance, so a
+  configuration that deletes before it creates does not double them.
+- **Fixtures** — `labs/g8032-by-name`: a four-node SAOS 10 CLI ring written as such configs are
+  (nested form, quoted names, no `ring-id`), with its containerlab links, recorded pivots and
+  expected facts; `g8032-saos6/A2.cfg` writes its virtual-ring commands in the short form (the
+  expected facts are unchanged). The site's lab index gains the new lab (`?lab=g8032-by-name`).
+
 ## [0.7.0] - 2026-10-30
 
 ### Added

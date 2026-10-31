@@ -9,7 +9,8 @@ link and LAG member failure replays, found by loss of signal or, for a silent fa
 the LACP timeout or the IGP hold timer, with the G.8032 protection switch and revert when the link
 is on a ring. The
 published site opens the [Adaptive-SR-CFM example](../examples/adaptive-sr-cfm/) and offers the
-`g8032-two-ring` fixture lab, from the `labs/index.json` the build stages (`labs.config.js`); *Load
+`g8032-two-ring` and `g8032-by-name` fixture labs, from the `labs/index.json` the build stages
+(`labs.config.js`); *Load
 your facts.json* (or drop a file on the page) reads any facts file of schema 1.x in the browser,
 without uploading it. `?facts=<url>`, `?labs=<index>` and `?lab=<id>` open facts served next to
 the site, and a site that stages `labs/index.json` beside the page opens that index's default lab
@@ -39,7 +40,9 @@ The importer reads the file with the npm reader (`../js/src`). Facts carry confi
 they do not say is derived or defaulted and listed in the **Import** tab: links are two interfaces
 in one IPv4 subnet, a LAG when both ride one (`lags` / `ports[].lag`; members paired in configured
 order, which the facts do not say), plus the file's top-level `links[]` (schema 1.5, the extractor's
-`--clab` topology) as plain L2 links between ports no addressed link joins (no subnet, no IGP); the IGP (OSPF when more devices run OSPF than IS-IS: the engine runs one);
+`--clab` topology) as plain L2 links between ports no addressed link joins (no subnet, no IGP; a subnet
+whose ports the file cables to other devices rides a bridged domain and keeps its interfaces but not the
+ports, which the cabled links take); the IGP (OSPF when more devices run OSPF than IS-IS: the engine runs one);
 roles (CE: no IGP and no MPLS-TP tunnel; PE: speaks BGP, ends a pseudowire or faces a CE); IS-IS
 metrics (each end's wide, else narrow, metric at the level the view runs; 10 where not configured)
 and OSPF costs where not configured; CFM level and CCM interval when not configured;
@@ -47,7 +50,10 @@ positions unless authored. MPLS-TP tunnels are stitched from each node's segment
 the neighbour on the forward next hop with the matching label, to the egress). Signalled PW labels
 and LFIBs are computed by the engine from the RFCs; static PW and tunnel labels are the configured ones.
 
-G.8032 rings (`rings[]`, schema 1.5) are joined across devices by ring id; a ring's links are the
+G.8032 rings (`rings[]`, schema 1.5) are joined across devices by ring id, or by ring name where no
+device gives the ring an id (a SAOS 10 CLI configuration normally leaves `ring-id` out; the Import tab
+lists the rings joined by name, and an id-less ring whose name is two different ring ids elsewhere
+stays on its device with a warning); a ring's links are the
 links whose two ends are ring ports of that ring, so a ring port on a link the view does not have
 (no addressed interface on it and no `links[]` entry) is reported and left out. The RPL is the link of the port the owner
 configures `rpl owner` on; an interconnection node is one where a sub-ring instance names a single
