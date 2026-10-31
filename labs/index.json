@@ -10,6 +10,11 @@
       "id": "g8032-two-ring",
       "title": "G.8032 two-ring lab (fixture, links from --clab)",
       "facts": "g8032-two-ring/facts.json"
+    },
+    {
+      "id": "g8032-by-name",
+      "title": "G.8032 ring without ring ids (fixture, joined by name)",
+      "facts": "g8032-by-name/facts.json"
     }
   ]
 }
