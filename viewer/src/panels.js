@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // The facts panels: the overview (devices, services, SR policies, MPLS-TP tunnels, BGP, G.8032
-// rings), one device (its facts record, then the engine's tables for it) and one service
-// (its pseudowire ends, transports and MEG). Links between them are hash
+// rings, SRv6 locators, Flex-Algos, EVPN instances), one device (its facts record, then the engine's tables for it) and one service
+// (its pseudowire ends, transports and MEG; or an EVPN instance's members, SIDs and paths). Links between them are hash
 // routes (#device=PE1, #service=...), handled by main.js.
 
 import { isisArea } from '../../js/src/index.ts';
+import { canonicalIp } from './import/facts.js';
 import { renderNode } from './view/panel.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -14,6 +15,14 @@ export const deviceHref = (id) => `#device=${encodeURIComponent(id)}`;
 export const serviceHref = (id) => `#service=${encodeURIComponent(id)}`;
 const deviceLink = (id) => `<a href="${deviceHref(id)}">${esc(id)}</a>`;
 const serviceLink = (s) => `<a href="${serviceHref(s.id)}">${esc(s.name)}</a>`;
+const eviLink = (i) => `<a href="${serviceHref(i.id)}">EVI ${esc(i.evi)}</a>`;
+const algoText = (a) => (a ? `Flex-Algo ${a}` : '0 (SPF)');
+const definitionText = (d) => {
+  if (!d) return 'none advertised';
+  const ag = d.adminGroups ?? {};
+  const groups = [...(ag.excludeAny ?? []).map((g) => `exclude ${g}`), ...(ag.includeAny ?? []).map((g) => `include-any ${g}`), ...(ag.includeAll ?? []).map((g) => `include-all ${g}`)];
+  return `${d.node}: ${d.metricType}${d.priority !== null ? `, priority ${d.priority}` : ''}${groups.length ? `, ${groups.join(', ')}` : ''}`;
+};
 
 // rows: arrays of cells; a cell is text (escaped) or { html }.
 function table(headers, rows) {
@@ -46,7 +55,7 @@ export function renderOverview(el, imp, net) {
     ['device', 'type', 'role', 'loopback', 'status', 'PWs', 'MEPs'],
     file.devices.map((r) => {
       const n = topo.nodes.find((x) => x.id === r.device);
-      return [n ? { html: deviceLink(r.device) } : r.device, r.type, n ? role[r.device].toUpperCase() : '-', n?.loopback, r.status, r.facts?.pseudowires?.length ?? 0, r.facts?.cfm?.meps?.length ?? 0];
+      return [n ? { html: deviceLink(r.device) } : r.device, r.type, n ? role[r.device].toUpperCase() : '-', n ? (n.loopbacks ?? [n.loopback]).filter(Boolean).join(', ') : null, r.status, r.facts?.pseudowires?.length ?? 0, r.facts?.cfm?.meps?.length ?? 0];
     }),
   );
   html += '<h2>Services</h2>';
@@ -92,7 +101,92 @@ export function renderOverview(el, imp, net) {
       }),
     );
   }
+  html += srv6Overview(net);
   el.innerHTML = html;
+}
+
+// SRv6 locators, Flex-Algos and EVPN instances, when the network has any.
+function srv6Overview(net) {
+  let html = '';
+  const { locators, algorithms } = net.srv6;
+  if (locators.length) {
+    html += '<h2>SRv6 locators</h2>';
+    html += table(['device', 'locator', 'prefix', 'algorithm', 'SID type', 'reached from'], locators.map((l) => {
+      const from = net.igp.routers.filter((r) => r !== l.node && !net.srv6.rib[r]?.[l.prefix]?.unreachable);
+      return [{ html: deviceLink(l.node) }, l.name, l.prefix, algoText(l.algorithm), l.sidType, `${from.length} of ${net.igp.routers.length - 1} routers`];
+    }));
+  }
+  if (algorithms.length > 1) {
+    html += '<h2>Flex-Algo</h2>';
+    html += table(['algorithm', 'definition in use', 'routers', 'links', 'notes'], algorithms.slice(1).map((a) => [a.algorithm, definitionText(a.definition), { html: a.participants.map(deviceLink).join(', ') || '-' }, a.links.length, a.notes.join('; ')]));
+  }
+  if (net.evpn.instances.length) {
+    html += '<h2>EVPN instances</h2>';
+    html += table(['EVI', 'type', 'members', 'service ids', 'SRv6 locator', 'state'], net.evpn.instances.map((i) => [
+      { html: eviLink(i) }, (i.type ?? '?').toUpperCase(), { html: i.members.map((m) => deviceLink(m.node)).join(' – ') },
+      i.type === 'vpws' ? i.members.map((m) => `${m.localServiceId ?? '-'}→${m.remoteServiceId ?? '-'}`).join(', ') : null,
+      [...new Set(i.members.map((m) => m.srv6Locator).filter(Boolean))].join(', '), `${i.state}${i.reasons.length ? ` (${i.reasons.join('; ')})` : ''}`,
+    ]));
+  }
+  return html;
+}
+
+// A device's SRv6 locators, the Flex-Algos it takes part in and its EVPN instances.
+function srv6Device(net, id) {
+  let html = '';
+  const mine = net.srv6.locators.filter((l) => l.node === id);
+  if (mine.length) {
+    html += '<h2>SRv6 locators</h2>';
+    html += table(['locator', 'prefix', 'algorithm', 'SID type', 'block / node / function bits', 'IS-IS instances'], mine.map((l) => [l.name, l.prefix, algoText(l.algorithm), l.sidType, `${dash(l.blockLength)} / ${dash(l.nodeLength)} / ${dash(l.functionLength)}`, l.instances.join(', ') || 'every instance']));
+  }
+  const algos = net.srv6.algorithms.slice(1).filter((a) => a.participants.includes(id) || (net.topo.flexAlgos ?? []).find((f) => f.algorithm === a.algorithm)?.definitions.some((d) => d.node === id));
+  if (algos.length) {
+    html += '<h2>Flex-Algo</h2>';
+    html += table(['algorithm', 'takes part', 'definition in use', 'own definition advertised'], algos.map((a) => {
+      const own = net.topo.flexAlgos.find((f) => f.algorithm === a.algorithm)?.definitions.find((d) => d.node === id);
+      return [a.algorithm, a.participants.includes(id) ? 'yes' : 'no', definitionText(a.definition), own ? (own.advertise ? 'yes' : 'no') : '-'];
+    }));
+  }
+  const routes = Object.values(net.srv6.rib[id] ?? {}).filter((r) => !r.local);
+  if (routes.length) {
+    html += '<h2>Routes to SRv6 locators</h2>';
+    html += table(['prefix', 'locator', 'algorithm', 'next hop', 'metric'], routes.map((r) => [r.prefix, `${r.owner} ${r.locator}`, algoText(r.algorithm), r.unreachable ? `unreachable: ${r.unreachable}` : r.nextHops.map((h) => `${h.node} (${h.link})`).join(', '), r.metric]));
+  }
+  const evis = net.evpn.instances.filter((i) => i.members.some((m) => m.node === id));
+  if (evis.length) {
+    html += '<h2>EVPN instances</h2>';
+    html += table(['EVI', 'type', 'AC', 'RD', 'route targets', 'locator', 'SIDs (view)', 'state'], evis.map((i) => {
+      const m = i.members.find((x) => x.node === id);
+      return [{ html: eviLink(i) }, (i.type ?? '?').toUpperCase(), `${dash(m.ac.name)} (port ${dash(m.ac.port)})`, m.rd, m.routeTargets.map((t) => `${t.rt} ${t.type}`).join(', '), m.srv6Locator, Object.entries(m.sids).map(([k, v]) => `${k.toUpperCase()} ${v}`).join(', '), i.state];
+    }));
+  }
+  return html;
+}
+
+// An EVPN instance: its members, their SIDs and the paths between them, and walk buttons.
+function renderEvpnService(el, net, id, actions) {
+  const inst = net.evpn.instances.find((i) => i.id === id);
+  if (!inst) {
+    el.innerHTML = `<p class="sub">No EVPN instance ${esc(id)}.</p>`;
+    return;
+  }
+  let html = `<h2 class="title">EVI ${esc(inst.evi)} <span class="sub">EVPN-${esc((inst.type ?? '?').toUpperCase())} over SRv6 · ${esc(inst.state)}</span></h2>`;
+  if (inst.reasons.length) html += `<ul class="gaps">${inst.reasons.map((x) => `<li class="warn">${esc(x)}</li>`).join('')}</ul>`;
+  html += '<h2>Members</h2>';
+  html += table(['PE', 'AC', 'forwarding domain', 'RD', 'route targets', ...(inst.type === 'vpws' ? ['service id local / remote'] : []), 'locator', 'SIDs (allocated by the view)'], inst.members.map((m) => [
+    { html: deviceLink(m.node) }, `${dash(m.ac.name)} (port ${dash(m.ac.port)})`, m.fd, m.rd, m.routeTargets.map((t) => `${t.rt} ${t.type}`).join(', '),
+    ...(inst.type === 'vpws' ? [`${dash(m.localServiceId)} / ${dash(m.remoteServiceId)}`] : []),
+    m.locator ? `${m.srv6Locator} ${m.locator.prefix}${m.locator.algorithm ? ` (Flex-Algo ${m.locator.algorithm})` : ''}` : m.srv6Locator, Object.entries(m.sids).map(([k, v]) => `${k.toUpperCase()} ${v}`).join(', '),
+  ]));
+  html += '<h2>Between members</h2>';
+  html += table(['from', 'to', 'EVPN routes', 'path to the far locator', 'state'], inst.pairs.map((p) => [
+    { html: deviceLink(p.from) }, { html: deviceLink(p.to) }, p.bgp ? (p.bgp.via === 'direct' ? 'direct iBGP' : `via route reflector ${p.bgp.via}`) : 'no BGP path', p.path ? p.path.nodes.join(' > ') : '-', p.ok ? 'ok' : p.reasons.join('; '),
+  ]));
+  html += '<div class="row">';
+  for (const m of inst.members) html += `<button type="button" data-walk-evpn="${esc(m.node)}">Walk a ${inst.type === 'vpls' ? 'broadcast ' : ''}frame from ${esc(m.node)}</button>`;
+  html += '</div>';
+  el.innerHTML = html;
+  for (const b of el.querySelectorAll('[data-walk-evpn]')) b.addEventListener('click', () => actions.walkEvpn(inst.id, b.dataset.walkEvpn));
 }
 
 export function renderDevice(el, imp, net, id) {
@@ -156,11 +250,11 @@ export function renderDevice(el, imp, net, id) {
       ['router id', bgp.router_id],
       ['route reflector', bgp.route_reflector ? `yes${bgp.cluster_id ? `, cluster ${bgp.cluster_id}` : ''}` : 'no'],
     ]);
-    const owner = Object.fromEntries(imp.topology.nodes.map((x) => [x.loopback, x.id]));
+    const owner = Object.fromEntries(imp.topology.nodes.flatMap((x) => [...new Set([x.loopback, ...(x.loopbacks ?? [])])].map((ip) => [ip, x.id])));
     html += table(
       ['neighbour', 'device', 'AS', 'RR client', 'families', 'session'],
       (f.peers ?? []).filter((p) => p.kind === 'bgp').map((p) => {
-        const peer = owner[p.ip];
+        const peer = owner[canonicalIp(p.ip)];
         const s = peer && net.bgp.sessions.find((x) => [x.a, x.b].includes(id) && [x.a, x.b].includes(peer));
         return [p.ip, peer ? { html: deviceLink(peer) } : null, p.remote_as, p.route_reflector_client ? 'yes' : 'no', (p.address_families ?? []).join(', '), s ? `${s.state}${s.reason ? ` (${s.reason})` : ''}` : null];
       }),
@@ -192,12 +286,14 @@ export function renderDevice(el, imp, net, id) {
       return [{ html: serviceLink(s) }, `${dash(e.fp)} (port ${dash(e.port)})`, { html: deviceLink(peer.node) }];
     }));
   }
+  html += srv6Device(net, id);
   el.innerHTML = `${html}<div class="engine-node"></div>`;
   if (n) renderNode(el.querySelector('.engine-node'), net, id);
 }
 
-// actions: { walkPw(pwId, from), walkCcm(megId) } to run the walks from the panel's buttons.
+// actions: { walkPw(pwId, from), walkCcm(megId), walkEvpn(id, from) } to run the walks from the panel's buttons.
 export function renderService(el, imp, net, id, actions) {
+  if (String(id).startsWith('evi:')) return renderEvpnService(el, net, id, actions);
   const s = imp.services.find((x) => x.id === id);
   if (!s) {
     el.innerHTML = `<p class="sub">No service ${esc(id)}.</p>`;

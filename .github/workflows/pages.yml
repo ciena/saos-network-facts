@@ -1,6 +1,6 @@
 # The example site: the viewer (viewer/) built with the bundled Adaptive-SR-CFM facts
 # (examples/adaptive-sr-cfm/facts.json) and the lab index its build stages (viewer/labs.config.js:
-# the example and the g8032-two-ring and g8032-by-name fixtures), at https://ciena.github.io/saos-network-facts/.
+# the example and the g8032-two-ring, g8032-by-name and srv6-evpn fixtures), at https://ciena.github.io/saos-network-facts/.
 #
 # main is deployed to the root of the gh-pages branch, which GitHub Pages serves
 # (Settings > Pages > Source: "Deploy from a branch", gh-pages / (root)). Pull-request previews

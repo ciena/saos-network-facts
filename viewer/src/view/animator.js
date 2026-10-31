@@ -16,7 +16,9 @@ function packetLabel(step) {
   if (names.includes('CFM CCM')) return 'CCM';
   if (names.includes('R-APS')) return step.headers.find((h) => h.name === 'R-APS').fields.request.split(' ')[0] === 'SF' ? 'R-APS(SF)' : 'R-APS(NR)';
   if (names.includes('BGP UPDATE')) return 'BGP';
+  if (names.includes('SRH') || (names.includes('IPv6') && step.headers.some((h) => h.name === 'Ethernet II (customer)'))) return 'SRv6';
   if (names.includes('IPv4')) return 'IPv4';
+  if (names.includes('IPv6')) return 'IPv6';
   return '';
 }
 

@@ -8,6 +8,7 @@
 // topo.srPolicies: [{ name, headend, color, endpoint: ip, segmentList: { name, sids: [label] } }]
 
 import { IMPLICIT_NULL, nodeOfSid } from './mpls.js';
+import { hostPrefix } from './ip.js';
 import { nodeById } from './topology.js';
 
 // Follow a label stack from `start` over the SR LFIBs until it is empty.
@@ -34,7 +35,7 @@ export function followStack(topo, mpls, vendor, start, stack) {
 
 export function computeSrPolicies(topo, isis, mpls, vendor) {
   const policies = (topo.srPolicies ?? []).map((p) => {
-    const endpointNode = topo.nodes.find((n) => n.loopback === p.endpoint)?.id ?? null;
+    const endpointNode = topo.nodes.find((n) => n.loopback === p.endpoint || (n.loopbacks ?? []).includes(p.endpoint))?.id ?? null;
     const sids = p.segmentList.sids.map((label) => ({ label, node: nodeOfSid(topo, vendor, label) ?? null }));
     const base = { ...p, endpointNode, sids, valid: false, path: [p.headend], hops: [] };
     // §5.1: a segment list is invalid when its SIDs cannot be resolved; we
@@ -43,7 +44,7 @@ export function computeSrPolicies(topo, isis, mpls, vendor) {
     if (!endpointNode) return { ...base, reason: `endpoint ${p.endpoint} is no router loopback` };
     const unknown = sids.find((s) => !s.node);
     if (unknown) return { ...base, reason: `SID ${unknown.label} is no Prefix-SID in the SRGB` };
-    const unreachable = sids.find((s) => s.node !== p.headend && !isis.rib[p.headend]?.[`${nodeById(topo, s.node).loopback}/32`]);
+    const unreachable = sids.find((s) => s.node !== p.headend && !isis.rib[p.headend]?.[hostPrefix(nodeById(topo, s.node).loopback)]);
     if (unreachable) return { ...base, reason: `SID ${unreachable.label} (${unreachable.node}) unreachable from ${p.headend}` };
     const { hops, end, error } = followStack(topo, mpls, vendor, p.headend, p.segmentList.sids);
     if (error) return { ...base, hops, reason: error };
@@ -66,7 +67,7 @@ export function imposeSr(topo, mpls, vendor, node, stack, pick = (hops) => hops[
   while (labels.length && nodeOfSid(topo, vendor, labels[0]) === node) labels = labels.slice(1);
   if (!labels.length) return { stack: [], nextHop: null };
   const target = nodeOfSid(topo, vendor, labels[0]);
-  const ftn = mpls.ftn[node]?.[`${nodeById(topo, target).loopback}/32`];
+  const ftn = mpls.ftn[node]?.[hostPrefix(nodeById(topo, target).loopback)];
   if (!ftn) return { stack: labels, nextHop: null };
   const nh = pick(ftn.nextHops);
   return { stack: nh.label === IMPLICIT_NULL ? labels.slice(1) : [nh.label, ...labels.slice(1)], nextHop: nh, top: labels[0], target };

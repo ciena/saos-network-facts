@@ -8,7 +8,7 @@
 //
 // FECs are the routers' loopback /32s (the BGP next hops).
 
-import { compareIp } from './ip.js';
+import { compareIp, hostPrefix } from './ip.js';
 import { nodeById, nodeOrdinal } from './topology.js';
 
 // RFC 3032 §2.1 reserved label values.
@@ -16,12 +16,12 @@ export const IMPLICIT_NULL = 3;
 
 export function fecsOf(topo, isis) {
   return isis.routers
-    .map((r) => `${nodeById(topo, r).loopback}/32`)
+    .map((r) => hostPrefix(nodeById(topo, r).loopback))
     .sort((a, b) => compareIp(a.split('/')[0], b.split('/')[0]));
 }
 
 function ownFec(topo, node) {
-  return `${nodeById(topo, node).loopback}/32`;
+  return hostPrefix(nodeById(topo, node).loopback);
 }
 
 // LFIB + FTN from a "label this neighbour expects for this FEC" function.
@@ -130,7 +130,7 @@ export const sr = {
   build(topo, isis, vendor) {
     const { base } = srgbOf(topo, vendor);
     const sidIndex = (fec) => {
-      const n = topo.nodes.find((x) => `${x.loopback}/32` === fec);
+      const n = topo.nodes.find((x) => x.loopback && hostPrefix(x.loopback) === fec);
       return n.sidIndex ?? nodeOrdinal(topo, n.id);
     };
     const label = (r, fec) => {

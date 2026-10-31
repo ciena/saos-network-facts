@@ -107,7 +107,7 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 ```json
 {
   "schema_version": "1.7.0",
-  "generator": {"name": "saos-network-facts", "version": "0.9.0", "translator": "translator 4.2.1 (mcp, https://...)"},
+  "generator": {"name": "saos-network-facts", "version": "0.10.0", "translator": "translator 4.2.1 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -281,9 +281,12 @@ reflection, a G.8032 major ring and sub-ring) in the [viewer](viewer/): one plan
 the topology, a panel per device and per service, packet walks and link-failure replays (a ring
 link's with the R-APS protection switch and the revert after the repair). The site also stages the
 `g8032-two-ring` fixture lab (a pure L2 ring lab, its links from the containerlab topology) and the
-`g8032-by-name` fixture lab (a SAOS 10 CLI ring without ring ids, joined by name): pick one in the
-page's lab menu or open [`?lab=g8032-two-ring`](https://ciena.github.io/saos-network-facts/?lab=g8032-two-ring)
-or [`?lab=g8032-by-name`](https://ciena.github.io/saos-network-facts/?lab=g8032-by-name).
+`g8032-by-name` fixture lab (a SAOS 10 CLI ring without ring ids, joined by name) and the
+`srv6-evpn` fixture lab (an IPv6-only IS-IS core with SRv6 locators, Flex-Algo 128 and EVPN-VPLS /
+EVPN-VPWS over SRv6): pick one in the page's lab menu or open
+[`?lab=g8032-two-ring`](https://ciena.github.io/saos-network-facts/?lab=g8032-two-ring),
+[`?lab=g8032-by-name`](https://ciena.github.io/saos-network-facts/?lab=g8032-by-name) or
+[`?lab=srv6-evpn`](https://ciena.github.io/saos-network-facts/?lab=srv6-evpn).
 *Load your facts.json* there to see your own network; the file stays in your browser.
 
 ![The Adaptive-SR-CFM example in the viewer](docs/example.png)
@@ -299,7 +302,7 @@ cd ../../viewer && npm ci && npm run build      # the site, in dist/
 ```
 
 The build stages `labs/index.json` beside the page with the example (the default lab) and the
-`g8032-two-ring` and `g8032-by-name` fixture labs, from `viewer/labs.config.js`; the page opens that index as any staged
+`g8032-two-ring`, `g8032-by-name` and `srv6-evpn` fixture labs, from `viewer/labs.config.js`; the page opens that index as any staged
 site would (below).
 
 The site is built by `.github/workflows/pages.yml`, which deploys `main` to the `gh-pages` branch
