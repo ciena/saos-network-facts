@@ -60,4 +60,4 @@ def test_extract_clab_end_to_end_with_rings_and_links(tmp_path, capsys, monkeypa
     assert owner == [("ring_1", "port1", "2")]
     assert "devices 9 / ok 9" in capsys.readouterr().err
     assert cli.main(["validate", str(out)]) == 0
-    assert "valid (schema 1.5.0)" in capsys.readouterr().out
+    assert f"valid (schema {SCHEMA_VERSION})" in capsys.readouterr().out

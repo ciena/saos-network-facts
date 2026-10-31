@@ -106,8 +106,8 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 
 ```json
 {
-  "schema_version": "1.5.0",
-  "generator": {"name": "saos-network-facts", "version": "0.7.0", "translator": "translator 4.2.1 (mcp, https://...)"},
+  "schema_version": "1.6.0",
+  "generator": {"name": "saos-network-facts", "version": "0.8.0", "translator": "translator 4.2.1 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -144,10 +144,14 @@ Facts (all devices): `hostname`, `interfaces`, `gateway`, `vlans`, `ports`, `lag
 `rings` (G.8032 rings, since schema 1.5 with `ring_id`, `ports` and protection `instances`; see
 [Rings](#rings)), `peers` (MPLS VCs, MPLS-TP tunnel ends, BGP neighbours with `route_reflector_client`;
 what a SAOS 10 neighbour inherits from its `peer-group` is resolved into it),
-`isis` (`instances` with `level`, `nets`, `net`, `area_id`, `system_id`, `sr_enabled`; `interfaces`
-with `level`, `type` and, since schema 1.3, `metrics`: per level the narrow `metric` and
-`wide_metric`), `segment_routing` (`srgb`, `prefix_sids`, `policies`, `segment_lists`),
-`bgp` (`instances` with `router_id`, `cluster_id`, `route_reflector`), `pseudowires` (`peer`,
+`isis` (`instances` with `level`, `nets`, `net`, `area_id`, `system_id`, `sr_enabled` and, SAOS 10
+since schema 1.6, `address_families`, `multi_topology`, `srv6_enabled`, `srv6_locators`; `interfaces`
+with `level`, `type`, since schema 1.3 `metrics` (per level the narrow `metric` and `wide_metric`)
+and, SAOS 10 since schema 1.6, `address_families`), `segment_routing` (`srgb`, `prefix_sids`,
+`policies`, `segment_lists`; SAOS 10 since schema 1.6 `srv6.locators` and `flex_algorithms`, see
+[SRv6, Flex-Algo and EVPN](#srv6-flex-algo-and-evpn)),
+`bgp` (`instances` with `router_id`, `cluster_id`, `route_reflector`; BGP `peers` carry `peer_group`
+since schema 1.6), `pseudowires` (`peer`,
 `pw_id`, labels, `mode`, `tunnel_type` and `tunnel_color` since schema 1.1, `service`,
 `service_type`), `cfm` (`meps` with `md`, `ma`, `mep_id`, `level`, `direction`, `port`, `vlan` and,
 since schema 1.4, `ccm_interval` as written, null when the MA leaves the default),
@@ -157,13 +161,46 @@ since schema 1.4, `ccm_interval` as written, null when the MA leaves the default
 `type`, `metric`, timers, `passive`, `bfd`), `tp_corouted_tunnels` (each node's segment of a static
 MPLS-TP co-routed tunnel: `source`, `destination`, `type` ingress / transit / egress, `role`,
 `primary` of a backup, forward and reverse in / out labels, next / previous hop, LSP `bfd`) and
-`l2vpn_services` (`fd`, `pseudowires`, `mtu`, `signaling_type`).
+`l2vpn_services` (`fd`, `pseudowires`, `mtu`, `signaling_type`), and since schema 1.6
+`evpn_instances`.
 
 Values read from a configuration are text as written (`"mtu": "9000"`); flags the extractor derives
 are booleans. Segment routing, BGP, OSPF and MPLS-TP tunnels are extracted from SAOS 10 only.
 
 **Compatibility.** `schema_version` is semver. Within 1.x, new versions only add optional fields, so
 a reader must ignore fields it does not know; a breaking change is schema 2.
+
+### SRv6, Flex-Algo and EVPN
+
+Since schema 1.6, SAOS 10 devices also carry their SRv6 locators, Flex-Algo definitions, the IS-IS
+address families and the EVPN instances (all optional fields: older files stay valid):
+
+```json
+{
+  "segment_routing": {
+    "srv6": {"locators": [{"name": "LOC-ALGO128", "prefix": "2001:db8:f8:1::/64", "sid_type": "u-sid",
+                           "algorithm": "128", "block_length": "32", "node_length": "16", "function_length": null,
+                           "end_behavior": null, "instances": ["CORE"]}]},
+    "flex_algorithms": [{"algorithm": "128", "metric_type": "latency", "advertise_definition": true, "priority": "200",
+                         "admin_groups": {"include_any": [], "include_all": [], "exclude_any": ["SLOW"]}, "srlg_exclude": []}]
+  },
+  "isis": {"instances": [{"name": "CORE", "address_families": ["ipv6 unicast"], "multi_topology": true,
+                          "srv6_enabled": true, "srv6_locators": ["LOC", "LOC-ALGO128"], "...": "..."}]},
+  "evpn_instances": [{"evi": "200", "type": "vpws", "fd": "FD-VPWS-200", "fds": ["FD-VPWS-200"],
+                      "local_service_id": "1", "remote_service_id": "2", "control_word": false,
+                      "route_distinguisher": "192.0.2.1:200", "route_targets": [{"route_target": "0:64500:200", "type": "both"}],
+                      "srv6_locator": "LOC-ALGO128", "sr_policy_color": null, "description": null}]
+}
+```
+
+- A locator with no `instances` is advertised in every IS-IS instance; an instance's `srv6_locators`
+  lists the locators it advertises and `srv6_enabled` is true when there is one.
+- An IS-IS interface runs IPv4 unicast unless `ipv4-unicast-default-disable` is set, plus each
+  `address-family` it configures; the instance's `address_families` is their union, so an IPv6-only
+  IGP reads `["ipv6 unicast"]`.
+- `evpn_instances[].type` is `vpls`, `vpws` or `fxc` (VLAN-aware flexible cross-connect); the two ends
+  of an EVPN-VPWS share the EVI and mirror `local_service_id` / `remote_service_id`. VRFs (L3VPN) are
+  not part of these facts.
 
 ### Rings
 

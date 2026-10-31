@@ -39,7 +39,14 @@ documentation ranges) and services are made up.
   as a loopback, the device layer adds its addresses and the services layer its MTU. RR1 reflects
   for PE1 and PE2 through the peer group `CLIENTS` (remote AS, address families, route-reflector
   client) and the PEs reach it through the peer group `RR`; RR1 turns route-reflector-client off for
-  PE2 in `ipv6 unicast` only. No VRFs and no Linux hosts; `platform-map.yaml` gives the device types.
+  PE2 in `ipv6 unicast` only. Every node also defines Flex-Algo 128 (latency metric, excluding the
+  admin group `SLOW`; only P1 advertises the definition, priority 200), runs IS-IS multi-topology with
+  its core links IPv6-only (`ipv4-unicast-default-disable` + `address-family ipv6 unicast`) and has an
+  SRv6 locator `LOC` (`2001:db8:f0:<n>::/64`, every instance); the PEs add `LOC-ALGO128`
+  (`2001:db8:f8:<n>::/64`, algorithm 128, restricted to `CORE`) and, in the services layer, EVPN
+  instance 100 (EVPN-VPLS on `FD-EVPN-100`, control word on, over `LOC`, route distinguisher per PE) and 200 (EVPN-VPWS
+  on `FD-VPWS-200`, service ids 1 / 2 mirrored, control word off, over `LOC-ALGO128`).
+  No VRFs and no Linux hosts; `platform-map.yaml` gives the device types.
 - `cases.yaml`: the extraction cases the tests run; `expected/`: their facts files.
 - `pivots.json`: the translator's recorded replies for every SAOS 10 file (`scripts/record_pivots.py`),
   all recorded with translator 4.2.1.

@@ -653,62 +653,6 @@
     }
    }
   },
-  "28185ae9b358ff7dd6638139": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-isis:isis": {
-      "instance": [
-       {
-        "interfaces": {
-         "interface": [
-          {
-           "interface-type": "point-to-point",
-           "name": "lo0"
-          }
-         ]
-        },
-        "level-type": "level-2",
-        "segment-routing": {
-         "enabled": true,
-         "srgb": [
-          {
-           "lower-bound": 16000,
-           "upper-bound": 23999
-          }
-         ]
-        },
-        "tag": "CORE"
-       }
-      ]
-     },
-     "ciena-mef-classifier:classifiers": {
-      "classifier": [
-       {
-        "filter-entry": [
-         {
-          "filter-parameter": "ciena-mef-classifier:vtag-stack",
-          "untagged-exclude-priority-tagged": false
-         }
-        ],
-        "name": "UNTAGGED"
-       }
-      ]
-     },
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "config": {
-         "ciena-openconfig-interfaces:type": "loopback",
-         "description": "router id and BGP source",
-         "name": "lo0"
-        },
-        "name": "lo0"
-       }
-      ]
-     }
-    }
-   }
-  },
   "2ba0e6ec5d4fd74237f096c9": {
    "pivot": {
     "yuma-netconf:config": {
@@ -945,102 +889,6 @@
       "config": {
        "hostname": "PE3"
       }
-     }
-    }
-   }
-  },
-  "3d7cf5c7b7446d7ba81d8160": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-bgp:bgp": {
-      "instance": [
-       {
-        "address-family": [
-         {
-          "afi": "l2vpn",
-          "route-reflector": true,
-          "safi": "evpn"
-         },
-         {
-          "afi": "ipv6",
-          "route-reflector": true,
-          "safi": "unicast"
-         }
-        ],
-        "as": 64500,
-        "peer-group": [
-         {
-          "address-family": [
-           {
-            "activate": true,
-            "afi": "l2vpn",
-            "route-reflector-client": true,
-            "safi": "evpn"
-           },
-           {
-            "activate": true,
-            "afi": "ipv6",
-            "route-reflector-client": true,
-            "safi": "unicast"
-           }
-          ],
-          "name": "CLIENTS",
-          "remote-as": 64500,
-          "update-source-interface": "lo0"
-         }
-        ]
-       }
-      ]
-     },
-     "ciena-isis:isis": {
-      "instance": [
-       {
-        "interfaces": {
-         "interface": [
-          {
-           "interface-type": "point-to-point",
-           "name": "lo0"
-          }
-         ]
-        },
-        "level-type": "level-2",
-        "segment-routing": {
-         "enabled": true,
-         "srgb": [
-          {
-           "lower-bound": 16000,
-           "upper-bound": 23999
-          }
-         ]
-        },
-        "tag": "CORE"
-       }
-      ]
-     },
-     "ciena-mef-classifier:classifiers": {
-      "classifier": [
-       {
-        "filter-entry": [
-         {
-          "filter-parameter": "ciena-mef-classifier:vtag-stack",
-          "untagged-exclude-priority-tagged": false
-         }
-        ],
-        "name": "UNTAGGED"
-       }
-      ]
-     },
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "config": {
-         "ciena-openconfig-interfaces:type": "loopback",
-         "description": "router id and BGP source",
-         "name": "lo0"
-        },
-        "name": "lo0"
-       }
-      ]
      }
     }
    }
@@ -1520,6 +1368,434 @@
     }
    }
   },
+  "4bf3062fea49c01e85318e6b": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-bgp:bgp": {
+      "instance": [
+       {
+        "as": 64500,
+        "cluster-id": "192.0.2.4",
+        "peer": [
+         {
+          "address": "2001:db8::1",
+          "peer-group": "CLIENTS"
+         },
+         {
+          "address": "2001:db8::2",
+          "address-family": [
+           {
+            "afi": "ipv6",
+            "route-reflector-client": false,
+            "safi": "unicast"
+           }
+          ],
+          "peer-group": "CLIENTS"
+         }
+        ],
+        "router-id": "192.0.2.4"
+       }
+      ]
+     },
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "address-families": {
+            "address-family": [
+             {
+              "afi": "ipv6",
+              "safi": "unicast"
+             }
+            ]
+           },
+           "interface-type": "point-to-point",
+           "ipv4-unicast-default-disable": true,
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "RR1-P1"
+          }
+         ]
+        },
+        "net": [
+         "49.0001.1920.0000.2004.00"
+        ],
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-RR1-P1"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-RR1-P1",
+        "logical-port": "1",
+        "name": "FP-RR1-P1"
+       }
+      ]
+     },
+     "ciena-sr:segment-routing": {
+      "connected-prefix-sid-map": [
+       {
+        "interface": "lo0",
+        "prefix": "192.0.2.4/32",
+        "start-sid": 4,
+        "value-type": "index"
+       }
+      ],
+      "srv6": {
+       "locators": {
+        "locator": [
+         {
+          "name": "LOC",
+          "prefix": "2001:db8:f0:4::/64",
+          "sid-type": "u-sid"
+         }
+        ]
+       }
+      }
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.4",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.4"
+           }
+          ]
+         }
+        },
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8::4",
+             "prefix-length": 128
+            },
+            "ip": "2001:db8::4"
+           }
+          ]
+         }
+        },
+        "name": "lo0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8:0:13::",
+             "prefix-length": 127
+            },
+            "ip": "2001:db8:0:13::"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-RR1-P1"
+          }
+         },
+         "mtu": 9000,
+         "name": "RR1-P1"
+        },
+        "name": "RR1-P1"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "RR1"
+      }
+     }
+    }
+   }
+  },
+  "53198984d2671ae8724eef3b": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "address-families": {
+            "address-family": [
+             {
+              "afi": "ipv6",
+              "safi": "unicast"
+             }
+            ]
+           },
+           "interface-type": "point-to-point",
+           "ipv4-unicast-default-disable": true,
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "P1-PE1"
+          },
+          {
+           "address-families": {
+            "address-family": [
+             {
+              "afi": "ipv6",
+              "safi": "unicast"
+             }
+            ]
+           },
+           "interface-type": "point-to-point",
+           "ipv4-unicast-default-disable": true,
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "P1-PE2"
+          },
+          {
+           "address-families": {
+            "address-family": [
+             {
+              "afi": "ipv6",
+              "safi": "unicast"
+             }
+            ]
+           },
+           "interface-type": "point-to-point",
+           "ipv4-unicast-default-disable": true,
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "P1-RR1"
+          }
+         ]
+        },
+        "net": [
+         "49.0001.1920.0000.2003.00"
+        ],
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-P1-PE1"
+       },
+       {
+        "mode": "vpls",
+        "name": "FD-P1-PE2"
+       },
+       {
+        "mode": "vpls",
+        "name": "FD-P1-RR1"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-P1-PE1",
+        "logical-port": "1",
+        "name": "FP-P1-PE1"
+       },
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-P1-PE2",
+        "logical-port": "2",
+        "name": "FP-P1-PE2"
+       },
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-P1-RR1",
+        "logical-port": "3",
+        "name": "FP-P1-RR1"
+       }
+      ]
+     },
+     "ciena-sr:segment-routing": {
+      "connected-prefix-sid-map": [
+       {
+        "interface": "lo0",
+        "prefix": "192.0.2.3/32",
+        "start-sid": 3,
+        "value-type": "index"
+       }
+      ],
+      "flex-algorithm": [
+       {
+        "advertise-definition": {
+         "priority": 200
+        },
+        "algorithm": 128
+       }
+      ],
+      "srv6": {
+       "locators": {
+        "locator": [
+         {
+          "name": "LOC",
+          "prefix": "2001:db8:f0:3::/64",
+          "sid-type": "u-sid"
+         }
+        ]
+       }
+      }
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.3",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.3"
+           }
+          ]
+         }
+        },
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8::3",
+             "prefix-length": 128
+            },
+            "ip": "2001:db8::3"
+           }
+          ]
+         }
+        },
+        "name": "lo0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8:0:11::1",
+             "prefix-length": 127
+            },
+            "ip": "2001:db8:0:11::1"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-P1-PE1"
+          }
+         },
+         "mtu": 9000,
+         "name": "P1-PE1"
+        },
+        "name": "P1-PE1"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8:0:12::1",
+             "prefix-length": 127
+            },
+            "ip": "2001:db8:0:12::1"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-P1-PE2"
+          }
+         },
+         "mtu": 9000,
+         "name": "P1-PE2"
+        },
+        "name": "P1-PE2"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8:0:13::1",
+             "prefix-length": 127
+            },
+            "ip": "2001:db8:0:13::1"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-P1-RR1"
+          }
+         },
+         "mtu": 9000,
+         "name": "P1-RR1"
+        },
+        "name": "P1-RR1"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "P1"
+      }
+     }
+    }
+   }
+  },
   "585c787ed638d49690b9d362": {
    "pivot": {
     "yuma-netconf:config": {
@@ -1855,6 +2131,269 @@
     }
    }
   },
+  "62675ad5cd010abe0bb3373d": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-ietf-te:te": {
+      "globals": {
+       "named-admin-groups": {
+        "named-admin-group": [
+         {
+          "bit-position": 1,
+          "name": "SLOW"
+         }
+        ]
+       }
+      }
+     },
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "address-families": {
+            "address-family": [
+             {
+              "afi": "ipv6",
+              "safi": "unicast"
+             }
+            ]
+           },
+           "interface-type": "point-to-point",
+           "name": "lo0"
+          }
+         ]
+        },
+        "level-type": "level-2",
+        "multi-topology-mode": {
+         "enable": true
+        },
+        "segment-routing": {
+         "enabled": true,
+         "srgb": [
+          {
+           "lower-bound": 16000,
+           "upper-bound": 23999
+          }
+         ]
+        },
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       }
+      ]
+     },
+     "ciena-sr:segment-routing": {
+      "flex-algorithm": [
+       {
+        "admin-group": {
+         "exclude-any-admin-group": [
+          "SLOW"
+         ]
+        },
+        "algorithm": 128,
+        "flex-algo-metric": "latency"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "description": "router id and BGP source",
+         "name": "lo0"
+        },
+        "name": "lo0"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "74c90491008e7f40b2e8776f": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-bgp:bgp": {
+      "instance": [
+       {
+        "as": 64500,
+        "peer": [
+         {
+          "address": "2001:db8::4",
+          "peer-group": "RR"
+         }
+        ],
+        "router-id": "192.0.2.2"
+       }
+      ]
+     },
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "address-families": {
+            "address-family": [
+             {
+              "afi": "ipv6",
+              "safi": "unicast"
+             }
+            ]
+           },
+           "interface-type": "point-to-point",
+           "ipv4-unicast-default-disable": true,
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "PE2-P1"
+          }
+         ]
+        },
+        "net": [
+         "49.0001.1920.0000.2002.00"
+        ],
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-PE2-P1"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-PE2-P1",
+        "logical-port": "1",
+        "name": "FP-PE2-P1"
+       }
+      ]
+     },
+     "ciena-sr:segment-routing": {
+      "connected-prefix-sid-map": [
+       {
+        "interface": "lo0",
+        "prefix": "192.0.2.2/32",
+        "start-sid": 2,
+        "value-type": "index"
+       }
+      ],
+      "srv6": {
+       "locators": {
+        "locator": [
+         {
+          "name": "LOC",
+          "prefix": "2001:db8:f0:2::/64",
+          "sid-type": "u-sid"
+         },
+         {
+          "algorithm": 128,
+          "block-length": 32,
+          "instances": {
+           "instance": [
+            {
+             "instance": "CORE"
+            }
+           ]
+          },
+          "name": "LOC-ALGO128",
+          "node-length": 16,
+          "prefix": "2001:db8:f8:2::/64",
+          "sid-type": "u-sid"
+         }
+        ]
+       }
+      }
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.2",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.2"
+           }
+          ]
+         }
+        },
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8::2",
+             "prefix-length": 128
+            },
+            "ip": "2001:db8::2"
+           }
+          ]
+         }
+        },
+        "name": "lo0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8:0:12::",
+             "prefix-length": 127
+            },
+            "ip": "2001:db8:0:12::"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-PE2-P1"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE2-P1"
+        },
+        "name": "PE2-P1"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "PE2"
+      }
+     }
+    }
+   }
+  },
   "79e6f1388447cff909b3a9cf": {
    "pivot": {
     "yuma-netconf:config": {
@@ -1961,6 +2500,138 @@
       "config": {
        "hostname": "AR_3"
       }
+     }
+    }
+   }
+  },
+  "805b06db373fba81456b4bf2": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-bgp:bgp": {
+      "instance": [
+       {
+        "address-family": [
+         {
+          "afi": "l2vpn",
+          "route-reflector": true,
+          "safi": "evpn"
+         },
+         {
+          "afi": "ipv6",
+          "route-reflector": true,
+          "safi": "unicast"
+         }
+        ],
+        "as": 64500,
+        "peer-group": [
+         {
+          "address-family": [
+           {
+            "activate": true,
+            "afi": "l2vpn",
+            "route-reflector-client": true,
+            "safi": "evpn"
+           },
+           {
+            "activate": true,
+            "afi": "ipv6",
+            "route-reflector-client": true,
+            "safi": "unicast"
+           }
+          ],
+          "name": "CLIENTS",
+          "remote-as": 64500,
+          "update-source-interface": "lo0"
+         }
+        ]
+       }
+      ]
+     },
+     "ciena-ietf-te:te": {
+      "globals": {
+       "named-admin-groups": {
+        "named-admin-group": [
+         {
+          "bit-position": 1,
+          "name": "SLOW"
+         }
+        ]
+       }
+      }
+     },
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "address-families": {
+            "address-family": [
+             {
+              "afi": "ipv6",
+              "safi": "unicast"
+             }
+            ]
+           },
+           "interface-type": "point-to-point",
+           "name": "lo0"
+          }
+         ]
+        },
+        "level-type": "level-2",
+        "multi-topology-mode": {
+         "enable": true
+        },
+        "segment-routing": {
+         "enabled": true,
+         "srgb": [
+          {
+           "lower-bound": 16000,
+           "upper-bound": 23999
+          }
+         ]
+        },
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       }
+      ]
+     },
+     "ciena-sr:segment-routing": {
+      "flex-algorithm": [
+       {
+        "admin-group": {
+         "exclude-any-admin-group": [
+          "SLOW"
+         ]
+        },
+        "algorithm": 128,
+        "flex-algo-metric": "latency"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "description": "router id and BGP source",
+         "name": "lo0"
+        },
+        "name": "lo0"
+       }
+      ]
      }
     }
    }
@@ -2649,290 +3320,6 @@
     }
    }
   },
-  "9e6835c80364c674b04e628f": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-bgp:bgp": {
-      "instance": [
-       {
-        "as": 64500,
-        "peer": [
-         {
-          "address": "2001:db8::4",
-          "peer-group": "RR"
-         }
-        ],
-        "router-id": "192.0.2.2"
-       }
-      ]
-     },
-     "ciena-isis:isis": {
-      "instance": [
-       {
-        "interfaces": {
-         "interface": [
-          {
-           "interface-type": "point-to-point",
-           "level-2": {
-            "wide-metric": 10
-           },
-           "level-type": "level-2",
-           "name": "PE2-P1"
-          }
-         ]
-        },
-        "net": [
-         "49.0001.1920.0000.2002.00"
-        ],
-        "tag": "CORE"
-       }
-      ]
-     },
-     "ciena-mef-fd:fds": {
-      "fd": [
-       {
-        "mode": "vpls",
-        "name": "FD-PE2-P1"
-       }
-      ]
-     },
-     "ciena-mef-fp:fps": {
-      "fp": [
-       {
-        "classifier-list": [
-         "UNTAGGED"
-        ],
-        "fd-name": "FD-PE2-P1",
-        "logical-port": "1",
-        "name": "FP-PE2-P1"
-       }
-      ]
-     },
-     "ciena-sr:segment-routing": {
-      "connected-prefix-sid-map": [
-       {
-        "interface": "lo0",
-        "prefix": "192.0.2.2/32",
-        "start-sid": 2,
-        "value-type": "index"
-       }
-      ]
-     },
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "192.0.2.2",
-             "prefix-length": 32
-            },
-            "ip": "192.0.2.2"
-           }
-          ]
-         }
-        },
-        "ciena-openconfig-if-ip:ipv6": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "2001:db8::2",
-             "prefix-length": 128
-            },
-            "ip": "2001:db8::2"
-           }
-          ]
-         }
-        },
-        "name": "lo0"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv6": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "2001:db8:0:12::",
-             "prefix-length": 127
-            },
-            "ip": "2001:db8:0:12::"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-PE2-P1"
-          }
-         },
-         "mtu": 9000,
-         "name": "PE2-P1"
-        },
-        "name": "PE2-P1"
-       }
-      ]
-     },
-     "openconfig-system:system": {
-      "config": {
-       "hostname": "PE2"
-      }
-     }
-    }
-   }
-  },
-  "a1e7f190e849f4c1c152ab4a": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-bgp:bgp": {
-      "instance": [
-       {
-        "as": 64500,
-        "cluster-id": "192.0.2.4",
-        "peer": [
-         {
-          "address": "2001:db8::1",
-          "peer-group": "CLIENTS"
-         },
-         {
-          "address": "2001:db8::2",
-          "address-family": [
-           {
-            "afi": "ipv6",
-            "route-reflector-client": false,
-            "safi": "unicast"
-           }
-          ],
-          "peer-group": "CLIENTS"
-         }
-        ],
-        "router-id": "192.0.2.4"
-       }
-      ]
-     },
-     "ciena-isis:isis": {
-      "instance": [
-       {
-        "interfaces": {
-         "interface": [
-          {
-           "interface-type": "point-to-point",
-           "level-2": {
-            "wide-metric": 10
-           },
-           "level-type": "level-2",
-           "name": "RR1-P1"
-          }
-         ]
-        },
-        "net": [
-         "49.0001.1920.0000.2004.00"
-        ],
-        "tag": "CORE"
-       }
-      ]
-     },
-     "ciena-mef-fd:fds": {
-      "fd": [
-       {
-        "mode": "vpls",
-        "name": "FD-RR1-P1"
-       }
-      ]
-     },
-     "ciena-mef-fp:fps": {
-      "fp": [
-       {
-        "classifier-list": [
-         "UNTAGGED"
-        ],
-        "fd-name": "FD-RR1-P1",
-        "logical-port": "1",
-        "name": "FP-RR1-P1"
-       }
-      ]
-     },
-     "ciena-sr:segment-routing": {
-      "connected-prefix-sid-map": [
-       {
-        "interface": "lo0",
-        "prefix": "192.0.2.4/32",
-        "start-sid": 4,
-        "value-type": "index"
-       }
-      ]
-     },
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "192.0.2.4",
-             "prefix-length": 32
-            },
-            "ip": "192.0.2.4"
-           }
-          ]
-         }
-        },
-        "ciena-openconfig-if-ip:ipv6": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "2001:db8::4",
-             "prefix-length": 128
-            },
-            "ip": "2001:db8::4"
-           }
-          ]
-         }
-        },
-        "name": "lo0"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv6": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "2001:db8:0:13::",
-             "prefix-length": 127
-            },
-            "ip": "2001:db8:0:13::"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-RR1-P1"
-          }
-         },
-         "mtu": 9000,
-         "name": "RR1-P1"
-        },
-        "name": "RR1-P1"
-       }
-      ]
-     },
-     "openconfig-system:system": {
-      "config": {
-       "hostname": "RR1"
-      }
-     }
-    }
-   }
-  },
   "a210fb36b6437042cea3882e": {
    "pivot": {
     "yuma-netconf:config": {
@@ -3142,60 +3529,6 @@
     }
    }
   },
-  "a4ce707d6de18b4949c64255": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-mef-classifier:classifiers": {
-      "classifier": [
-       {
-        "filter-entry": [
-         {
-          "filter-parameter": "ciena-mef-classifier:vtag-stack",
-          "vtags": [
-           {
-            "tag": 1,
-            "vlan-id": 100
-           }
-          ]
-         }
-        ],
-        "name": "VLAN100"
-       }
-      ]
-     },
-     "ciena-mef-fd:fds": {
-      "fd": [
-       {
-        "mode": "vpls",
-        "name": "FD-EVPN-100"
-       }
-      ]
-     },
-     "ciena-mef-fp:fps": {
-      "fp": [
-       {
-        "classifier-list": [
-         "VLAN100"
-        ],
-        "fd-name": "FD-EVPN-100",
-        "logical-port": "5",
-        "name": "FP-AC-100"
-       }
-      ]
-     },
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "config": {
-         "mtu": 1500
-        },
-        "name": "lo0"
-       }
-      ]
-     }
-    }
-   }
-  },
   "a57d9c5024caacb987ba010b": {
    "pivot": {
     "yuma-netconf:config": {
@@ -3354,7 +3687,136 @@
     }
    }
   },
-  "aa416310e6a92fc79efb58aa": {
+  "b60c674d81993c681a81df20": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-evpn:evpn": {
+      "evpn-instances": {
+       "evpn-instance": [
+        {
+         "id": 100,
+         "route-distinguisher": {
+          "ip-based": {
+           "value": "192.0.2.2:100"
+          }
+         },
+         "segment-routing-srv6": {
+          "locator": "LOC"
+         },
+         "vpls-fd": [
+          {
+           "control-word": true,
+           "forwarding-domain": "FD-EVPN-100"
+          }
+         ],
+         "vpn-target": [
+          {
+           "route-target": "0:64500:100",
+           "route-target-type": "both"
+          }
+         ]
+        },
+        {
+         "id": 200,
+         "segment-routing-srv6": {
+          "locator": "LOC-ALGO128"
+         },
+         "vpn-target": [
+          {
+           "route-target": "0:64500:200",
+           "route-target-type": "both"
+          }
+         ],
+         "vpws-cross-connect-fd": [
+          {
+           "control-word": false,
+           "forwarding-domain": "FD-VPWS-200",
+           "local-service-id": 2,
+           "remote-service-id": 1
+          }
+         ]
+        }
+       ]
+      }
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 100
+           }
+          ]
+         }
+        ],
+        "name": "VLAN100"
+       },
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 200
+           }
+          ]
+         }
+        ],
+        "name": "VLAN200"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "evpn-vpls",
+        "name": "FD-EVPN-100"
+       },
+       {
+        "mode": "evpn-vpws",
+        "name": "FD-VPWS-200"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "VLAN100"
+        ],
+        "fd-name": "FD-EVPN-100",
+        "logical-port": "5",
+        "name": "FP-AC-100"
+       },
+       {
+        "classifier-list": [
+         "VLAN200"
+        ],
+        "fd-name": "FD-VPWS-200",
+        "logical-port": "5",
+        "name": "FP-AC-200"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "config": {
+         "mtu": 1500
+        },
+        "name": "lo0"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "bef20029977c89168aa51518": {
    "pivot": {
     "yuma-netconf:config": {
      "ciena-bgp:bgp": {
@@ -3377,7 +3839,16 @@
         "interfaces": {
          "interface": [
           {
+           "address-families": {
+            "address-family": [
+             {
+              "afi": "ipv6",
+              "safi": "unicast"
+             }
+            ]
+           },
            "interface-type": "point-to-point",
+           "ipv4-unicast-default-disable": true,
            "level-2": {
             "wide-metric": 10
            },
@@ -3421,7 +3892,33 @@
         "start-sid": 1,
         "value-type": "index"
        }
-      ]
+      ],
+      "srv6": {
+       "locators": {
+        "locator": [
+         {
+          "name": "LOC",
+          "prefix": "2001:db8:f0:1::/64",
+          "sid-type": "u-sid"
+         },
+         {
+          "algorithm": 128,
+          "block-length": 32,
+          "instances": {
+           "instance": [
+            {
+             "instance": "CORE"
+            }
+           ]
+          },
+          "name": "LOC-ALGO128",
+          "node-length": 16,
+          "prefix": "2001:db8:f8:1::/64",
+          "sid-type": "u-sid"
+         }
+        ]
+       }
+      }
      },
      "openconfig-interfaces:interfaces": {
       "interface": [
@@ -3486,100 +3983,6 @@
       "config": {
        "hostname": "PE1"
       }
-     }
-    }
-   }
-  },
-  "babecca64225f5eab5f0d00d": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-bgp:bgp": {
-      "instance": [
-       {
-        "address-family": [
-         {
-          "afi": "l2vpn",
-          "route-reflector": false,
-          "safi": "evpn"
-         },
-         {
-          "afi": "ipv6",
-          "route-reflector": false,
-          "safi": "unicast"
-         }
-        ],
-        "as": 64500,
-        "peer-group": [
-         {
-          "address-family": [
-           {
-            "activate": true,
-            "afi": "l2vpn",
-            "safi": "evpn"
-           },
-           {
-            "activate": true,
-            "afi": "ipv6",
-            "safi": "unicast"
-           }
-          ],
-          "name": "RR",
-          "remote-as": 64500,
-          "update-source-interface": "lo0"
-         }
-        ]
-       }
-      ]
-     },
-     "ciena-isis:isis": {
-      "instance": [
-       {
-        "interfaces": {
-         "interface": [
-          {
-           "interface-type": "point-to-point",
-           "name": "lo0"
-          }
-         ]
-        },
-        "level-type": "level-2",
-        "segment-routing": {
-         "enabled": true,
-         "srgb": [
-          {
-           "lower-bound": 16000,
-           "upper-bound": 23999
-          }
-         ]
-        },
-        "tag": "CORE"
-       }
-      ]
-     },
-     "ciena-mef-classifier:classifiers": {
-      "classifier": [
-       {
-        "filter-entry": [
-         {
-          "filter-parameter": "ciena-mef-classifier:vtag-stack",
-          "untagged-exclude-priority-tagged": false
-         }
-        ],
-        "name": "UNTAGGED"
-       }
-      ]
-     },
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "config": {
-         "ciena-openconfig-interfaces:type": "loopback",
-         "description": "router id and BGP source",
-         "name": "lo0"
-        },
-        "name": "lo0"
-       }
-      ]
      }
     }
    }
@@ -3893,9 +4296,58 @@
     }
    }
   },
-  "cf91ba88089a2e3990d88df1": {
+  "d8ff23e63da81e5b46bc9d8f": {
    "pivot": {
     "yuma-netconf:config": {
+     "ciena-evpn:evpn": {
+      "evpn-instances": {
+       "evpn-instance": [
+        {
+         "id": 100,
+         "route-distinguisher": {
+          "ip-based": {
+           "value": "192.0.2.1:100"
+          }
+         },
+         "segment-routing-srv6": {
+          "locator": "LOC"
+         },
+         "vpls-fd": [
+          {
+           "control-word": true,
+           "forwarding-domain": "FD-EVPN-100"
+          }
+         ],
+         "vpn-target": [
+          {
+           "route-target": "0:64500:100",
+           "route-target-type": "both"
+          }
+         ]
+        },
+        {
+         "id": 200,
+         "segment-routing-srv6": {
+          "locator": "LOC-ALGO128"
+         },
+         "vpn-target": [
+          {
+           "route-target": "0:64500:200",
+           "route-target-type": "both"
+          }
+         ],
+         "vpws-cross-connect-fd": [
+          {
+           "control-word": false,
+           "forwarding-domain": "FD-VPWS-200",
+           "local-service-id": 1,
+           "remote-service-id": 2
+          }
+         ]
+        }
+       ]
+      }
+     },
      "ciena-mef-classifier:classifiers": {
       "classifier": [
        {
@@ -3911,14 +4363,32 @@
          }
         ],
         "name": "VLAN100"
+       },
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "vtags": [
+           {
+            "tag": 1,
+            "vlan-id": 200
+           }
+          ]
+         }
+        ],
+        "name": "VLAN200"
        }
       ]
      },
      "ciena-mef-fd:fds": {
       "fd": [
        {
-        "mode": "vpls",
+        "mode": "evpn-vpls",
         "name": "FD-EVPN-100"
+       },
+       {
+        "mode": "evpn-vpws",
+        "name": "FD-VPWS-200"
        }
       ]
      },
@@ -3931,6 +4401,14 @@
         "fd-name": "FD-EVPN-100",
         "logical-port": "5",
         "name": "FP-AC-100"
+       },
+       {
+        "classifier-list": [
+         "VLAN200"
+        ],
+        "fd-name": "FD-VPWS-200",
+        "logical-port": "5",
+        "name": "FP-AC-200"
        }
       ]
      },
@@ -3939,6 +4417,136 @@
        {
         "config": {
          "mtu": 1500
+        },
+        "name": "lo0"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "dc2592d8a21b89f747b72093": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-bgp:bgp": {
+      "instance": [
+       {
+        "address-family": [
+         {
+          "afi": "l2vpn",
+          "route-reflector": false,
+          "safi": "evpn"
+         },
+         {
+          "afi": "ipv6",
+          "route-reflector": false,
+          "safi": "unicast"
+         }
+        ],
+        "as": 64500,
+        "peer-group": [
+         {
+          "address-family": [
+           {
+            "activate": true,
+            "afi": "l2vpn",
+            "safi": "evpn"
+           },
+           {
+            "activate": true,
+            "afi": "ipv6",
+            "safi": "unicast"
+           }
+          ],
+          "name": "RR",
+          "remote-as": 64500,
+          "update-source-interface": "lo0"
+         }
+        ]
+       }
+      ]
+     },
+     "ciena-ietf-te:te": {
+      "globals": {
+       "named-admin-groups": {
+        "named-admin-group": [
+         {
+          "bit-position": 1,
+          "name": "SLOW"
+         }
+        ]
+       }
+      }
+     },
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "address-families": {
+            "address-family": [
+             {
+              "afi": "ipv6",
+              "safi": "unicast"
+             }
+            ]
+           },
+           "interface-type": "point-to-point",
+           "name": "lo0"
+          }
+         ]
+        },
+        "level-type": "level-2",
+        "multi-topology-mode": {
+         "enable": true
+        },
+        "segment-routing": {
+         "enabled": true,
+         "srgb": [
+          {
+           "lower-bound": 16000,
+           "upper-bound": 23999
+          }
+         ]
+        },
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       }
+      ]
+     },
+     "ciena-sr:segment-routing": {
+      "flex-algorithm": [
+       {
+        "admin-group": {
+         "exclude-any-admin-group": [
+          "SLOW"
+         ]
+        },
+        "algorithm": 128,
+        "flex-algo-metric": "latency"
+       }
+      ]
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "description": "router id and BGP source",
+         "name": "lo0"
         },
         "name": "lo0"
        }
@@ -4170,220 +4778,6 @@
      "openconfig-system:system": {
       "config": {
        "hostname": "PE2"
-      }
-     }
-    }
-   }
-  },
-  "f06a156cbd735f08c114bcd1": {
-   "pivot": {
-    "yuma-netconf:config": {
-     "ciena-isis:isis": {
-      "instance": [
-       {
-        "interfaces": {
-         "interface": [
-          {
-           "interface-type": "point-to-point",
-           "level-2": {
-            "wide-metric": 10
-           },
-           "level-type": "level-2",
-           "name": "P1-PE1"
-          },
-          {
-           "interface-type": "point-to-point",
-           "level-2": {
-            "wide-metric": 10
-           },
-           "level-type": "level-2",
-           "name": "P1-PE2"
-          },
-          {
-           "interface-type": "point-to-point",
-           "level-2": {
-            "wide-metric": 10
-           },
-           "level-type": "level-2",
-           "name": "P1-RR1"
-          }
-         ]
-        },
-        "net": [
-         "49.0001.1920.0000.2003.00"
-        ],
-        "tag": "CORE"
-       }
-      ]
-     },
-     "ciena-mef-fd:fds": {
-      "fd": [
-       {
-        "mode": "vpls",
-        "name": "FD-P1-PE1"
-       },
-       {
-        "mode": "vpls",
-        "name": "FD-P1-PE2"
-       },
-       {
-        "mode": "vpls",
-        "name": "FD-P1-RR1"
-       }
-      ]
-     },
-     "ciena-mef-fp:fps": {
-      "fp": [
-       {
-        "classifier-list": [
-         "UNTAGGED"
-        ],
-        "fd-name": "FD-P1-PE1",
-        "logical-port": "1",
-        "name": "FP-P1-PE1"
-       },
-       {
-        "classifier-list": [
-         "UNTAGGED"
-        ],
-        "fd-name": "FD-P1-PE2",
-        "logical-port": "2",
-        "name": "FP-P1-PE2"
-       },
-       {
-        "classifier-list": [
-         "UNTAGGED"
-        ],
-        "fd-name": "FD-P1-RR1",
-        "logical-port": "3",
-        "name": "FP-P1-RR1"
-       }
-      ]
-     },
-     "ciena-sr:segment-routing": {
-      "connected-prefix-sid-map": [
-       {
-        "interface": "lo0",
-        "prefix": "192.0.2.3/32",
-        "start-sid": 3,
-        "value-type": "index"
-       }
-      ]
-     },
-     "openconfig-interfaces:interfaces": {
-      "interface": [
-       {
-        "ciena-openconfig-if-ip:ipv4": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "192.0.2.3",
-             "prefix-length": 32
-            },
-            "ip": "192.0.2.3"
-           }
-          ]
-         }
-        },
-        "ciena-openconfig-if-ip:ipv6": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "2001:db8::3",
-             "prefix-length": 128
-            },
-            "ip": "2001:db8::3"
-           }
-          ]
-         }
-        },
-        "name": "lo0"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv6": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "2001:db8:0:11::1",
-             "prefix-length": 127
-            },
-            "ip": "2001:db8:0:11::1"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-P1-PE1"
-          }
-         },
-         "mtu": 9000,
-         "name": "P1-PE1"
-        },
-        "name": "P1-PE1"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv6": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "2001:db8:0:12::1",
-             "prefix-length": 127
-            },
-            "ip": "2001:db8:0:12::1"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-P1-PE2"
-          }
-         },
-         "mtu": 9000,
-         "name": "P1-PE2"
-        },
-        "name": "P1-PE2"
-       },
-       {
-        "ciena-openconfig-if-ip:ipv6": {
-         "addresses": {
-          "address": [
-           {
-            "config": {
-             "ip": "2001:db8:0:13::1",
-             "prefix-length": 127
-            },
-            "ip": "2001:db8:0:13::1"
-           }
-          ]
-         }
-        },
-        "config": {
-         "ciena-openconfig-interfaces:type": "ip",
-         "ciena-underlay-binding:underlay-binding": {
-          "config": {
-           "fd": "FD-P1-RR1"
-          }
-         },
-         "mtu": 9000,
-         "name": "P1-RR1"
-        },
-        "name": "P1-RR1"
-       }
-      ]
-     },
-     "openconfig-system:system": {
-      "config": {
-       "hostname": "P1"
       }
      }
     }

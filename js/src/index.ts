@@ -2,10 +2,13 @@
 // Reader for saos-network-facts facts files, and the helpers every consumer needs: which IP
 // interfaces ride a port (SAOS 10: flow point -> forwarding domain -> interface; SAOS 6: the VLANs
 // the port carries), loopbacks, BGP neighbours, the parts of an IS-IS NET, IS-IS interface metrics,
-// CCM intervals, G.8032 rings and the devices on a ring. Pure functions, no Node APIs, so this entry
+// CCM intervals, G.8032 rings and the devices on a ring, SRv6 locators, Flex-Algo definitions and
+// EVPN instances. Pure functions, no Node APIs, so this entry
 // point works in a browser too; `@ciena/saos-network-facts/node` adds `readFacts(file)`.
 
-import type { DeviceFacts, DeviceRecord, FactsFile, Interface, IsisInstance, Mep, Ring, RingInstance, RingPort } from "./generated/facts.ts";
+import type {
+  DeviceFacts, DeviceRecord, EvpnInstance, FactsFile, FlexAlgorithm, Interface, IsisInstance, Mep, Ring, RingInstance, RingPort, Srv6Locator,
+} from "./generated/facts.ts";
 
 export type * from "./generated/facts.ts";
 
@@ -106,14 +109,18 @@ export function loopbacks(facts: DeviceFacts): Array<{ name: string; ip: string;
 
 /** BGP neighbours, with the remote AS as a number (null when not set). `routeReflectorClient` is null
  * when the record does not say (a SAOS 6 peer, a pre-schema file), so a caller can fall back to
- * another source; only an explicit flag is true or false. */
-export function bgpPeers(facts: DeviceFacts): Array<{ ip: string | null; remoteAs: number | null; routeReflectorClient: boolean | null }> {
+ * another source; only an explicit flag is true or false. `peerGroup` is the neighbour's peer group
+ * (schema 1.6), null when it has none or the file predates it. */
+export function bgpPeers(
+  facts: DeviceFacts,
+): Array<{ ip: string | null; remoteAs: number | null; routeReflectorClient: boolean | null; peerGroup: string | null }> {
   return (facts.peers ?? [])
     .filter((p) => p.kind === "bgp")
     .map((p) => ({
       ip: p.ip,
       remoteAs: p.remote_as == null ? null : Number(p.remote_as),
       routeReflectorClient: p.route_reflector_client == null ? null : Boolean(p.route_reflector_client),
+      peerGroup: p.peer_group ?? null,
     }));
 }
 
@@ -191,8 +198,13 @@ export function ccmIntervalMs(mep: Pick<Mep, "ccm_interval"> | string | null | u
  * has no rings or no facts. */
 export type RingFacts = Ring & { ports: RingPort[]; instances: RingInstance[] };
 
+/** A device's facts from its facts or its record (null when it has none). */
+function factsOf(device: DeviceFacts | DeviceRecord | null | undefined): DeviceFacts | null | undefined {
+  return device && "facts" in device && !("hostname" in device) ? device.facts : (device as DeviceFacts | null | undefined);
+}
+
 export function ringsOf(device: DeviceFacts | DeviceRecord | null | undefined): RingFacts[] {
-  const facts = device && "facts" in device && !("rings" in device) ? device.facts : (device as DeviceFacts | null | undefined);
+  const facts = factsOf(device);
   return (facts?.rings ?? []).map((r) => ({ ...r, ports: r.ports ?? [], instances: r.instances ?? [] }));
 }
 
@@ -212,6 +224,43 @@ export function ringMembers(file: FactsFile, ringId: string | number): RingMembe
   for (const [device, facts] of devicesByName(file)) {
     for (const ring of ringsOf(facts)) {
       if (ring.ring_id != null && String(ring.ring_id) === want) out.push({ device, ring });
+    }
+  }
+  return out;
+}
+
+/** The SRv6 locators a device configures (SAOS 10, schema 1.6), in configuration order; empty for a
+ * device without any, a SAOS 6 / 8 device or an older file. Takes a device's facts or its record. */
+export function srv6Locators(device: DeviceFacts | DeviceRecord | null | undefined): Srv6Locator[] {
+  return factsOf(device)?.segment_routing?.srv6?.locators ?? [];
+}
+
+/** The Flex-Algo definitions a device configures (SAOS 10, schema 1.6); empty when there are none. */
+export function flexAlgorithms(device: DeviceFacts | DeviceRecord | null | undefined): FlexAlgorithm[] {
+  return factsOf(device)?.segment_routing?.flex_algorithms ?? [];
+}
+
+/** The EVPN instances a device configures (SAOS 10, schema 1.6); empty when there are none. */
+export function evpnInstances(device: DeviceFacts | DeviceRecord | null | undefined): EvpnInstance[] {
+  return factsOf(device)?.evpn_instances ?? [];
+}
+
+export type EvpnMember = {
+  /** the device name, as in `devices[].device` */
+  device: string;
+  /** that device's EVPN instance */
+  instance: EvpnInstance;
+};
+
+/** Every device of the file that configures an EVPN instance with this EVI (`1` and `"1"` match),
+ * with its instance, in file order: the PEs of one EVPN-VPLS, or the two ends of an EVPN-VPWS
+ * (whose `local_service_id` / `remote_service_id` mirror each other). */
+export function evpnMembers(file: FactsFile, evi: string | number): EvpnMember[] {
+  const want = String(evi);
+  const out: EvpnMember[] = [];
+  for (const [device, facts] of devicesByName(file)) {
+    for (const instance of evpnInstances(facts)) {
+      if (String(instance.evi) === want) out.push({ device, instance });
     }
   }
   return out;

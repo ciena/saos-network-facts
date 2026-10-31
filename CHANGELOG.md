@@ -17,6 +17,35 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-31
+
+### Added
+
+- **Schema 1.6.0: SRv6 locators, Flex-Algo definitions, IS-IS address families, EVPN instances, BGP
+  peer groups (SAOS 10)** — all new fields are optional, so 1.5 files stay valid.
+  `segment_routing.srv6.locators[]`: each `segment-routing srv6 locators locator` with its `prefix`,
+  `sid_type` (`u-sid` / `uncompressed-sid`), Flex-Algo `algorithm`, `block_length` / `node_length` /
+  `function_length`, `end_behavior` and the IS-IS `instances` it is restricted to (empty: every
+  instance). `segment_routing.flex_algorithms[]`: each `segment-routing flex-algorithm` with its
+  `metric_type` (`igp` / `latency` / `te`), `advertise_definition` and `priority`, the
+  `admin_groups` it includes (any / all) or excludes, and `srlg_exclude`. IS-IS instances gain
+  `address_families` (the union of their interfaces': IPv4 unicast unless
+  `ipv4-unicast-default-disable`, plus each configured `address-family`, so an IPv6-only IGP is
+  explicit), `multi_topology`, `srv6_locators` (the locators the instance advertises) and
+  `srv6_enabled`; IS-IS interfaces gain `address_families`. `evpn_instances[]`: each
+  `evpn evpn-instances evpn-instance` with its `evi`, service `type` (`vpls`, `vpws`, `fxc`), the
+  forwarding domain (`fd`, `fds`), the EVPN-VPWS `local_service_id` / `remote_service_id`,
+  `control_word`, `route_distinguisher`, `route_targets`, its `srv6_locator` and `sr_policy_color`.
+  BGP peers gain `peer_group`. VRFs (L3VPN) are not part of this release.
+- **npm reader** — `srv6Locators(device)`, `flexAlgorithms(device)`, `evpnInstances(device)` (empty for
+  older files and SAOS 6 / 8 devices), `evpnMembers(file, evi)` (the devices with an EVI: the PEs of an
+  EVPN-VPLS, the two ends of an EVPN-VPWS), and `peerGroup` on `bgpPeers(facts)`.
+- **Fixtures** — `labs/srv6-evpn` gains Flex-Algo 128 with an admin-group exclusion, IS-IS
+  multi-topology with IPv6-only core links, an SRv6 locator per node and a Flex-Algo locator per PE,
+  and an EVPN-VPLS and an EVPN-VPWS instance over SRv6 on the PEs; its pivots are re-recorded
+  (translator 4.2.1) and the expected facts regenerated. The other expected files only gain the new
+  empty fields.
+
 ## [0.7.2] - 2026-10-31
 
 ### Fixed

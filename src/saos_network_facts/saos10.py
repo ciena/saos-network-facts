@@ -37,7 +37,8 @@ def new_facts():
     facts = _base_facts()
     facts.update({"fds": [], "fps": [], "classifiers": {}, "vrfs": [], "segments": [], "objects": 0,
                   "ospf": {"instances": [], "interfaces": []}, "tp_corouted_tunnels": [], "l2vpn_services": [],
-                  BGP_SETTINGS: {}})
+                  "evpn_instances": [], BGP_SETTINGS: {}})
+    facts["segment_routing"].update({"srv6": {"locators": []}, "flex_algorithms": []})
     return facts
 
 
@@ -326,10 +327,10 @@ def _isis(facts, container):
         sr = get(instance, "segment-routing")
         previous = next((i for i in facts["isis"]["instances"] if i["name"] == tag), None)
         entry = {"name": tag, "level": text(get(instance, "level-type")), "area": nets[0] if nets else None,
-                 "nets": nets, "sr_enabled": flag(get(sr, "enabled"))}
+                 "nets": nets, "sr_enabled": flag(get(sr, "enabled")), "multi_topology": _isis_multi_topology(instance)}
         if previous is not None:
             # a later file that only adds to the instance keeps what an earlier one set
-            for key in ("level", "area", "sr_enabled"):
+            for key in ("level", "area", "sr_enabled", "multi_topology"):
                 if entry[key] is None:
                     entry[key] = previous.get(key)
             if not nets:
@@ -348,11 +349,39 @@ def _isis(facts, container):
                 facts["isis"]["interfaces"].append(current)
             else:
                 current.update({k: v for k, v in item.items() if v is not None})
+            _isis_interface_afs(current, interface)
             for level in ("level-1", "level-2"):
                 # the metric the interface advertises at the level: narrow `metric`, wide `wide-metric` (RFC 5305)
                 settings = get(interface, level)
                 values = {"metric": text(get(settings, "metric")), "wide_metric": text(get(settings, "wide-metric"))}
                 set_isis_metric(current, level, **{k: v for k, v in values.items() if v is not None})
+
+
+def _isis_multi_topology(instance):
+    """IS-IS multi-topology routing (RFC 5120: IPv6 in its own topology, MT 2): ``multi-topology-mode
+    enable``, or the deprecated ``multi-topology <level>`` list; None when the instance leaves it unset."""
+    mode = flag(get(get(instance, "multi-topology-mode"), "enable"))
+    if mode is not None:
+        return mode
+    return True if entries(instance, "multi-topology") else None
+
+
+def _isis_interface_afs(current, interface):
+    """The address families configured on an IS-IS interface: ``address-families address-family <afi>
+    <safi>`` entries, and ``ipv4-unicast-default-disable`` (IPv4 unicast runs on every IS-IS interface
+    unless that is true). ``finish`` turns them into the interface's ``address_families``."""
+    configured = current.setdefault("_afs", [])
+    for af in entries(get(interface, "address-families"), "address-family"):
+        name = " ".join(x for x in (text(get(af, "afi")), text(get(af, "safi"))) if x)
+        if not name:
+            continue
+        if removed(af):
+            current["_afs"] = configured = [a for a in configured if a != name]
+        else:
+            _add(configured, name)
+    disabled = flag(get(interface, "ipv4-unicast-default-disable"))
+    if disabled is not None:
+        current["_ipv4_off"] = disabled
 
 
 def _bgp_settings(store, entry):
@@ -385,7 +414,7 @@ def _bgp_peer(facts, asn, peer):
         return
     if current is None:
         current = {"kind": "bgp", "name": f"as{asn}", "ip": ip, "remote_as": None,
-                   "route_reflector_client": False, "address_families": []}
+                   "route_reflector_client": False, "address_families": [], "peer_group": None}
         facts["peers"].append(current)
     settings = facts[BGP_SETTINGS].setdefault((asn, "peer", ip), _new_settings())
     if get(peer, "peer-group") is not None:
@@ -445,6 +474,7 @@ def _bgp_resolve(facts):
         for af in own["address_families"]:
             _add(peer["address_families"], af)
         peer["route_reflector_client"] = any({**group["rr_clients"], **own["rr_clients"]}.values())
+        peer["peer_group"] = own["group"]
 
 
 def _vrfs(facts, container):
@@ -520,6 +550,10 @@ def _esi(identifier):
 def _evpn(facts, container):
     """EVPN ethernet segments (EVLAG / multihoming): the logical port, the ESI, the redundancy mode
     and the DF-election preference, under ``segments``. Two devices sharing an ESI form one segment."""
+    if removed(container):
+        facts["evpn_instances"] = []
+    else:
+        _evpn_instances(facts, get(container, "evpn-instances"))
     segments = get(container, "ethernet-segments")
     if removed(container) or removed(segments):
         facts["segments"] = []
@@ -546,12 +580,166 @@ def _evpn(facts, container):
             current["evlag"] = text(get(es, "evlag")).lower() == "true"
 
 
+EVPN_SERVICES = (("vpls-fd", "vpls"), ("vpws-cross-connect-fd", "vpws"), ("flexible-cross-connect-vlan-aware-fd", "fxc"))
+
+
+def _evpn_instances(facts, container):
+    """``evpn evpn-instances evpn-instance <evi>``: an EVPN instance (EVI) binds a forwarding domain to
+    the EVPN control plane: EVPN-VPLS (``vpls-fd``), EVPN-VPWS (``vpws-cross-connect-fd`` with the local
+    and remote service ids that pair the two ends) or VLAN-aware FXC; its route targets and route
+    distinguisher, and the transport: an SRv6 locator (``segment-routing-srv6 locator``, the End.DT2
+    SIDs come from it) or an SR policy color. ``evi`` is the instance id, unique per device."""
+    if removed(container):
+        facts["evpn_instances"] = []
+        return
+    for item in entries(container, "evpn-instance"):
+        evi = text(get(item, "id"))
+        if not evi:
+            continue
+        current = next((e for e in facts["evpn_instances"] if e["evi"] == evi), None)
+        if removed(item):
+            facts["evpn_instances"] = [e for e in facts["evpn_instances"] if e is not current]
+            continue
+        if current is None:
+            if path_only(item):
+                continue
+            current = {"evi": evi, "description": None, "type": None, "fd": None, "fds": [], "local_service_id": None,
+                       "remote_service_id": None, "control_word": None, "route_distinguisher": None, "route_targets": [],
+                       "srv6_locator": None, "sr_policy_color": None}
+            facts["evpn_instances"].append(current)
+        if get(item, "description") is not None:
+            current["description"] = text(get(item, "description"))
+        for leaf, kind in EVPN_SERVICES:
+            for fd in entries(item, leaf):
+                name = text(get(fd, "forwarding-domain"))
+                if not name:
+                    continue
+                if removed(fd):
+                    current["fds"] = [f for f in current["fds"] if f != name]
+                    if current["fd"] == name:
+                        current["fd"] = current["fds"][0] if current["fds"] else None
+                    continue
+                _add(current["fds"], name)
+                current["fd"] = current["fd"] or name
+                current["type"] = kind
+                for key, sub in (("local_service_id", "local-service-id"), ("remote_service_id", "remote-service-id")):
+                    if get(fd, sub) is not None:
+                        current[key] = text(get(fd, sub))
+                if get(fd, "control-word") is not None:
+                    current["control_word"] = flag(get(fd, "control-word"))
+        rd = get(item, "route-distinguisher")
+        if isinstance(rd, dict):
+            value = next((text(get(v, "value")) for k, v in rd.items() if not k.startswith("__") and isinstance(v, dict)), None)
+            current["route_distinguisher"] = value or current["route_distinguisher"]
+        for target in entries(item, "vpn-target"):
+            value = text(get(target, "route-target"))
+            if not value:
+                continue
+            current["route_targets"] = [t for t in current["route_targets"] if t["route_target"] != value]
+            if not removed(target):
+                current["route_targets"].append({"route_target": value, "type": text(get(target, "route-target-type"))})
+        locator = get(get(item, "segment-routing-srv6"), "locator")
+        if locator is not None:
+            current["srv6_locator"] = text(locator)
+        color = get(get(item, "sr-policy"), "color")
+        if color is not None:
+            current["sr_policy_color"] = text(color)
+
+
+def _srv6_locators(sr, container):
+    """``segment-routing srv6 locators locator <name>``: an SRv6 locator is the IPv6 prefix the node's
+    SRv6 SIDs are allocated from (``prefix``), with its SID format (``sid-type`` ``u-sid`` for
+    compressed micro-SIDs or ``uncompressed-sid``), the optional block / node / function lengths
+    of the SID structure, the Flex-Algo it belongs to (``algorithm``, 128-255; none is algorithm 0)
+    and the IS-IS instances that advertise it (``instances instance``; none means every instance)."""
+    locators = sr["srv6"]["locators"]
+    if removed(container) or removed(get(container, "locators")):
+        sr["srv6"]["locators"] = []
+        return
+    for item in entries(get(container, "locators"), "locator"):
+        name = text(get(item, "name"))
+        if not name:
+            continue
+        current = next((loc for loc in locators if loc["name"] == name), None)
+        if removed(item):
+            sr["srv6"]["locators"] = locators = [loc for loc in locators if loc is not current]
+            continue
+        if current is None:
+            if path_only(item):
+                continue
+            current = {"name": name, "prefix": None, "sid_type": None, "algorithm": None, "block_length": None,
+                       "node_length": None, "function_length": None, "end_behavior": None, "instances": []}
+            locators.append(current)
+        for key, leaf in (("prefix", "prefix"), ("sid_type", "sid-type"), ("algorithm", "algorithm"),
+                          ("block_length", "block-length"), ("node_length", "node-length"),
+                          ("function_length", "function-length"), ("end_behavior", "end-behavior-type")):
+            if get(item, leaf) is not None:
+                current[key] = text(get(item, leaf))
+        for instance in entries(get(item, "instances"), "instance"):
+            tag = text(get(instance, "instance"))
+            if not tag:
+                continue
+            if removed(instance):
+                current["instances"] = [i for i in current["instances"] if i != tag]
+            else:
+                _add(current["instances"], tag)
+
+
+ADMIN_GROUPS = (("include_any", "include-any-admin-group", "include-any"), ("include_all", "include-all-admin-group", "include-all"),
+                ("exclude_any", "exclude-any-admin-group", "exclude-any"))
+
+
+def _flex_algorithms(sr, container):
+    """``segment-routing flex-algorithm <128-255>``: a Flex-Algo definition (FAD, RFC 9350): the metric
+    its SPF minimises (``flex-algo-metric`` ``igp`` / ``latency`` / ``te``; unset is IGP), whether this
+    node advertises the definition and with which priority (``advertise-definition priority``; the
+    highest priority FAD in the area wins), and the link affinities (admin groups, by name) the
+    computation includes or excludes. The deprecated ``include-any`` / ``include-all`` /
+    ``exclude-any`` leaves read the same as their ``-admin-group`` replacements."""
+    algos = sr["flex_algorithms"]
+    for item in as_list(get(container, "flex-algorithm")):
+        number = text(get(item, "algorithm"))
+        if not number:
+            continue
+        current = next((a for a in algos if a["algorithm"] == number), None)
+        if removed(item):
+            sr["flex_algorithms"] = algos = [a for a in algos if a is not current]
+            continue
+        if current is None:
+            if path_only(item):
+                continue
+            current = {"algorithm": number, "metric_type": None, "advertise_definition": False, "priority": None,
+                       "admin_groups": {"include_any": [], "include_all": [], "exclude_any": []}, "srlg_exclude": []}
+            algos.append(current)
+        if get(item, "flex-algo-metric") is not None:
+            current["metric_type"] = text(get(item, "flex-algo-metric"))
+        advertise = get(item, "advertise-definition")
+        if removed(advertise):
+            current["advertise_definition"], current["priority"] = False, None
+        elif advertise is not None:
+            current["advertise_definition"] = True
+            if get(advertise, "priority") is not None:
+                current["priority"] = text(get(advertise, "priority"))
+        groups = get(item, "admin-group")
+        for key, *leaves in ADMIN_GROUPS:
+            for leaf in leaves:
+                for color in as_list(get(groups, leaf)):
+                    _add(current["admin_groups"][key], text(color))
+        for srlg in as_list(get(item, "srlg-exclude")):
+            _add(current["srlg_exclude"], text(srlg))
+
+
 def _segment_routing(facts, container):
-    """``ciena-sr:segment-routing``: connected prefix SIDs (``node`` is decided in ``finish``)."""
+    """``ciena-sr:segment-routing``: connected prefix SIDs (``node`` is decided in ``finish``), SRv6
+    locators and Flex-Algo definitions."""
     sr = facts["segment_routing"]
     if removed(container):
         sr["prefix_sids"] = []
+        sr["srv6"]["locators"], sr["flex_algorithms"] = [], []
         return
+    if get(container, "srv6") is not None:
+        _srv6_locators(sr, get(container, "srv6"))
+    _flex_algorithms(sr, container)
     for item in as_list(get(container, "connected-prefix-sid-map")):
         prefix = text(get(item, "prefix"))
         if not prefix:
@@ -968,6 +1156,7 @@ def finish(facts):
             pw["service"] = svc["name"]
             pw["service_type"] = modes.get(svc["fd"]) if modes.get(svc["fd"]) in ("vpws", "vpls") else None
     _ospf_areas(facts)
+    _isis_address_families(facts)
     fps = {fp["name"]: fp for fp in facts["fps"]}
     for mep in facts["cfm"]["meps"]:
         fp = fps.get(mep["interface"])
@@ -979,6 +1168,24 @@ def finish(facts):
                 _add(_port(facts, mep["port"])["roles"], "cfm-mep")
     finish_rings(facts)
     return finish_isis(facts)
+
+
+def _isis_address_families(facts):
+    """The address families each IS-IS interface runs (IPv4 unicast unless disabled, plus the ones it
+    configures) and, per instance, their union in ``address_families`` (so an IPv6-only IGP is
+    explicit), the SRv6 locators the instance advertises (those naming it, and those naming no
+    instance) and ``srv6_enabled`` when there is at least one."""
+    for item in facts["isis"]["interfaces"]:
+        configured, ipv4_off = item.pop("_afs", []), item.pop("_ipv4_off", False)
+        afs = [] if ipv4_off else ["ipv4 unicast"]
+        item["address_families"] = afs + [a for a in configured if a not in afs]
+    locators = facts["segment_routing"].get("srv6", {}).get("locators", [])
+    for instance in facts["isis"]["instances"]:
+        afs = [a for i in facts["isis"]["interfaces"] if i["instance"] == instance["name"] for a in i["address_families"]]
+        instance["address_families"] = sorted(set(afs), key=lambda a: (a != "ipv4 unicast", a))
+        instance["srv6_locators"] = [loc["name"] for loc in locators if not loc["instances"] or instance["name"] in loc["instances"]]
+        instance["srv6_enabled"] = bool(instance["srv6_locators"])
+        instance.setdefault("multi_topology", None)
 
 
 def _ospf_areas(facts):

@@ -13,6 +13,7 @@
         "classifiers": {
           "UNTAGGED": []
         },
+        "evpn_instances": [],
         "fds": [
           {
             "mode": "vpls",
@@ -179,10 +180,14 @@
         "recognised": 7,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
           "segment_lists": {},
-          "srgb": []
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
         },
         "segments": [],
         "sub_ports": [],
@@ -229,6 +234,7 @@
         "classifiers": {
           "UNTAGGED": []
         },
+        "evpn_instances": [],
         "fds": [
           {
             "mode": "vpls",
@@ -395,10 +401,14 @@
         "recognised": 7,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
           "segment_lists": {},
-          "srgb": []
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
         },
         "segments": [],
         "sub_ports": [],
@@ -448,6 +458,7 @@
             "200"
           ]
         },
+        "evpn_instances": [],
         "fds": [
           {
             "mode": "vpls",
@@ -661,10 +672,14 @@
         "recognised": 9,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
           "segment_lists": {},
-          "srgb": []
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
         },
         "segments": [],
         "sub_ports": [],
@@ -747,6 +762,7 @@
             "200"
           ]
         },
+        "evpn_instances": [],
         "fds": [
           {
             "mode": "vpls",
@@ -960,10 +976,14 @@
         "recognised": 9,
         "rings": [],
         "segment_routing": {
+          "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
           "segment_lists": {},
-          "srgb": []
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
         },
         "segments": [],
         "sub_ports": [],
@@ -1034,7 +1054,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.7.2"
+    "version": "0.8.0"
   },
-  "schema_version": "1.5.0"
+  "schema_version": "1.6.0"
 }
