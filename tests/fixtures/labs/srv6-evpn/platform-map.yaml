@@ -1,0 +1,6 @@
+# Device types for the synthetic layered SAOS 10 lab.
+devices:
+  PE1: 5164-10x
+  PE2: 5164-10x
+  P1: 5164-10x
+  RR1: 5164-10x

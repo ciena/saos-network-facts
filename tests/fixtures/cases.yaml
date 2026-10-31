@@ -22,3 +22,6 @@ g8032-saos6:
   platform_map: labs/g8032-saos6/platform-map.yaml
 g8032-by-name:
   clab: labs/g8032-by-name/topo.clab.yml
+srv6-evpn:
+  configs: [labs/srv6-evpn]
+  platform_map: labs/srv6-evpn/platform-map.yaml

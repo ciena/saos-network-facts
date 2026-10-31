@@ -45,7 +45,9 @@ saos-network-facts validate facts.json
 How files map to devices:
 
 - a file is a device named after the file up to its first dot (`PE_1.cfg.partial` is `PE_1`); files
-  that share that name are one device, applied in name order (`R1.day0.cfg`, `R1.day1.cfg`);
+  that share that name are one device, applied in name order (`R1.day0.cfg`, `R1.day1.cfg`). Each
+  file adds to the earlier ones: a SAOS 10 object a later file mentions again keeps the leaves it
+  does not set (a base file's `type loopback` survives a device file's address);
 - a subdirectory is a device; its files are applied in name order;
 - `--clab`: every node is a device; its `startup-config` is its configuration unless `--configs`
   has files for it. Nodes of other kinds (Linux hosts) are recorded as `skipped`;
@@ -140,7 +142,8 @@ The full schema, with a description on every field, is
 
 Facts (all devices): `hostname`, `interfaces`, `gateway`, `vlans`, `ports`, `lags`, `sub_ports`,
 `rings` (G.8032 rings, since schema 1.5 with `ring_id`, `ports` and protection `instances`; see
-[Rings](#rings)), `peers` (MPLS VCs, MPLS-TP tunnel ends, BGP neighbours with `route_reflector_client`),
+[Rings](#rings)), `peers` (MPLS VCs, MPLS-TP tunnel ends, BGP neighbours with `route_reflector_client`;
+what a SAOS 10 neighbour inherits from its `peer-group` is resolved into it),
 `isis` (`instances` with `level`, `nets`, `net`, `area_id`, `system_id`, `sr_enabled`; `interfaces`
 with `level`, `type` and, since schema 1.3, `metrics`: per level the narrow `metric` and
 `wide_metric`), `segment_routing` (`srgb`, `prefix_sids`, `policies`, `segment_lists`),

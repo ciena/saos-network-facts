@@ -17,6 +17,26 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-31
+
+### Fixed
+
+- **SAOS 10: a device's later files add to an interface instead of replacing it** — a device split
+  into several files (a base layer, a device layer, a services layer) is folded in order, but an
+  interface a later file mentioned again was rebuilt from that file alone, so the leaves an earlier
+  file set were lost: a loopback typed in the base layer and addressed in the device layer came out
+  as kind `unknown` (no node SIDs, no loopback), and a later MTU wiped the addresses. A later file
+  now sets only the leaves it carries and adds its addresses to the earlier ones; LAG members, a
+  port's leaves, forwarding domains, flow points (classifiers are added), classifiers (VLANs are
+  added), CFM MEPs and connected prefix SIDs merge the same way. Removals still drop the object.
+- **SAOS 10: BGP peer groups are resolved into their peers** — a peer configured as
+  `peer <address> peer-group <name>` had `remote_as` null, no address families and
+  `route_reflector_client` false, because the settings live on the peer group, so a route
+  reflector came out with `route_reflector` false. Each peer now inherits its group's remote AS,
+  address families and route-reflector-client setting per address family, its own settings
+  winning, wherever the group is defined among the device's files. A removed BGP peer or peer group
+  now leaves the facts. No schema change.
+
 ## [0.7.1] - 2026-10-31
 
 ### Fixed

@@ -1,0 +1,884 @@
+{
+  "devices": [
+    {
+      "device": "P1",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": []
+        },
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-P1-PE1"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-P1-PE2"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-P1-RR1"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-P1-PE1",
+            "logical_port": "1",
+            "name": "FP-P1-PE1"
+          },
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-P1-PE2",
+            "logical_port": "2",
+            "name": "FP-P1-PE2"
+          },
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-P1-RR1",
+            "logical_port": "3",
+            "name": "FP-P1-RR1"
+          }
+        ],
+        "gateway": null,
+        "hostname": "P1",
+        "interfaces": [
+          {
+            "description": "router id and BGP source",
+            "fd": null,
+            "ip": "192.0.2.3/32",
+            "ipv4": [
+              "192.0.2.3/32"
+            ],
+            "ipv6": [
+              "2001:db8::3/128"
+            ],
+            "isis": "CORE",
+            "kind": "loopback",
+            "mtu": null,
+            "name": "lo0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-P1-PE1",
+            "ip": null,
+            "ipv4": [],
+            "ipv6": [
+              "2001:db8:0:11::1/127"
+            ],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "P1-PE1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-P1-PE2",
+            "ip": null,
+            "ipv4": [],
+            "ipv6": [
+              "2001:db8:0:12::1/127"
+            ],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "P1-PE2",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-P1-RR1",
+            "ip": null,
+            "ipv4": [],
+            "ipv6": [
+              "2001:db8:0:13::1/127"
+            ],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "P1-RR1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "area": "49.0001.1920.0000.2003.00",
+              "area_id": "49.0001",
+              "level": "level-2",
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2003.00",
+              "nets": [
+                "49.0001.1920.0000.2003.00"
+              ],
+              "sr_enabled": true,
+              "system_id": "1920.0000.2003"
+            }
+          ],
+          "interfaces": [
+            {
+              "instance": "CORE",
+              "interface": "lo0",
+              "level": null,
+              "metrics": [],
+              "type": "point-to-point"
+            },
+            {
+              "instance": "CORE",
+              "interface": "P1-PE1",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            },
+            {
+              "instance": "CORE",
+              "interface": "P1-PE2",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            },
+            {
+              "instance": "CORE",
+              "interface": "P1-RR1",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            }
+          ]
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 9,
+        "objects": 9,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          },
+          "3": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          }
+        },
+        "pseudowires": [],
+        "recognised": 9,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [
+            {
+              "interface": "lo0",
+              "node": true,
+              "prefix": "192.0.2.3/32",
+              "sid": "3",
+              "value_type": "index"
+            }
+          ],
+          "segment_lists": {},
+          "srgb": [
+            {
+              "instance": "CORE",
+              "lower": "16000",
+              "upper": "23999"
+            }
+          ]
+        },
+        "segments": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {},
+        "vrfs": []
+      },
+      "platform": "cn5164",
+      "status": "ok",
+      "templates": [
+        "P1.1-base.cfg",
+        "P1.3-device.cfg"
+      ],
+      "type": "5164-10x"
+    },
+    {
+      "device": "PE1",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": [
+            {
+              "as": "64500",
+              "cluster_id": null,
+              "route_reflector": false,
+              "router_id": "192.0.2.1"
+            }
+          ]
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": [],
+          "VLAN100": [
+            "100"
+          ]
+        },
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-PE1-P1"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-EVPN-100"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-PE1-P1",
+            "logical_port": "1",
+            "name": "FP-PE1-P1"
+          },
+          {
+            "classifiers": [
+              "VLAN100"
+            ],
+            "fd": "FD-EVPN-100",
+            "logical_port": "5",
+            "name": "FP-AC-100"
+          }
+        ],
+        "gateway": null,
+        "hostname": "PE1",
+        "interfaces": [
+          {
+            "description": "router id and BGP source",
+            "fd": null,
+            "ip": "192.0.2.1/32",
+            "ipv4": [
+              "192.0.2.1/32"
+            ],
+            "ipv6": [
+              "2001:db8::1/128"
+            ],
+            "isis": "CORE",
+            "kind": "loopback",
+            "mtu": "1500",
+            "name": "lo0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-PE1-P1",
+            "ip": null,
+            "ipv4": [],
+            "ipv6": [
+              "2001:db8:0:11::/127"
+            ],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "PE1-P1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "area": "49.0001.1920.0000.2001.00",
+              "area_id": "49.0001",
+              "level": "level-2",
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2001.00",
+              "nets": [
+                "49.0001.1920.0000.2001.00"
+              ],
+              "sr_enabled": true,
+              "system_id": "1920.0000.2001"
+            }
+          ],
+          "interfaces": [
+            {
+              "instance": "CORE",
+              "interface": "lo0",
+              "level": null,
+              "metrics": [],
+              "type": "point-to-point"
+            },
+            {
+              "instance": "CORE",
+              "interface": "PE1-P1",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            }
+          ]
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 15,
+        "objects": 15,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [
+          {
+            "address_families": [
+              "l2vpn evpn",
+              "ipv6 unicast"
+            ],
+            "ip": "2001:db8::4",
+            "kind": "bgp",
+            "name": "as64500",
+            "remote_as": "64500",
+            "route_reflector_client": false
+          }
+        ],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          },
+          "5": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 15,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [
+            {
+              "interface": "lo0",
+              "node": true,
+              "prefix": "192.0.2.1/32",
+              "sid": "1",
+              "value_type": "index"
+            }
+          ],
+          "segment_lists": {},
+          "srgb": [
+            {
+              "instance": "CORE",
+              "lower": "16000",
+              "upper": "23999"
+            }
+          ]
+        },
+        "segments": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "5"
+            ]
+          }
+        },
+        "vrfs": []
+      },
+      "platform": "cn5164",
+      "status": "ok",
+      "templates": [
+        "PE1.1-base.cfg",
+        "PE1.3-device.cfg",
+        "PE1.6-services.cfg"
+      ],
+      "type": "5164-10x"
+    },
+    {
+      "device": "PE2",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": [
+            {
+              "as": "64500",
+              "cluster_id": null,
+              "route_reflector": false,
+              "router_id": "192.0.2.2"
+            }
+          ]
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": [],
+          "VLAN100": [
+            "100"
+          ]
+        },
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-PE2-P1"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-EVPN-100"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-PE2-P1",
+            "logical_port": "1",
+            "name": "FP-PE2-P1"
+          },
+          {
+            "classifiers": [
+              "VLAN100"
+            ],
+            "fd": "FD-EVPN-100",
+            "logical_port": "5",
+            "name": "FP-AC-100"
+          }
+        ],
+        "gateway": null,
+        "hostname": "PE2",
+        "interfaces": [
+          {
+            "description": "router id and BGP source",
+            "fd": null,
+            "ip": "192.0.2.2/32",
+            "ipv4": [
+              "192.0.2.2/32"
+            ],
+            "ipv6": [
+              "2001:db8::2/128"
+            ],
+            "isis": "CORE",
+            "kind": "loopback",
+            "mtu": "1500",
+            "name": "lo0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-PE2-P1",
+            "ip": null,
+            "ipv4": [],
+            "ipv6": [
+              "2001:db8:0:12::/127"
+            ],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "PE2-P1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "area": "49.0001.1920.0000.2002.00",
+              "area_id": "49.0001",
+              "level": "level-2",
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2002.00",
+              "nets": [
+                "49.0001.1920.0000.2002.00"
+              ],
+              "sr_enabled": true,
+              "system_id": "1920.0000.2002"
+            }
+          ],
+          "interfaces": [
+            {
+              "instance": "CORE",
+              "interface": "lo0",
+              "level": null,
+              "metrics": [],
+              "type": "point-to-point"
+            },
+            {
+              "instance": "CORE",
+              "interface": "PE2-P1",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            }
+          ]
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 15,
+        "objects": 15,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [
+          {
+            "address_families": [
+              "l2vpn evpn",
+              "ipv6 unicast"
+            ],
+            "ip": "2001:db8::4",
+            "kind": "bgp",
+            "name": "as64500",
+            "remote_as": "64500",
+            "route_reflector_client": false
+          }
+        ],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          },
+          "5": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 15,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [
+            {
+              "interface": "lo0",
+              "node": true,
+              "prefix": "192.0.2.2/32",
+              "sid": "2",
+              "value_type": "index"
+            }
+          ],
+          "segment_lists": {},
+          "srgb": [
+            {
+              "instance": "CORE",
+              "lower": "16000",
+              "upper": "23999"
+            }
+          ]
+        },
+        "segments": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "5"
+            ]
+          }
+        },
+        "vrfs": []
+      },
+      "platform": "cn5164",
+      "status": "ok",
+      "templates": [
+        "PE2.1-base.cfg",
+        "PE2.3-device.cfg",
+        "PE2.6-services.cfg"
+      ],
+      "type": "5164-10x"
+    },
+    {
+      "device": "RR1",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": [
+            {
+              "as": "64500",
+              "cluster_id": "192.0.2.4",
+              "route_reflector": true,
+              "router_id": "192.0.2.4"
+            }
+          ]
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": []
+        },
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-RR1-P1"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-RR1-P1",
+            "logical_port": "1",
+            "name": "FP-RR1-P1"
+          }
+        ],
+        "gateway": null,
+        "hostname": "RR1",
+        "interfaces": [
+          {
+            "description": "router id and BGP source",
+            "fd": null,
+            "ip": "192.0.2.4/32",
+            "ipv4": [
+              "192.0.2.4/32"
+            ],
+            "ipv6": [
+              "2001:db8::4/128"
+            ],
+            "isis": "CORE",
+            "kind": "loopback",
+            "mtu": null,
+            "name": "lo0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-RR1-P1",
+            "ip": null,
+            "ipv4": [],
+            "ipv6": [
+              "2001:db8:0:13::/127"
+            ],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "RR1-P1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "area": "49.0001.1920.0000.2004.00",
+              "area_id": "49.0001",
+              "level": "level-2",
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2004.00",
+              "nets": [
+                "49.0001.1920.0000.2004.00"
+              ],
+              "sr_enabled": true,
+              "system_id": "1920.0000.2004"
+            }
+          ],
+          "interfaces": [
+            {
+              "instance": "CORE",
+              "interface": "lo0",
+              "level": null,
+              "metrics": [],
+              "type": "point-to-point"
+            },
+            {
+              "instance": "CORE",
+              "interface": "RR1-P1",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            }
+          ]
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 11,
+        "objects": 11,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [
+          {
+            "address_families": [
+              "l2vpn evpn",
+              "ipv6 unicast"
+            ],
+            "ip": "2001:db8::1",
+            "kind": "bgp",
+            "name": "as64500",
+            "remote_as": "64500",
+            "route_reflector_client": true
+          },
+          {
+            "address_families": [
+              "l2vpn evpn",
+              "ipv6 unicast"
+            ],
+            "ip": "2001:db8::2",
+            "kind": "bgp",
+            "name": "as64500",
+            "remote_as": "64500",
+            "route_reflector_client": true
+          }
+        ],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          }
+        },
+        "pseudowires": [],
+        "recognised": 11,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [
+            {
+              "interface": "lo0",
+              "node": true,
+              "prefix": "192.0.2.4/32",
+              "sid": "4",
+              "value_type": "index"
+            }
+          ],
+          "segment_lists": {},
+          "srgb": [
+            {
+              "instance": "CORE",
+              "lower": "16000",
+              "upper": "23999"
+            }
+          ]
+        },
+        "segments": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {},
+        "vrfs": []
+      },
+      "platform": "cn5164",
+      "status": "ok",
+      "templates": [
+        "RR1.1-base.cfg",
+        "RR1.3-device.cfg"
+      ],
+      "type": "5164-10x"
+    }
+  ],
+  "generator": {
+    "name": "saos-network-facts",
+    "translator": "translator 4.2.1 (recorded)",
+    "version": "0.7.2"
+  },
+  "schema_version": "1.5.0"
+}
