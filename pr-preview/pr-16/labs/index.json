@@ -1,0 +1,25 @@
+{
+  "labs": [
+    {
+      "id": "adaptive-sr-cfm",
+      "title": "Adaptive-SR-CFM (example)",
+      "facts": "adaptive-sr-cfm/facts.json",
+      "default": true
+    },
+    {
+      "id": "g8032-two-ring",
+      "title": "G.8032 two-ring lab (fixture, links from --clab)",
+      "facts": "g8032-two-ring/facts.json"
+    },
+    {
+      "id": "g8032-by-name",
+      "title": "G.8032 ring without ring ids (fixture, joined by name)",
+      "facts": "g8032-by-name/facts.json"
+    },
+    {
+      "id": "srv6-evpn",
+      "title": "SRv6, Flex-Algo and EVPN over an IPv6 core (fixture)",
+      "facts": "srv6-evpn/facts.json"
+    }
+  ]
+}
