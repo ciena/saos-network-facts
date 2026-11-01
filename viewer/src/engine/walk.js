@@ -12,7 +12,8 @@ import { ends, ifOrdinal, nodeById, nodeOrdinal } from './topology.js';
 import { floodLsp, lspId } from './isis.js';
 import { ALL_SPF_ROUTERS, areaView, fmtSeq } from './ospf.js';
 import { ACH_BFD_CC, GAL } from './mplstp.js';
-import { buildUpdate, fsmToEstablished } from './bgp.js';
+import { buildUpdate, familyOf, fsmToEstablished, siteRts } from './bgp.js';
+import { locatorRoute } from './srv6.js';
 import { ccmGroupMac, ccmStream, fmtMs } from './cfm.js';
 import { IMPLICIT_NULL } from './mpls.js';
 import { imposeSr } from './srpolicy.js';
@@ -52,6 +53,7 @@ export function ethernet(net, tx, ethertype) {
 }
 
 function packetHeaders(pkt) {
+  const outer = pkt.outer ? [{ name: 'IPv6 (outer, SRv6)', fields: { src: pkt.outer.src, dst: pkt.outer.dst, hopLimit: pkt.outer.hopLimit, nextHeader: pkt.outer.nextHeader } }] : [];
   const h = pkt.labels.map((l, i) => ({
     name: 'MPLS',
     fields: { label: l.label, tc: 0, s: i === pkt.labels.length - 1 ? 1 : 0, ttl: l.ttl, role: l.role },
@@ -66,7 +68,7 @@ function packetHeaders(pkt) {
     h.push({ name: l4, fields: { sport: pkt.l4.sport, dport: pkt.l4.dport } });
   }
   if (pkt.app) h.push(pkt.app);
-  return h;
+  return [...outer, ...h];
 }
 
 export function lagNote(tx) {
@@ -88,7 +90,7 @@ function vrfOfArrival(net, nodeId, inLink) {
 // Addresses a node owns: its loopback, its link ends and its VRF interfaces.
 function ownsAddress(net, nodeId, ip) {
   const n = nodeById(net.topo, nodeId);
-  if (n.loopback === ip || (n.loopbacks ?? []).includes(ip)) return true;
+  if (n.loopback === ip || (n.loopbacks ?? []).includes(ip) || (n.addresses ?? []).includes(ip)) return true;
   if (net.topo.links.some((l) => [l.a, l.b].some((e) => e.node === nodeId && (e.ip === ip || e.ip6 === ip)))) return true;
   return (net.topo.vrfs ?? []).some((v) => v.sites.some((s) => s.pe === nodeId && (s.interfaces ?? []).some((i) => i.ip === ip)));
 }
@@ -96,7 +98,7 @@ function ownsAddress(net, nodeId, ip) {
 // An address inside the modeled lab: a link subnet, a loopback or a VRF member.
 function inLab(net, ip) {
   if (net.topo.links.some((l) => [l.subnet, l.subnet6].some((s) => s && inPrefix(ip, s)))) return true;
-  if (net.topo.nodes.some((n) => n.loopback === ip || (n.loopbacks ?? []).includes(ip) || (n.lan && inPrefix(ip, n.lan)))) return true;
+  if (net.topo.nodes.some((n) => n.loopback === ip || (n.loopbacks ?? []).includes(ip) || (n.addresses ?? []).includes(ip) || (n.lan && inPrefix(ip, n.lan)))) return true;
   return (net.topo.vrfs ?? []).some((v) => v.sites.some((s) => (s.interfaces ?? []).some((i) => inPrefix(ip, i.prefix))));
 }
 
@@ -105,8 +107,9 @@ function inLab(net, ip) {
 function hostLookup(net, nodeId, dst) {
   const node = nodeById(net.topo, nodeId);
   const mine = net.topo.links.filter((l) => l.a.node === nodeId || l.b.node === nodeId);
-  const conn = mine.filter((l) => l.subnet && inPrefix(dst, l.subnet)).map((l) => ({ prefix: l.subnet, link: l, type: 'connected' }));
-  const stat = (node.routes ?? []).filter((r) => inPrefix(dst, r.prefix)).map((r) => ({ ...r, link: mine.find((l) => l.subnet && inPrefix(r.nextHop, l.subnet)), type: 'static' }));
+  const subnets = (l) => [l.subnet, l.subnet6].filter(Boolean);
+  const conn = mine.flatMap((l) => subnets(l).filter((s) => inPrefix(dst, s)).map((s) => ({ prefix: s, link: l, type: 'connected' })));
+  const stat = (node.routes ?? []).filter((r) => r.nextHop && inPrefix(dst, r.prefix)).map((r) => ({ ...r, link: mine.find((l) => subnets(l).some((s) => inPrefix(r.nextHop, s))), type: 'static' }));
   const all = [...conn, ...stat].filter((r) => r.link).sort((x, y) => Number(y.prefix.split('/')[1]) - Number(x.prefix.split('/')[1]));
   return all[0] ?? null;
 }
@@ -122,16 +125,46 @@ export function forward(net, start, pkt, { flow, inLink = null, maxHops = 16, vr
     const node = nodeById(net.topo, nodeId);
     const actions = [];
     let lookup = null;
-    let vrf = hop === 0 && startVrf ? startVrf : node.role === 'pe' ? vrfOfArrival(net, nodeId, arrived) : null;
+    let vrf = hop === 0 && startVrf ? startVrf : node.role !== 'ce' ? vrfOfArrival(net, nodeId, arrived) : null;
     let out = null; // { link, desc }
     const done = (status, title) => {
       steps.push({ node: nodeId, title, lookup, actions, headers: packetHeaders(pkt), moves: [], status });
       return steps;
     };
 
+    // SRv6 (RFC 8986): a packet with an outer IPv6 header is forwarded on its destination SID by
+    // the routes to the locators; at the SID's owner the End.DT4 / End.DT6 SID decapsulates it and
+    // the inner packet is looked up in the SID's VRF (§4.6-4.7).
+    if (pkt.outer && node.role !== 'ce') {
+      const dst = pkt.outer.dst;
+      const r = locatorRoute(net.srv6, nodeId, dst);
+      if (!r || r.unreachable) {
+        lookup = { table: `${nodeId} IPv6 RIB (SRv6 locators)`, key: dst, result: r?.unreachable ?? 'no route' };
+        actions.push('drop: no route to the SID');
+        return done('dropped', `Drop at ${nodeId}`);
+      }
+      if (r.local) {
+        const own = net.bgp.sids?.[nodeId]?.[dst];
+        if (!own) {
+          lookup = { table: `${nodeId} local SIDs`, key: dst, result: 'no such SID' };
+          actions.push('drop: unknown local SID');
+          return done('dropped', `Drop at ${nodeId}`);
+        }
+        actions.push(`local SID ${dst}: ${own.behavior} of VRF ${own.vrf} (locator ${own.locator})`, `${own.behavior}: remove the outer IPv6 header and look up ${pkt.ip.dst} in VRF ${own.vrf} (RFC 8986 ${own.behavior === 'End.DT6' ? '§4.6' : '§4.7'})`);
+        delete pkt.outer;
+        vrf = own.vrf;
+      } else {
+        const nh = pickNextHop(net, r.nextHops, flow);
+        lookup = { table: `${nodeId} IPv6 RIB (SRv6 locators)`, key: dst, result: `${r.prefix} (${r.locator}, ${r.algorithm ? `Flex-Algo ${r.algorithm}` : 'algorithm 0'}) via ${nh.node} metric ${r.metric}` };
+        actions.push(`hop limit ${pkt.outer.hopLimit} -> ${pkt.outer.hopLimit - 1}`);
+        pkt.outer.hopLimit -= 1;
+        out = { link: nh.link, title: `${nodeId}: IPv6 forward to ${r.locator}` };
+      }
+    }
+
     // 0. MPLS-TP static LSPs (RFC 5960 §3): swap along the tunnel, or pop
     // at its end point and go on with the label below (the PW label).
-    const tp = pkt.labels.length && node.role !== 'ce' ? net.tp?.lfib[nodeId]?.[pkt.labels[0].label] : null;
+    const tp = !out && pkt.labels.length && node.role !== 'ce' ? net.tp?.lfib[nodeId]?.[pkt.labels[0].label] : null;
     if (tp) {
       const top = pkt.labels[0];
       const t = net.tp.tunnels.find((x) => x.id === tp.tunnel);
@@ -258,7 +291,22 @@ export function forward(net, start, pkt, { flow, inLink = null, maxHops = 16, vr
           actions.push('drop: no route in VRF');
           return done('dropped', `Drop at ${nodeId}`);
         }
-        if (r.type === 'bgp') {
+        if (r.type === 'bgp' && r.sid) {
+          // H.Encaps.Red (RFC 8986 §5.1): one SID, so no segment routing header.
+          const lr = locatorRoute(net.srv6, nodeId, r.sid);
+          if (!lr || lr.unreachable || lr.local) {
+            lookup = { table: `VRF ${vrf}`, key: dst, result: `${r.prefix} SID ${r.sid}: ${lr?.unreachable ?? 'no route to the locator'}` };
+            actions.push('drop: SID unreachable');
+            return done('dropped', `Drop at ${nodeId}`);
+          }
+          const nh = pickNextHop(net, lr.nextHops, flow);
+          const src = (node.loopbacks ?? [node.loopback]).find((a) => isV6(a)) ?? node.loopback;
+          lookup = { table: `VRF ${vrf}`, key: dst, result: `${r.prefix} via BGP NH ${r.nextHop} (${r.reason}), SRv6 SID ${r.sid} ${r.behavior}; ${lr.prefix} -> ${nh.node}` };
+          pkt.ip.ttl -= 1;
+          pkt.outer = { src, dst: r.sid, hopLimit: 64, nextHeader: isV6(dst) ? '41 (IPv6)' : '4 (IPv4)' };
+          actions.push(`route from ${r.originator ?? r.from} (RD ${r.rd}), learned from ${r.from}`, `H.Encaps.Red: outer IPv6 ${src} -> ${r.sid}, next header ${pkt.outer.nextHeader} (RFC 8986 §5.1)`);
+          out = { link: nh.link, title: `${nodeId} VRF ${vrf} lookup, SRv6 encapsulation` };
+        } else if (r.type === 'bgp') {
           const fec = hostPrefix(r.nextHop);
           const ftn = net.mpls.ftn[nodeId][fec];
           const nh = pickNextHop(net, ftn.nextHops, flow);
@@ -284,7 +332,11 @@ export function forward(net, start, pkt, { flow, inLink = null, maxHops = 16, vr
           return done('delivered', `Received by ${nodeId} (VRF ${vrf} ${r.if})`);
         } else {
           const st = r.type === 'static' ? ` ${r.via.ip} preference ${r.preference}${r.alternatives?.length > 1 ? ` (${r.alternatives.filter((a) => a.state !== 'active').map((a) => `${a.nextHop} pref ${a.preference} ${a.state}`).join(', ')})` : ''}` : '';
-          lookup = { table: `VRF ${vrf}`, key: dst, result: `${r.prefix} ${r.type}${st} via ${r.via.node ?? '-'}` };
+          lookup = { table: `VRF ${vrf}`, key: dst, result: `${r.prefix} ${r.type}${st} via ${r.discard ? 'Null0' : (r.via.node ?? '-')}` };
+          if (r.discard) {
+            actions.push('drop: discard route (Null0)');
+            return done('dropped', `${nodeId} discards it (VRF ${vrf} Null0)`);
+          }
           if (!r.via.link) {
             actions.push('drop: the interface is not cabled');
             return done('dropped', `Drop at ${nodeId}`);
@@ -326,7 +378,7 @@ export function forward(net, start, pkt, { flow, inLink = null, maxHops = 16, vr
 
     const tx = transmit(net, nodeId, out.link, flow);
     actions.push(...lagNote(tx));
-    const l2 = ethernet(net, tx, pkt.labels.length ? ETHERTYPE.MPLS : ETHERTYPE.IPV4);
+    const l2 = ethernet(net, tx, pkt.outer ? ETHERTYPE.IPV6 : pkt.labels.length ? ETHERTYPE.MPLS : pkt.ip && isV6(pkt.ip.dst) ? ETHERTYPE.IPV6 : ETHERTYPE.IPV4);
     steps.push({
       node: nodeId,
       title: out.title,
@@ -495,9 +547,11 @@ function flattenUpdate(u) {
     AS_PATH: a.AS_PATH,
     LOCAL_PREF: a.LOCAL_PREF,
     EXT_COMMUNITIES: a.EXTENDED_COMMUNITIES.join(' '),
+    ...(a.ORIGINATOR_ID ? { ORIGINATOR_ID: a.ORIGINATOR_ID, CLUSTER_LIST: a.CLUSTER_LIST } : {}),
     'MP_REACH AFI/SAFI': `${a.MP_REACH_NLRI.afi}/${a.MP_REACH_NLRI.safi}`,
     'MP_REACH next hop': a.MP_REACH_NLRI.nextHop,
     NLRI: `label ${n.label}, RD ${n.rd}, ${n.prefix}`,
+    ...(a.PREFIX_SID ? { PREFIX_SID: a.PREFIX_SID } : {}),
   };
 }
 
@@ -811,25 +865,127 @@ export function tpTunnelWalk(net, id = null) {
 
 // ---- hosts -----------------------------------------------------------------------
 
-// Data plane: an IP packet from host (or CE) `from` to address `dst`, e.g. a
-// DCN gateway reaching a node's loopback in a VRF; or, with `vrf`, from PE
-// `from`'s loopback in that VRF (e.g. a node's management traffic to the DCN).
+// Data plane: an IP packet from host (or CE) `from` to address `dst`, e.g. a host reaching
+// another site's host through its VRF (an L3VPN packet over MPLS or SRv6), a DCN gateway reaching
+// a node's loopback in a VRF; or, with `vrf`, from PE `from`'s loopback (else first address) in that
+// VRF (e.g. a node's management traffic to the DCN). The source address is of `dst`'s family.
 export function hostWalk(net, from, dst, { vrf = null, ...flowOverride } = {}) {
   const node = nodeById(net.topo, from);
   if (node.role !== 'ce' && !vrf) throw new Error(`${from} is not a host or CE (give a VRF to source from a PE)`);
-  const lo = vrf ? (net.topo.vrfs ?? []).find((v) => v.name === vrf)?.sites.find((s) => s.pe === from)?.interfaces?.find((i) => i.kind === 'loopback') : null;
-  if (vrf && !lo) throw new Error(`${from} has no loopback in VRF ${vrf}`);
-  const src = lo?.ip ?? net.topo.links.flatMap((l) => [l.a, l.b]).find((e) => e.node === from && e.ip)?.ip ?? node.lan?.replace(/\.0\/\d+$/, '.10');
+  const v6 = isV6(dst);
+  const fam = (a) => a && isV6(a) === v6;
+  let src = null;
+  if (vrf) {
+    const ifs = (net.topo.vrfs ?? []).find((v) => v.name === vrf)?.sites.find((s) => s.pe === from)?.interfaces ?? [];
+    src = (ifs.find((i) => i.kind === 'loopback' && fam(i.ip)) ?? ifs.find((i) => fam(i.ip)))?.ip ?? null;
+    if (!src) throw new Error(`${from} has no ${v6 ? 'IPv6' : 'IPv4'} address in VRF ${vrf}`);
+  } else {
+    const linkEnds = net.topo.links.flatMap((l) => [l.a, l.b]).filter((e) => e.node === from).flatMap((e) => [e.ip, e.ip6]);
+    src = [...linkEnds, ...(node.addresses ?? [])].find(fam) ?? (v6 ? null : node.lan?.replace(/\.0\/\d+$/, '.10')) ?? null;
+    if (!src) throw new Error(`${from} has no ${v6 ? 'IPv6' : 'IPv4'} address`);
+  }
   const flow = { ...DEFAULT_FLOW, src, dst, ...flowOverride };
   const pkt = { ip: { src, dst, ttl: 64, proto: flow.proto }, l4: { sport: flow.sport, dport: flow.dport }, labels: [] };
   const steps = forward(net, from, pkt, { flow, vrf });
-  return { kind: 'host', layer: 'physical', title: `${from}${vrf ? ` (VRF ${vrf})` : ''} -> ${dst} (${net.mpls.mode.toUpperCase()})`, flow, steps, delivered: steps.at(-1).status === 'delivered' };
+  const encap = steps.some((s) => s.headers?.some((h) => h.name.startsWith('IPv6 (outer'))) ? 'SRv6' : steps.some((s) => s.headers?.some((h) => h.name === 'MPLS')) ? net.mpls.mode.toUpperCase() : 'IP';
+  return { kind: 'host', layer: (net.topo.vrfs ?? []).length ? 'vrf' : 'physical', title: `${from}${vrf ? ` (VRF ${vrf})` : ''} -> ${dst} (${encap})`, flow, steps, delivered: steps.at(-1).status === 'delivered' };
 }
 
-// Addresses a host walk can target: VRF loopbacks and interfaces, and hosts.
+// Where a host walk can start: hosts and CEs, then each PE in each VRF it has an address in.
+export function hostSources(net) {
+  const out = net.topo.nodes.filter((n) => n.host || (n.role === 'ce' && n.lan)).map((n) => ({ value: n.id, label: n.id, from: n.id, vrf: null }));
+  for (const v of net.topo.vrfs ?? []) {
+    for (const s of v.sites) if ((s.interfaces ?? []).length) out.push({ value: `${s.pe}|${v.name}`, label: `${s.pe} (VRF ${v.name})`, from: s.pe, vrf: v.name });
+  }
+  return out;
+}
+
+// Addresses a host walk can target: VRF loopbacks and interfaces, and the hosts' addresses.
 export function hostTargets(net) {
   const out = [];
-  for (const v of net.topo.vrfs ?? []) for (const s of v.sites) for (const i of s.interfaces ?? []) if (i.kind === 'loopback') out.push({ ip: i.ip, label: `${s.pe} ${i.name} (VRF ${v.name})` });
-  for (const n of net.topo.nodes.filter((x) => x.host)) for (const l of net.topo.links) for (const e of [l.a, l.b]) if (e.node === n.id && e.ip) out.push({ ip: e.ip, label: `${n.id} ${e.if}` });
+  const seen = new Set();
+  const add = (ip, label) => {
+    if (!ip || seen.has(ip)) return;
+    seen.add(ip);
+    out.push({ ip, label });
+  };
+  for (const n of net.topo.nodes.filter((x) => x.host)) {
+    for (const ip of n.addresses ?? []) add(ip, `${n.id} ${ip}`);
+    for (const l of net.topo.links) for (const e of [l.a, l.b]) if (e.node === n.id) for (const ip of [e.ip, e.ip6]) add(ip, `${n.id} ${e.if} ${ip}`);
+  }
+  for (const v of net.topo.vrfs ?? []) for (const s of v.sites) for (const i of s.interfaces ?? []) add(i.ip, `${s.pe} ${i.name} ${i.ip} (VRF ${v.name})`);
   return out;
+}
+
+// The VPN routes a walk can follow: each PE's exported routes, as { value, label }.
+export function vpnRouteChoices(net) {
+  return Object.entries(net.bgp.originated).flatMap(([pe, routes]) => routes.map((r) => ({ value: `${pe}|${r.vrf}|${r.prefix}`, label: `${pe} VRF ${r.vrf} ${r.prefix} (${r.transport === 'srv6' ? `SRv6 ${r.behavior}` : `label ${r.label}`})` })));
+}
+
+// Control plane: the BGP UPDATE of one VPN route (`pe|vrf|prefix`) as it propagates: originated
+// (redistributed into BGP, RD:prefix, route targets, a VPN label or an SRv6 SID), sent over each
+// iBGP session in TCP between loopbacks through the core, reflected by a route reflector
+// (ORIGINATOR_ID, CLUSTER_LIST, RFC 4456 §8), and at every PE imported into each VRF whose import
+// route targets it carries, or not imported (RFC 4364 §4.3.1, §4.3.3).
+export function vpnUpdateWalk(net, key) {
+  const [pe, vrfName, prefix] = String(key).split('|');
+  const route = net.bgp.originated[pe]?.find((r) => r.vrf === vrfName && r.prefix === prefix);
+  if (!route) throw new Error(`${pe} exports no VPN route ${prefix} from VRF ${vrfName}`);
+  const title = `BGP UPDATE ${route.rd}:${route.prefix} from ${pe} (VRF ${vrfName})`;
+  const how = route.sid ? `SRv6 SID ${route.sid} (${route.behavior} from locator ${route.locator}, RFC 9252 §3.2)` : `VPN label ${route.label} (${route.site?.labelAllocation?.[isV6(prefix) ? 'ipv6' : 'ipv4'] === 'per-vrf' ? 'per VRF' : 'per prefix'})`;
+  const steps = [{
+    node: pe,
+    title: `${pe} exports ${route.prefix} from VRF ${vrfName}`,
+    lookup: { table: `VRF ${vrfName}`, key: route.prefix, result: `${route.type} -> VPN-IPv${isV6(prefix) ? 6 : 4} ${route.rd}:${route.prefix}` },
+    actions: [`redistribute ${route.type === 'static' ? 'static' : 'connected'} into BGP (${familyOf(prefix)})`, `allocate ${how}`, `attach ${route.rts.map((rt) => `RT ${rt}`).join(', ') || 'no route target'}; NEXT_HOP ${route.nextHop} (own loopback)`],
+    headers: [{ name: 'BGP UPDATE', fields: flattenUpdate(buildUpdate(route)) }],
+    moves: [],
+    status: 'forward',
+  }];
+  // Each first delivery of the route to a speaker, in propagation order (direct, then reflected).
+  const deliveries = Object.entries(net.bgp.adjRibIn)
+    .flatMap(([to, rib]) => rib.filter((r) => r.originator === pe && r.rd === route.rd && r.prefix === prefix).map((r) => ({ to, r })))
+    .sort((x, y) => x.r.clusterList.length - y.r.clusterList.length || x.to.localeCompare(y.to));
+  const seen = new Set();
+  let delivered = 0;
+  for (const { to, r } of deliveries) {
+    if (seen.has(to)) continue;
+    seen.add(to);
+    const from = r.from;
+    const fromLo = nodeById(net.topo, from).loopback;
+    const toLo = nodeById(net.topo, to).loopback;
+    const rid = (id) => nodeById(net.topo, id)?.loopback ?? id;
+    const app = { name: 'BGP UPDATE', fields: flattenUpdate(buildUpdate({ ...r, originatorId: r.originatorId ? `${rid(r.originatorId)} (${r.originatorId})` : null, clusterList: r.clusterList.map(rid) })) };
+    const flow = { src: fromLo, dst: toLo, proto: 'TCP', sport: 179, dport: 50000 };
+    const pkt = { ip: { src: fromLo, dst: toLo, ttl: 255, proto: 'TCP' }, l4: { sport: 179, dport: 50000 }, labels: [], app };
+    const fwd = forward(net, from, pkt, { flow });
+    if (r.reflectedBy) fwd[0].actions.unshift(`reflect (route reflector ${from}): ORIGINATOR_ID ${rid(r.originatorId)} (${r.originatorId}), CLUSTER_LIST ${r.clusterList.map(rid).join(' ')} (RFC 4456 §8)`);
+    fwd[0].title = `${from} sends the UPDATE to ${to}${r.reflectedBy ? ' (reflected)' : ''}`;
+    const last = fwd.at(-1);
+    if (last.status === 'delivered') {
+      delivered += 1;
+      const imports = [];
+      for (const v of net.topo.vrfs ?? []) {
+        const site = v.sites.find((s) => s.pe === to);
+        if (!site) continue;
+        const want = siteRts(v, site, r.family, 'import');
+        const hit = r.rts.filter((rt) => want.includes(rt));
+        const famOk = !site.families || site.families.includes(r.family);
+        const installed = net.bgp.vrfs[to]?.[v.name]?.[prefix];
+        if (!famOk) imports.push(`VRF ${v.name}: runs no ${r.family}, not imported`);
+        else if (!hit.length) imports.push(`VRF ${v.name}: imports ${want.join(', ') || 'no route target'}, none of ${r.rts.join(', ')}: not imported`);
+        else if (installed?.type === 'bgp' && installed.originator === pe && installed.rd === r.rd) imports.push(`VRF ${v.name}: RT ${hit.join(', ')} imported; best (${installed.reason}), installed via ${installed.nextHop} ${installed.sid ? `SID ${installed.sid}` : `label ${installed.vpnLabel}`}`);
+        else if (installed && installed.type !== 'bgp') imports.push(`VRF ${v.name}: RT ${hit.join(', ')} imported; the local ${installed.type} route wins`);
+        else if (installed?.type === 'bgp') imports.push(`VRF ${v.name}: RT ${hit.join(', ')} imported; ${installed.originator}'s route is best (${installed.reason})`);
+        else imports.push(`VRF ${v.name}: RT ${hit.join(', ')} imported; next hop ${r.nextHop} unresolved over ${r.sid ? 'its locator' : 'an LSP'}: not installed`);
+      }
+      const reflects = deliveries.some((d) => d.r.from === to && d.to !== pe);
+      last.title = `${to} receives the UPDATE`;
+      last.lookup = { table: 'Adj-RIB-In', key: `${r.rd}:${r.prefix}`, result: imports.length ? `${imports.length} VRF${imports.length > 1 ? 's' : ''} checked` : reflects ? 'no VRF: reflect only' : 'no VRF' };
+      last.actions = ['TCP :179 to the local stack: UpdateMsg (Event 27)', ...imports, ...(reflects ? ['route reflector: pass it on to the other clients'] : [])];
+    }
+    steps.push(...fwd);
+  }
+  if (!deliveries.length) steps[0].actions.push('no peer receives it: no Established session carrying the family');
+  return { kind: 'bgp', layer: 'bgp', title, steps, delivered: delivered > 0 };
 }

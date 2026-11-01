@@ -40,10 +40,12 @@ describe('the bundled Adaptive-SR-CFM example', () => {
   const topo = imp.topology;
   const net = buildNetwork(topo, { labelMode: imp.labelMode });
 
-  test('every device is a node; CE1 is the only host and P2 / P7 the only P routers', () => {
+  test('every device is a node; CE1 is the only CE; a router without a service is a P whatever its name', () => {
     expect(topo.nodes.map((n) => n.id)).toEqual(['CE1', 'P2', 'P3', 'P7', 'P8', 'PE1', 'PE4', 'PE5', 'PE6', 'PE9']);
     expect(topo.nodes.filter((n) => n.role === 'ce').map((n) => n.id)).toEqual(['CE1']);
-    expect(topo.nodes.filter((n) => n.role === 'p').map((n) => n.id)).toEqual(['P2', 'P7']);
+    // P8 and PE5 are iBGP clients of PE6 with no pseudowire, VRF, EVPN instance or CE: transit routers.
+    expect(topo.nodes.filter((n) => n.role === 'p').map((n) => n.id)).toEqual(['P2', 'P7', 'P8', 'PE5']);
+    expect(topo.nodes.filter((n) => n.rr).map((n) => `${n.id} ${n.role}`)).toEqual(['PE6 pe']);
     const pe1 = topo.nodes.find((n) => n.id === 'PE1');
     expect(pe1).toMatchObject({ loopback: '10.255.10.1', systemId: '0102.5501.0001', sidIndex: 1 });
   });

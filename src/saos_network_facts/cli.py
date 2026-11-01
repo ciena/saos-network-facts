@@ -34,7 +34,11 @@ def cmd_extract(args):
         if not args.quiet or record["status"] in ("error", "partial"):
             print(extract.summary_line(record), file=sys.stderr)
     links = extract.links_from_clab(args.clab) if args.clab else None
-    write_json(extract.document(records, translator, links), args.output)
+    hosts = extract.collect_hosts(args.clab, args.hosts, devices)
+    for host in hosts or []:
+        if not args.quiet:
+            print(extract.host_summary_line(host), file=sys.stderr)
+    write_json(extract.document(records, translator, links, hosts), args.output)
     counts = {s: sum(1 for r in records if r["status"] == s) for s in ("ok", "partial", "error", "skipped")}
     print(f"devices {len(records)} / ok {counts['ok']} / partial {counts['partial']} / errors {counts['error']} "
           f"/ skipped {counts['skipped']}", file=sys.stderr)
@@ -75,6 +79,9 @@ def parser():
                         "files sharing a name up to the first dot are one device, applied in name order)")
     e.add_argument("--clab", metavar="FILE",
                    help="a containerlab topology: node kinds and types, startup-config files, and the links between nodes")
+    e.add_argument("--hosts", metavar="FILE",
+                   help="YAML/JSON {hosts: {NAME: {interfaces: [{name, addresses, attached: {device, port}}], routes: "
+                        "[{prefix, next_hop}], gateway}}}: Linux hosts no containerlab exec line describes")
     e.add_argument("--platform-map", metavar="FILE",
                    help="YAML/JSON {devices: {NAME: {type, platform, extractor, configs}}} for what the files do not say; "
                         "a SAOS 10 device needs a type (5164-10x) or platform (cn5164), else it is an error")

@@ -6,12 +6,12 @@
 // #device=NAME, #service=ID, #topology (panels hidden); anything else is the overview.
 
 import exampleFacts from '../../examples/adaptive-sr-cfm/facts.json?raw';
-import { buildNetwork, ccmWalk, evpnWalk, isisFloodWalk, locatorTargets, ospfFloodAreas, ospfFloodWalk, replayFailure, srv6PingWalk, tpTunnelWalk, vpwsWalk } from './engine/index.js';
+import { buildNetwork, ccmWalk, evpnWalk, hostSources, hostTargets, hostWalk, isisFloodWalk, locatorTargets, ospfFloodAreas, ospfFloodWalk, failureModes, replayFailure, srv6PingWalk, tpTunnelWalk, vpnRouteChoices, vpnUpdateWalk, vpwsWalk } from './engine/index.js';
 import { importFacts } from './import/facts.js';
-import { labParams, loadFromParams, loadLab } from './labs.js';
+import { labChoices, labParams, loadFromParams, loadLab } from './labs.js';
 import { renderDevice, renderOverview, renderService } from './panels.js';
 import { Animator, DWELL_MS, TRAVEL_MS } from './view/animator.js';
-import { LAYERS, LayerView, hex } from './view/layers.js';
+import { LAYERS, LayerView, hex, presentLayers } from './view/layers.js';
 import { labelOptions } from './view/labels.js';
 import { markStep, renderImportReport, renderStep, renderStepList } from './view/panel.js';
 import { createScene } from './view/scene.js';
@@ -26,11 +26,13 @@ const { renderer, labels, scene, camera, controls } = createScene($('scene'), $(
 const layers = new LayerView(scene);
 const animator = new Animator(scene, layers);
 
-const state = { imp: null, net: null, failures: [], walk: null, step: 0, playing: false, speed: 1, elapsed: 0, replay: null };
+// present: the layers the loaded facts have content for, decided from the network with no failure.
+const state = { imp: null, net: null, present: null, failures: [], walk: null, step: 0, playing: false, speed: 1, elapsed: 0, replay: null };
 
 // ---- loading ---------------------------------------------------------------
 
-function load(text, name, positions = null) {
+// shown: what the lab menu names ({ lab: id }, { example: true } or { file: name }; see labs.js labChoices).
+function load(text, name, positions = null, shown = { file: name }) {
   let imp;
   try {
     imp = importFacts(text, { name: name ?? undefined, positions });
@@ -40,6 +42,9 @@ function load(text, name, positions = null) {
   }
   showError(null);
   state.imp = imp;
+  state.present = null;
+  state.shown = shown;
+  fillLabSelect();
   state.failures = [];
   state.replay = null;
   setWalk(null);
@@ -59,8 +64,16 @@ function showError(text) {
 function rebuild(net = null) {
   const { imp } = state;
   state.net = net ?? buildNetwork(imp.topology, { labelMode: imp.labelMode, failures: state.failures });
-  layers.build(state.net);
-  for (const el of document.querySelectorAll('#layer-toggles label')) el.hidden = !layers.present.includes(el.dataset.layer);
+  if (!state.present) {
+    const base = state.failures.length ? buildNetwork(imp.topology, { labelMode: imp.labelMode }) : state.net;
+    state.present = presentLayers(base).map((l) => l.id);
+  }
+  layers.build(state.net, state.present);
+  // Only the layers the facts have are listed; a hidden one's toggle is reset (layers.visible is too).
+  for (const el of document.querySelectorAll('#layer-toggles label')) {
+    el.hidden = !layers.present.includes(el.dataset.layer);
+    if (el.hidden) el.querySelector('input').checked = true;
+  }
   $('topo-name').textContent = `${imp.topology.name} · ${imp.topology.nodes.length} devices, ${imp.topology.links.length} links`;
   $('fail-state').textContent = state.failures.length ? `Down: ${state.failures.join(', ')}` : 'All links up';
   renderOverview($('tab-overview'), imp, state.net);
@@ -216,6 +229,11 @@ function fillWalkParams() {
   } else if (kind === 'srv6') {
     add('wp-a', net.igp.routers.map((r) => ({ value: r, label: `from ${r}` })));
     add('wp-b', locatorTargets(net));
+  } else if (kind === 'l3vpn') {
+    add('wp-a', hostSources(net).map((s) => ({ value: s.value, label: `from ${s.label}` })));
+    add('wp-b', hostTargets(net).map((t) => ({ value: t.ip, label: `to ${t.label}` })));
+  } else if (kind === 'vpnupdate') {
+    add('wp-a', vpnRouteChoices(net));
   } else if (kind === 'ccm') {
     add('wp-a', net.cfm.megs.map((m) => ({ value: m.id, label: `MEG ${m.id}` })));
   } else {
@@ -232,7 +250,7 @@ function fillWalkParams() {
 }
 
 function fillSelects() {
-  const has = { vpws: state.net.vpws.pseudowires.length > 0, ccm: state.net.cfm.megs.length > 0, tp: state.net.tp.tunnels.length > 0, evpn: state.net.evpn.instances.length > 0, isis: state.net.igp.routers.length > 0, srv6: state.net.srv6.locators.length > 0 };
+  const has = { vpws: state.net.vpws.pseudowires.length > 0, ccm: state.net.cfm.megs.length > 0, tp: state.net.tp.tunnels.length > 0, evpn: state.net.evpn.instances.length > 0, isis: state.net.igp.routers.length > 0, srv6: state.net.srv6.locators.length > 0, l3vpn: hostSources(state.net).length > 0 && hostTargets(state.net).length > 0, vpnupdate: vpnRouteChoices(state.net).length > 0 };
   $('walk-kind').querySelector('option[value="isis"]').textContent = state.net.igpName === 'ospf' ? 'OSPF LSA flood' : 'IS-IS LSP flood';
   for (const o of $('walk-kind').options) o.disabled = !has[o.value];
   if (!has[$('walk-kind').value]) $('walk-kind').value = Object.keys(has).find((k) => has[k]) ?? 'vpws';
@@ -241,15 +259,29 @@ function fillSelects() {
     { value: l.id, label: `${l.id} (${l.kind}${l.lag ? ', LAG' : ''})` },
     ...(l.lag ? l.members.map((m) => ({ value: m.id, label: `\u2003member ${m.id} (${m.a}\u2013${m.b})` })) : []),
   ]));
+  fillFailureModes();
 }
 
 $('walk-kind').addEventListener('change', fillWalkParams);
+
+function fillFailureModes() {
+  options($('fail-detection'), failureModes(state.net, $('fail-target').value));
+}
+$('fail-target').addEventListener('change', fillFailureModes);
 
 const walkActions = {
   walkPw: (pwId, from) => runWalk(() => vpwsWalk(state.net, pwId, from)),
   walkCcm: (megId) => runWalk(() => ccmWalk(state.net, megId)),
   walkEvpn: (id, from) => runWalk(() => evpnWalk(state.net, id, from)),
+  walkHost: (from, dst, vrf = null) => runWalk(() => hostWalk(state.net, from, dst, { vrf })),
+  walkUpdate: (key) => runWalk(() => vpnUpdateWalk(state.net, key)),
 };
+
+// The host / VRF source a walk-params value names (`host`, or `PE|VRF`).
+function hostSource(value) {
+  const [from, vrf = null] = String(value).split('|');
+  return { from, vrf };
+}
 
 function runWalk(make) {
   if (state.replay) restore();
@@ -272,6 +304,8 @@ $('walk-run').addEventListener('click', () => {
   else if (kind === 'tp') runWalk(() => tpTunnelWalk(state.net, a));
   else if (kind === 'evpn') walkActions.walkEvpn(a, b);
   else if (kind === 'srv6') runWalk(() => srv6PingWalk(state.net, a, b));
+  else if (kind === 'l3vpn') walkActions.walkHost(hostSource(a).from, b, hostSource(a).vrf);
+  else if (kind === 'vpnupdate') walkActions.walkUpdate(a);
   else runWalk(() => (state.net.igpName === 'ospf' ? ospfFloodWalk(state.net, a, b ?? null) : isisFloodWalk(state.net, a)));
 });
 
@@ -314,7 +348,9 @@ $('fail-run').addEventListener('click', () => {
   const link = $('fail-target').value;
   if (!link) return;
   const detection = $('fail-detection').value;
-  const { before, after, networks, replay } = replayFailure(state.imp.topology, link, { labelMode: state.imp.labelMode, detection });
+  // With the L3VPN walk selected, the replay follows that flow before and after.
+  const host = $('walk-kind').value === 'l3vpn' && $('wp-a')?.value && $('wp-b')?.value ? { ...hostSource($('wp-a').value), dst: $('wp-b').value } : null;
+  const { before, after, networks, replay } = replayFailure(state.imp.topology, link, { labelMode: state.imp.labelMode, detection, host });
   state.failures = [link];
   state.replay = { before, after, networks };
   setWalk(replay);
@@ -376,18 +412,26 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 $('facts-file').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  if (load(await file.text(), file.name.replace(/\.json$/i, ''))) location.hash = '';
+  if (load(await file.text(), file.name.replace(/\.json$/i, ''))) dropLabParam();
   e.target.value = '';
 });
 $('facts-example').addEventListener('click', () => {
-  load(exampleFacts, EXAMPLE_NAME);
+  load(exampleFacts, EXAMPLE_NAME, null, { example: true });
   history.replaceState(null, '', location.pathname);
 });
+
+// A loaded file is not the lab the URL names: drop ?lab= (and the hash) so a reload does not pretend it is.
+function dropLabParam() {
+  const q = new URLSearchParams(location.search);
+  q.delete('lab');
+  history.replaceState(null, '', `${location.pathname}${q.size ? `?${q}` : ''}`);
+  location.hash = '';
+}
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', async (e) => {
   e.preventDefault();
   const file = e.dataTransfer.files[0];
-  if (file && load(await file.text(), file.name.replace(/\.json$/i, ''))) location.hash = '';
+  if (file && load(await file.text(), file.name.replace(/\.json$/i, ''))) dropLabParam();
 });
 
 // ---- frame loop ------------------------------------------------------------
@@ -419,14 +463,16 @@ function frame(now) {
 let labIndex = null;
 
 function loadLabResult(lab) {
-  return load(lab.factsText, lab.title, lab.positions);
+  return load(lab.factsText, lab.title, lab.positions, { lab: lab.id });
 }
 
 function fillLabSelect() {
   const sel = $('lab-select');
   sel.hidden = !labIndex || labIndex.labs.length < 2;
   if (!labIndex) return;
-  options(sel, labIndex.labs.map((l) => ({ value: l.id, label: l.title })));
+  const { options: choices, value } = labChoices(labIndex, state.shown ?? {});
+  options(sel, choices);
+  sel.value = value;
 }
 
 $('lab-select').addEventListener('change', async (e) => {
@@ -448,17 +494,15 @@ async function start() {
   try {
     found = await loadFromParams(labParams(location.search), { base: location.href, fetch });
   } catch (err) {
-    load(exampleFacts, EXAMPLE_NAME);
+    load(exampleFacts, EXAMPLE_NAME, null, { example: true });
     showError(`${err.message}; showing the example`);
     return;
   }
   if (!found) {
-    load(exampleFacts, EXAMPLE_NAME);
+    load(exampleFacts, EXAMPLE_NAME, null, { example: true });
     return;
   }
   labIndex = found.index;
-  fillLabSelect();
-  if (labIndex) $('lab-select').value = found.lab.id;
   loadLabResult(found.lab);
 }
 

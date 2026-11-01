@@ -17,6 +17,76 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-01
+
+### Added
+
+- **Schema 1.8.0: Linux hosts** — a new optional top-level `hosts[]` (1.7 files stay valid): each Linux
+  host of the lab (a test host, a CE site, a DCN gateway) with its `interfaces` (addresses with prefix
+  length, IPv4 and IPv6, and `attached`: the device and port at the other end of its cable), its static
+  `routes`, its `default_gateway` per family, its `sources` and the `ignored_commands`. From the `linux`
+  nodes of `--clab` (their `exec` lines: `ip [-4|-6] addr add`, `ip [-4|-6] route add|replace`; every
+  other line is listed in `ignored_commands`, not dropped silently) and from the new `--hosts FILE`
+  (YAML / JSON: interfaces, routes, gateway), which adds to a containerlab host of the same name. A
+  containerlab host's device record stays `skipped` (reason "a Linux host: see hosts[]"). The CLI prints
+  a `HOST` line per host.
+- **npm reader** — `hosts(file)`, `hostByName(file, name)`, `hostGateway(host, family)` (empty / null for
+  older files).
+- **Viewer: Linux hosts, a VRFs / L3VPN plane and L3VPN walks** — hosts are CE nodes with their addresses
+  and routes, linked to their PE by subnet (else by `links[]`). VRFs from `vrf_instances` become L3VPN
+  sites (RD, route targets per address family, interfaces and their hosts, static routes with Null0
+  discards, redistribution, per-VRF or per-prefix labels, SRv6 locators); the engine gains per-site and
+  per-family route targets, VPN-IPv6 (RFC 4659, 6VPE over an IPv4 core), sessions that carry only the
+  VPN families both ends negotiate, and SRv6 L3VPN: End.DT4 / End.DT6 SIDs from each family's locator
+  (allocated by the view: the facts carry locators), next hops resolved over the route to the locator,
+  H.Encaps.Red and decapsulation into the VRF (RFC 8986, RFC 9252). A **VRFs / L3VPN** plane (only for a
+  network with VRFs): one colour per VRF, a ring per PE with its RD and transport, arcs between the PEs
+  whose routes cross, lines to the attached hosts, and each VRF's state with the reasons (no BGP path,
+  a route target mismatch, an unresolved next hop). Walks: *L3VPN packet* (a host, or a PE in a VRF, to
+  an address: host routing, the ingress VRF lookup, VPN + transport labels or SRv6 encapsulation, the
+  egress VRF lookup, delivery to the host) and *BGP UPDATE of a VPN route* (originated with its RD, route
+  targets and label or SRv6 Prefix-SID, carried to each speaker, reflected with ORIGINATOR_ID /
+  CLUSTER_LIST, and imported or not into each VRF by route target). With the L3VPN walk selected, a
+  failure replay follows that flow (a floating static default taking over when a DCN gateway's link
+  fails). Overview, device (VRF tables), host and VRF (`#service=vrf:<name>`) panels.
+- **Fixtures** — a new clab lab `labs/l3vpn-hosts` (PE1 - P1 - PE2 on IS-IS + SR-MPLS with a backup link,
+  P1 the VPNv4 / VPNv6 route reflector, VRF BLUE with per-VRF labels between Linux hosts h1 and h2,
+  the management VRF MGMT with a loopback per node and two DCN gateway hosts with floating static
+  defaults), recorded with translator 4.2.1 (the earlier pivots are unchanged); `labs/srv6-evpn` gains
+  `hosts.yaml` (its CE sites `ce-a` and `ce-b`, given with `--hosts`). The other expected files only gain
+  the new version (and `hosts` where a topology was given).
+- **Site** — the `l3vpn-hosts` fixture lab is in the lab index (`?lab=l3vpn-hosts`); `srv6-evpn` now
+  shows its L3VPN over SRv6.
+
+### Fixed
+
+- **Viewer: only the layers the loaded facts have are listed and drawn** — every layer now checks
+  whether the network gives it anything to draw (any node; a G.8032 ring; an IGP router; an MPLS-TP
+  tunnel, SR policy or LSP between PEs; an SRv6 locator or Flex-Algo; a BGP session; a VRF; a
+  pseudowire; an EVPN instance; a CFM MEG), and a layer with nothing is neither in the sidebar nor
+  stacked. Before, only the SRv6 and EVPN layers were optional, and even those toggles stayed visible
+  (the list's `display: flex` beat `hidden`): a ring-only lab offered IGP, MPLS, BGP, pseudowire and CFM
+  planes with nothing on them. The layers are decided once per loaded lab or file (a failure replay
+  does not reshuffle the stack), and a hidden layer's on / off choice is kept only while the lab has
+  it: a layer a later lab brings back starts visible.
+- **Viewer: Linux hosts are listed as hosts, not as skipped devices** — the overview's Devices table
+  showed a containerlab host with the topology's default type (5164), role CE and status `skipped`;
+  hosts are now only in the Hosts table, with their kind (`linux`) and role host, and a host's panel shows
+  its interfaces, routes and cabling instead of the placeholder device record.
+- **Viewer: P and PE from the services a router has** — a router was a PE as soon as it spoke BGP, so a
+  route reflector with no service (the l3vpn-hosts P1, the srv6-evpn RR1) showed as a PE. A PE now ends a
+  pseudowire or an EVPN instance, has a VRF other than a management VRF, or faces a CE or host; any
+  other router is a P, shown as P / RR when it reflects BGP routes (a PE that reflects is PE / RR). In
+  the example, P8 and PE5 (iBGP clients with no service configured) are now P and PE6 is PE / RR; a P
+  with a management VRF keeps its VRF table.
+- **Viewer: the failure menu offers only what the lab can detect** — "Silent failure: found by CFM CCM /
+  BFD" was offered for every link. The silent mode is now offered per selected link only when something
+  finds it there, and names it (CFM CCM, BFD, the LACP timeout, the IS-IS hold timer or OSPF dead
+  interval); a link nothing watches (a host link, an L2 ring link) offers loss of signal only.
+- **Viewer: the lab menu names a loaded file** — after *Load your facts.json* (or a drop) the lab menu
+  still showed the previous lab; it now shows "Your file: NAME", and the page's `?lab=` is dropped so a
+  reload does not claim the file is that lab. The *Example lab* button selects the index's default lab.
+
 ## [0.10.0] - 2026-10-31
 
 ### Added

@@ -3,12 +3,13 @@
 export { builtinTopology, validateTopology } from './topology.js';
 export { importClab } from './clab.js';
 export { buildNetwork } from './network.js';
-export { dataWalk, hostWalk, hostTargets, isisFloodWalk, ospfFloodWalk, ospfFloodAreas, bgpUpdateWalk, ccmWalk, vpwsWalk, tpTunnelWalk } from './walk.js';
+export { dataWalk, hostWalk, hostTargets, hostSources, vpnUpdateWalk, vpnRouteChoices, isisFloodWalk, ospfFloodWalk, ospfFloodAreas, bgpUpdateWalk, ccmWalk, vpwsWalk, tpTunnelWalk } from './walk.js';
 export { computeOspf } from './ospf.js';
 export { computeMplsTp } from './mplstp.js';
-export { replayFailure } from './replay.js';
+export { failureModes, replayFailure, silentDetection } from './replay.js';
 export { computeG8032, ringDataPath, rapsHops } from './g8032.js';
 export { rfcVendor } from './vendor.js';
 export { labelProtocols } from './mpls.js';
 export { computeSrv6, computeEvpn, sidOf, locatorPath } from './srv6.js';
 export { evpnWalk, srv6PingWalk, locatorTargets } from './srv6walk.js';
+export { computeL3vpn } from './l3vpn.js';

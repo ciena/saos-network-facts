@@ -53,13 +53,15 @@ describe('an IPv6 core (C3)', () => {
   const { imp, net } = load(text);
   const topo = imp.topology;
 
-  test('links come from the /127 subnets, with their ports', () => {
+  test('links come from the /127 subnets, with their ports (and the hosts\' access links, schema 1.8)', () => {
     expect(topo.links.map((l) => [l.id, l.kind, l.subnet])).toEqual([
+      ['PE1-ce-a', 'access', '198.51.100.0/31'],
+      ['PE2-ce-b', 'access', '203.0.113.0/31'],
       ['P1-PE1', 'core', '2001:db8:0:11::/127'],
       ['P1-PE2', 'core', '2001:db8:0:12::/127'],
       ['P1-RR1', 'core', '2001:db8:0:13::/127'],
     ]);
-    expect(topo.links[0]).toMatchObject({ a: { node: 'P1', ip: '2001:db8:0:11::1', port: '1' }, b: { node: 'PE1', ip: '2001:db8:0:11::', port: '1' } });
+    expect(topo.links[2]).toMatchObject({ a: { node: 'P1', ip: '2001:db8:0:11::1', port: '1' }, b: { node: 'PE1', ip: '2001:db8:0:11::', port: '1' } });
   });
 
   test('IS-IS runs on the IPv6 loopbacks and every adjacency is up', () => {
@@ -83,8 +85,8 @@ describe('an IPv6 core (C3)', () => {
       r.facts.segment_routing.srgb = [];
     }
     const v6 = load(file);
-    expect(v6.imp.topology.links).toHaveLength(3);
-    expect(v6.imp.topology.nodes.every((n) => n.loopback.startsWith('2001:db8::') && !n.loopbacks)).toBe(true);
+    expect(v6.imp.topology.links.filter((l) => l.kind === 'core')).toHaveLength(3);
+    expect(v6.imp.topology.nodes.filter((n) => !n.host).every((n) => n.loopback.startsWith('2001:db8::') && !n.loopbacks)).toBe(true);
     expect(v6.net.isis.adjacencies.every((a) => a.state === 'Up')).toBe(true);
     expect(v6.net.bgp.sessions.every((s) => s.state === 'Established')).toBe(true);
     expect(v6.net.evpn.instances.map((i) => i.state)).toEqual(['Up', 'Up']);
@@ -205,8 +207,8 @@ describe('EVPN instances over SRv6 (C7)', () => {
     expect(after.evpn.instances.map((i) => i.state)).toEqual(['Down', 'Down']);
   });
 
-  test('the SRv6 and EVPN planes are shown only for a network that has them', () => {
-    expect(presentLayers(net).map((l) => l.id)).toEqual(['physical', 'ring', 'isis', 'mpls', 'srv6', 'bgp', 'pw', 'evpn', 'cfm']);
+  test('the SRv6, VRF and EVPN planes are shown only for a network that has them', () => {
+    expect(presentLayers(net).map((l) => l.id)).toEqual(['physical', 'isis', 'mpls', 'srv6', 'bgp', 'vrf', 'evpn']);
     const ex = importFacts(example);
     expect(presentLayers(buildNetwork(ex.topology, { labelMode: ex.labelMode })).map((l) => l.id)).toEqual(['physical', 'ring', 'isis', 'mpls', 'bgp', 'pw', 'cfm']);
   });

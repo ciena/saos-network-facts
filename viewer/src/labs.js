@@ -95,3 +95,15 @@ export async function loadFromParams(params, { base, fetch: fetchFn }) {
   if (!lab) throw new Error(`no lab "${id}" in ${index.url}`);
   return { index, lab: await loadLab(fetchFn, lab) };
 }
+
+// The lab menu for what is shown: `shown` is { lab: id } (a lab of the index), { example: true } (the
+// bundled example: the index's default lab when it has one) or { file: name } (a file the visitor
+// loaded). A file, or anything the index does not list, gets an entry of its own at the top, selected,
+// so the menu never names a lab that is not on the page. Returns { options: [{ value, label }], value }.
+export function labChoices(index, shown) {
+  const labs = (index?.labs ?? []).map((l) => ({ value: l.id, label: l.title }));
+  const id = shown.lab ?? (shown.example ? index?.labs.find((l) => l.default)?.id : null);
+  if (id && labs.some((l) => l.value === id)) return { options: labs, value: id };
+  const label = shown.file ? `Your file: ${shown.file}` : shown.example ? 'Example' : 'Your file';
+  return { options: [{ value: '', label }, ...labs], value: '' };
+}

@@ -12,7 +12,9 @@ def run_case(name, translator=None):
     translator = translator or RecordedTranslator()
     records = [extract.device_facts(d, translator, recipe=CASES[name].get("recipe")) for d in case_devices(name)]
     clab = CASES[name].get("clab")
-    return extract.document(records, translator, extract.links_from_clab(FIXTURES / clab) if clab else None)
+    hosts_file = CASES[name].get("hosts")
+    hosts = extract.collect_hosts(clab and FIXTURES / clab, hosts_file and FIXTURES / hosts_file, case_devices(name))
+    return extract.document(records, translator, extract.links_from_clab(FIXTURES / clab) if clab else None, hosts)
 
 
 @pytest.mark.parametrize("name", sorted(CASES))
@@ -353,3 +355,67 @@ def test_srv6_evpn_lab_l3vpn():
     assert [r["prefix"] for r in facts["PE2"]["static_routes"]] == ["203.0.113.128/25", "203.0.113.64/26"]
     assert all("vpnv4 unicast" in p["address_families"] for p in facts["RR1"]["peers"])
     assert facts["P1"]["vrf_instances"] == []
+
+
+def test_parse_host_exec_reads_addresses_and_routes_and_lists_the_rest():
+    parsed = extract.parse_host_exec([
+        "ip link set eth1 up", "ip addr add 192.0.2.10/24 dev eth1", "sudo ip -6 address add 2001:db8::10/64 dev eth1",
+        "ip a add 198.51.100.7 dev lo", "ip route add default via 192.0.2.1 metric 5", "ip -6 route replace default via 2001:db8::1",
+        "ip route add 203.0.113.0/24 dev eth2", "ip ro add blackhole 10.0.0.0/8", "sysctl -w net.ipv4.ip_forward=1",
+        "echo 'unbalanced", ""])
+    assert parsed["addresses"] == [("eth1", "192.0.2.10/24"), ("eth1", "2001:db8::10/64"), ("lo", "198.51.100.7/32")]
+    assert [(r["prefix"], r["family"], r["next_hop"], r["interface"], r["metric"]) for r in parsed["routes"]] == [
+        ("0.0.0.0/0", "ipv4", "192.0.2.1", None, 5), ("::/0", "ipv6", "2001:db8::1", None, None),
+        ("203.0.113.0/24", "ipv4", None, "eth2", None)]
+    assert parsed["ignored"] == ["ip link set eth1 up", "ip ro add blackhole 10.0.0.0/8", "sysctl -w net.ipv4.ip_forward=1",
+                                 "echo 'unbalanced"]
+
+
+def test_l3vpn_hosts_lab_hosts_from_clab_exec():
+    doc = run_case("l3vpn-hosts")
+    hosts = {h["name"]: h for h in doc["hosts"]}
+    assert list(hosts) == ["h1", "h2", "dcn1", "dcn2"]
+    assert hosts["h1"]["interfaces"] == [{"name": "eth1", "addresses": ["192.168.10.10/24", "2001:db8:10::10/64"],
+                                          "attached": {"device": "PE1", "port": "5"}}]
+    assert hosts["h1"]["default_gateway"] == {"ipv4": "192.168.10.1", "ipv6": "2001:db8:10::1"}
+    assert hosts["dcn1"]["ignored_commands"] == ["sysctl -w net.ipv4.ip_forward=1"]
+    assert hosts["dcn2"]["routes"][0]["metric"] == 20
+    records = {r["device"]: r for r in doc["devices"]}
+    assert (records["h1"]["status"], records["h1"]["reason"]) == ("skipped", "a Linux host (kind linux): see hosts[]")
+    blue = {r["device"]: next(v for v in r["facts"]["vrf_instances"] if v["name"] == "BLUE")
+            for r in doc["devices"] if r["status"] == "ok" and any(v["name"] == "BLUE" for v in r["facts"]["vrf_instances"])}
+    assert {d: v["label_allocation"] for d, v in blue.items()} == {"PE1": {"ipv4": "per-vrf", "ipv6": "per-vrf"},
+                                                                    "PE2": {"ipv4": "per-vrf", "ipv6": "per-vrf"}}
+
+
+def test_hosts_file_merges_into_clab_hosts_and_adds_its_own(tmp_path):
+    (tmp_path / "topo.clab.yml").write_text(
+        "topology:\n  nodes:\n    R: {kind: ciena_saos}\n    H:\n      kind: linux\n"
+        "      exec: [\"ip addr add 192.0.2.10/24 dev eth1\", \"ip route add default via 192.0.2.1\"]\n"
+        "  links:\n    - endpoints: [\"R:3\", \"H:eth1\"]\n")
+    (tmp_path / "hosts.yaml").write_text(
+        "hosts:\n  H:\n    interfaces: [{name: eth2, addresses: [198.51.100.2]}]\n    gateway: {ipv6: '2001:db8::1'}\n"
+        "  G:\n    interfaces: [{name: eth0, addresses: [203.0.113.5/24], attached: {device: R, port: 4}}]\n"
+        "    routes: [{prefix: 10.0.0.0/8, next_hop: 203.0.113.1}]\n    gateway: 203.0.113.1\n")
+    devices = extract.collect(clab=tmp_path / "topo.clab.yml")
+    hosts = {h["name"]: h for h in extract.collect_hosts(tmp_path / "topo.clab.yml", tmp_path / "hosts.yaml", devices)}
+    assert hosts["H"]["sources"] == ["clab", "hosts-file"]
+    assert [(i["name"], i["addresses"], i["attached"]) for i in hosts["H"]["interfaces"]] == [
+        ("eth1", ["192.0.2.10/24"], {"device": "R", "port": "3"}), ("eth2", ["198.51.100.2/32"], None)]
+    assert hosts["H"]["default_gateway"] == {"ipv4": "192.0.2.1", "ipv6": "2001:db8::1"}
+    assert (hosts["G"]["kind"], hosts["G"]["sources"], hosts["G"]["default_gateway"]["ipv4"]) == (None, ["hosts-file"], "203.0.113.1")
+    assert hosts["G"]["interfaces"][0]["attached"] == {"device": "R", "port": "4"}
+    assert extract.collect_hosts() is None
+    assert extract.collect_hosts(tmp_path / "topo.clab.yml")[0]["name"] == "H"
+    (tmp_path / "clash.yaml").write_text("hosts:\n  R: {}\n")
+    with pytest.raises(ValueError, match="also a device"):
+        extract.collect_hosts(tmp_path / "topo.clab.yml", tmp_path / "clash.yaml", devices)
+    (tmp_path / "bad.yaml").write_text("hosts:\n  X:\n    routes: [{prefix: nowhere}]\n")
+    with pytest.raises(ValueError, match="not an address"):
+        extract.load_hosts(tmp_path / "bad.yaml")
+
+
+def test_hosts_are_optional():
+    assert "hosts" not in run_case("mixed")
+    assert [h["name"] for h in run_case("sr-l2")["hosts"]] == ["CE1"]
+    assert [h["name"] for h in run_case("srv6-evpn")["hosts"]] == ["ce-a", "ce-b"]

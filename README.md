@@ -39,6 +39,9 @@ saos-network-facts extract --clab topo.clab.yml --configs solutions/ -o facts.js
 # device types the files do not say, for a plain configs directory
 saos-network-facts extract --configs configs/ --platform-map devices.yaml -o facts.json
 
+# Linux hosts no containerlab exec line describes (test hosts, CE sites, DCN gateways)
+saos-network-facts extract --configs configs/ --platform-map devices.yaml --hosts hosts.yaml -o facts.json
+
 saos-network-facts validate facts.json
 ```
 
@@ -50,7 +53,11 @@ How files map to devices:
   does not set (a base file's `type loopback` survives a device file's address);
 - a subdirectory is a device; its files are applied in name order;
 - `--clab`: every node is a device; its `startup-config` is its configuration unless `--configs`
-  has files for it. Nodes of other kinds (Linux hosts) are recorded as `skipped`;
+  has files for it. A node of kind `linux` is a host: its record is `skipped` and its addresses and
+  routes, read from its `exec` lines, go into `hosts` (below); nodes of other kinds are `skipped`;
+- `--hosts`: YAML or JSON, `hosts: {NAME: {interfaces: [{name, addresses, attached: {device, port}}],
+  routes: [{prefix, next_hop, interface, metric}], gateway: ADDRESS | {ipv4, ipv6}}}`, for hosts no
+  `exec` line describes; an entry for a containerlab host adds to it;
 - `--platform-map`: YAML or JSON, `devices: {NAME: {type, platform, extractor, configs}}` (or
   `NAME: TYPE`), for what the inputs do not say.
 
@@ -106,8 +113,8 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 
 ```json
 {
-  "schema_version": "1.7.0",
-  "generator": {"name": "saos-network-facts", "version": "0.10.0", "translator": "translator 4.2.1 (mcp, https://...)"},
+  "schema_version": "1.8.0",
+  "generator": {"name": "saos-network-facts", "version": "0.11.0", "translator": "translator 4.2.1 (mcp, https://...)"},
   "devices": [
     {
       "device": "PE1", "type": "5164", "platform": "cn5164", "extractor": "saos10",
@@ -127,6 +134,7 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 ```
 
 `links` (since schema 1.5) is present only when `--clab` was given: the topology's links, as declared.
+`hosts` (since schema 1.8) is present when `--clab` or `--hosts` was given: see [Linux hosts](#linux-hosts).
 
 The full schema, with a description on every field, is
 [`src/saos_network_facts/schema/facts-v1.schema.json`](src/saos_network_facts/schema/facts-v1.schema.json)
@@ -239,6 +247,29 @@ interfaces by their `vrf`, CE neighbours as BGP `peers` with `vrf` set, static r
   `default` for the global table, and a route through an interface alone (`Null0`) has a null
   `next_hop`.
 
+### Linux hosts
+
+Since schema 1.8 the file can carry the lab's Linux hosts (a test host, a CE site, a DCN gateway): a
+host has no device facts, but its addresses, routes and cabling are what a packet needs to start and
+end. They come from the `linux` nodes of a containerlab topology, whose `exec` lines are read
+(`ip [-4|-6] addr add <address> dev <if>`, `ip [-4|-6] route add|replace <prefix>|default [via <next hop>]
+[dev <if>] [metric <n>]`), and from a `--hosts` file. Every other `exec` line is listed in
+`ignored_commands`, so nothing is dropped silently.
+
+```json
+{
+  "hosts": [{"name": "h1", "kind": "linux", "sources": ["clab"],
+             "interfaces": [{"name": "eth1", "addresses": ["192.168.10.10/24", "2001:db8:10::10/64"],
+                             "attached": {"device": "PE1", "port": "5"}}],
+             "routes": [{"prefix": "0.0.0.0/0", "family": "ipv4", "next_hop": "192.168.10.1", "interface": null, "metric": null}],
+             "default_gateway": {"ipv4": "192.168.10.1", "ipv6": "2001:db8:10::1"},
+             "ignored_commands": ["ip link set eth1 up"]}]
+}
+```
+
+`attached` is the device and port at the other end of the host's cable (the topology's `links`, or the
+hosts file's `attached`); `default_gateway` is the next hop of the lowest-metric default route per family.
+
 ### Rings
 
 G.8032 Ethernet ring protection is read from SAOS 10 `g8032-rings` and from SAOS 6 / 8
@@ -282,11 +313,14 @@ the topology, a panel per device and per service, packet walks and link-failure 
 link's with the R-APS protection switch and the revert after the repair). The site also stages the
 `g8032-two-ring` fixture lab (a pure L2 ring lab, its links from the containerlab topology) and the
 `g8032-by-name` fixture lab (a SAOS 10 CLI ring without ring ids, joined by name) and the
-`srv6-evpn` fixture lab (an IPv6-only IS-IS core with SRv6 locators, Flex-Algo 128 and EVPN-VPLS /
-EVPN-VPWS over SRv6): pick one in the page's lab menu or open
+`srv6-evpn` fixture lab (an IPv6-only IS-IS core with SRv6 locators, Flex-Algo 128, EVPN-VPLS /
+EVPN-VPWS and an L3VPN over SRv6 between two hosts) and the `l3vpn-hosts` fixture lab (an L3VPN over
+SR-MPLS with Linux hosts, a route reflector and a management VRF with two DCN gateways): pick one in
+the page's lab menu or open
 [`?lab=g8032-two-ring`](https://ciena.github.io/saos-network-facts/?lab=g8032-two-ring),
-[`?lab=g8032-by-name`](https://ciena.github.io/saos-network-facts/?lab=g8032-by-name) or
-[`?lab=srv6-evpn`](https://ciena.github.io/saos-network-facts/?lab=srv6-evpn).
+[`?lab=g8032-by-name`](https://ciena.github.io/saos-network-facts/?lab=g8032-by-name),
+[`?lab=srv6-evpn`](https://ciena.github.io/saos-network-facts/?lab=srv6-evpn) or
+[`?lab=l3vpn-hosts`](https://ciena.github.io/saos-network-facts/?lab=l3vpn-hosts).
 *Load your facts.json* there to see your own network; the file stays in your browser.
 
 ![The Adaptive-SR-CFM example in the viewer](docs/example.png)
@@ -366,7 +400,7 @@ page fetches the facts from the same site, so they stay as private as the site t
 
 ```ts
 import { readFacts } from "@ciena/saos-network-facts/node";
-import { ccmIntervalMs, devicesByName, interfacesOnPort, isisArea, isisMetric, ringsOf, ringMembers } from "@ciena/saos-network-facts";
+import { ccmIntervalMs, devicesByName, hostByName, hostGateway, hosts, interfacesOnPort, isisArea, isisMetric, ringsOf, ringMembers } from "@ciena/saos-network-facts";
 
 const facts = readFacts("facts.json");          // schema 1.x (or a pre-schema bare list)
 const pe1 = devicesByName(facts).get("PE1")!;
@@ -376,6 +410,8 @@ isisMetric(pe1, "PE1-PE2", 2);                  // 100: the level-2 wide metric,
 ccmIntervalMs(pe1.cfm.meps[0]!);                // 10: the MA's CCM interval ("10ms", "1s", "1sec", "3.3ms", an 802.1Q index) in ms, else null
 ringsOf(pe1);                                   // the device's G.8032 rings with their ports and instances ([] here)
 ringMembers(facts, 1);                          // [{ device, ring }] for every device on ring id 1
+hosts(facts);                                   // the Linux hosts (schema 1.8; [] for older files)
+hostGateway(hostByName(facts, "h1")!, "ipv4");  // "192.168.10.1", or null
 ```
 
 The main entry point has no Node dependencies (`parseFacts(json)` for browsers); see [`js/`](js/).

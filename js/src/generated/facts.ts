@@ -19,6 +19,10 @@ export interface FactsFile {
    * Physical links between devices, as the input topology declares them (the `links` of a containerlab file given with `--clab`), in topology order. Optional: present only when the extractor was given a topology; absent in files before schema 1.4. Since schema 1.5.
    */
   links?: Link[];
+  /**
+   * Linux hosts of the lab (test hosts, DCN gateways, CEs that are Linux containers): their addresses, routes and the device ports they are cabled to. From the `linux` nodes of a containerlab file given with `--clab` (their `exec` lines) and from a hosts file given with `--hosts`. A host has no device facts; a containerlab host also keeps its `devices[]` record (`status: skipped`). Optional: present (possibly empty) only when the extractor was given a topology or a hosts file; absent in files before schema 1.8. Since schema 1.8.
+   */
+  hosts?: Host[];
 }
 /**
  * What wrote the file.
@@ -1634,6 +1638,103 @@ export interface LinkEnd {
    * The port on that device, as the topology names it (`2`, `eth1`).
    */
   port: string;
+}
+/**
+ * A Linux host. Since schema 1.8.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "Host".
+ */
+export interface Host {
+  /**
+   * The host name: the containerlab node or the hosts-file key (a containerlab host's `devices[].device` too).
+   */
+  name: string;
+  /**
+   * The containerlab kind (`linux`); null for a host only the hosts file gives without one.
+   */
+  kind: string | null;
+  /**
+   * Where the host comes from: `clab` (a containerlab node and its `exec` lines), `hosts-file` (`--hosts`), in that order; a hosts-file entry for a containerlab host is merged into it.
+   */
+  sources: ("clab" | "hosts-file")[];
+  /**
+   * The host's interfaces: those it is cabled on in the topology (in link order), then those only an address names.
+   */
+  interfaces: HostInterface[];
+  /**
+   * The host's static routes (`ip route add|replace`, the hosts file's `routes` and `gateway`), one per prefix, in the order given (a later route to the same prefix replaces the earlier one).
+   */
+  routes: HostRoute[];
+  default_gateway: HostGateway;
+  /**
+   * The containerlab `exec` commands the extractor did not read, as written: anything but `ip addr add` and `ip route add|replace` (`ip link set ... up`, `sysctl`, a script), so nothing is dropped silently.
+   */
+  ignored_commands: string[];
+}
+/**
+ * An interface of a Linux host. Since schema 1.8.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "HostInterface".
+ */
+export interface HostInterface {
+  /**
+   * The interface name (`eth1`), as the topology's link and `ip addr add ... dev` name it.
+   */
+  name: string;
+  /**
+   * Its addresses with prefix length (`192.168.10.10/24`, `2001:db8:10::10/64`), IPv4 and IPv6, in the order configured; an address given without a length is a host address (/32, /128).
+   */
+  addresses: string[];
+  /**
+   * The device and port at the other end of the cable (from the topology's `links`, or the hosts file's `attached`); null when not cabled in the inputs.
+   */
+  attached: LinkEnd | null;
+}
+/**
+ * A static route of a Linux host. Since schema 1.8.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "HostRoute".
+ */
+export interface HostRoute {
+  /**
+   * The destination prefix (`0.0.0.0/0` and `::/0` for `default`).
+   */
+  prefix: string;
+  /**
+   * `ipv4` or `ipv6`.
+   */
+  family: "ipv4" | "ipv6";
+  /**
+   * The next-hop address (`via`); null for a route out of an interface alone.
+   */
+  next_hop: string | null;
+  /**
+   * The outgoing interface (`dev`); null when not given.
+   */
+  interface: string | null;
+  /**
+   * The route metric; null when not given (the kernel's 0).
+   */
+  metric: number | null;
+}
+/**
+ * A host's default gateway per address family: the next hop of its default route (`0.0.0.0/0`, `::/0`) with the lowest metric. Since schema 1.8.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "HostGateway".
+ */
+export interface HostGateway {
+  /**
+   * The IPv4 default gateway; null when the host has no IPv4 default route.
+   */
+  ipv4: string | null;
+  /**
+   * The IPv6 default gateway; null when the host has no IPv6 default route.
+   */
+  ipv6: string | null;
 }
 /**
  * SRv6 configuration. Since schema 1.6.

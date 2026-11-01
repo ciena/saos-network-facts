@@ -61,3 +61,16 @@ def test_extract_clab_end_to_end_with_rings_and_links(tmp_path, capsys, monkeypa
     assert "devices 9 / ok 9" in capsys.readouterr().err
     assert cli.main(["validate", str(out)]) == 0
     assert f"valid (schema {SCHEMA_VERSION})" in capsys.readouterr().out
+
+
+def test_extract_with_a_hosts_file(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(cli, "load_translator", lambda *a: RecordedTranslator())
+    lab = FIXTURES / "labs/srv6-evpn"
+    out = tmp_path / "facts.json"
+    rc = cli.main(["extract", "--configs", str(lab), "--platform-map", str(lab / "platform-map.yaml"),
+                   "--hosts", str(lab / "hosts.yaml"), "-o", str(out)])
+    assert rc == 0
+    assert "HOST    ce-a (hosts-file) interfaces=2 addresses=3 routes=2 ipv4-gateway=198.51.100.0" in capsys.readouterr().err
+    doc = json.loads(out.read_text())
+    assert doc["hosts"] == json.loads((EXPECTED / "srv6-evpn.facts.json").read_text())["hosts"]
+    assert cli.main(["validate", str(out)]) == 0

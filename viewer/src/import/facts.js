@@ -29,10 +29,14 @@
 //   Flex-Algo    segment_routing.flex_algorithms (schema 1.6): each device's definitions, grouped by algorithm
 //   EVPN         evpn_instances (schema 1.6) grouped by EVI across devices, the attachment circuit the flow
 //                point on the instance's forwarding domain
+//   hosts        hosts[] (schema 1.8, Linux hosts from --clab exec lines or --hosts): CE nodes with their
+//                addresses and static routes, linked to a router by subnet like any device, else by links[]
+//   VRFs         vrf_instances (schema 1.7) joined across devices by name: per PE its RD, route targets per
+//                address family, interfaces, static routes, redistribution, label allocation, SRv6 locators
 //   G.8032       rings[] (schema 1.5) joined across devices by ring id: the links whose two ends are ring ports
 //                of the ring, the RPL from the owner's and neighbour's port, a sub-ring's interconnection nodes
 
-import { ccmIntervalMs, devicesByName, evpnInstances, flexAlgorithms, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts, ringsOf, srv6Locators } from '../../../js/src/index.ts';
+import { ccmIntervalMs, devicesByName, evpnInstances, flexAlgorithms, hosts as factsHosts, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts, ringsOf, srv6Locators, staticRoutes, vrfInstances, vrfRouteTargets } from '../../../js/src/index.ts';
 import { CCM_INTERVALS_MS } from '../engine/cfm.js';
 import { hostPrefix, ip6ToBig, isV6, networkOf } from '../engine/ip.js';
 import { BACKBONE, normArea } from '../engine/ospf.js';
@@ -69,6 +73,8 @@ export function ipv6Subnet(cidr) {
 
 // Either family.
 export const ipSubnet = (cidr) => ipv4Subnet(cidr) ?? ipv6Subnet(cidr);
+// A prefix in its network form (192.0.2.7/24 -> 192.0.2.0/24), or as written when it is none.
+const prefixOf = (p) => ipSubnet(p)?.subnet ?? p;
 
 // An interface's addresses by family, as written (`ip` is the first IPv4 address in schema 1.x).
 const v4Of = (i) => (i.ipv4?.length ? i.ipv4 : [i.ip]).filter((c) => ipv4Subnet(c));
@@ -266,19 +272,19 @@ function isisLink(link, devices, level, defaults) {
   if (ma !== mb) link.cost = { a: ma, b: mb };
 }
 
-function buildLinks(devices, nodes, igp, isisLevel, report) {
+function buildLinks(devices, nodes, igp, isisLevel, report, hostFacts = new Map()) {
   // IPv4 subnets first, then IPv6: an IPv6 subnet on two interfaces an IPv4 subnet already links is
   // the same link's second address family.
   const bySubnet = new Map();
   for (const [family, addrs, parse] of [['ipv4', v4Of, ipv4Subnet], ['ipv6', v6Of, ipv6Subnet]]) {
-    for (const [name, f] of devices) {
+    for (const [name, f] of [...devices, ...hostFacts]) {
       for (const i of f.interfaces ?? []) {
         if (!isRouted({ ...i, ip: i.ip ?? v6Of(i)[0] ?? null })) continue;
         for (const cidr of addrs(i)) {
           const s = parse(cidr);
           if (!s || s.len >= (family === 'ipv6' ? 128 : 32)) continue;
           if (!bySubnet.has(s.subnet)) bySubnet.set(s.subnet, []);
-          const port = portOf(f, i.name);
+          const port = f.host ? (f.ports[i.name] ?? null) : portOf(f, i.name);
           bySubnet.get(s.subnet).push({ node: name, if: i.name, ip: s.ip, port, lag: lagOf(f, port), igp: inIgp(igp, f, i) });
         }
       }
@@ -422,14 +428,21 @@ function buildBgp(devices, owner, report) {
         continue;
       }
       const key = [name, peer].sort().join('|');
-      const s = sessions.get(key) ?? { a: [name, peer].sort()[0], b: [name, peer].sort()[1], client: null, configuredOn: [], families: [] };
+      const s = sessions.get(key) ?? { a: [name, peer].sort()[0], b: [name, peer].sort()[1], client: null, configuredOn: [], families: [], sides: {} };
       s.configuredOn.push(name);
+      s.sides[name] = p.address_families ?? [];
       for (const fam of p.address_families ?? []) if (!s.families.includes(fam)) s.families.push(fam);
       if (p.route_reflector_client) s.client = peer;
       sessions.set(key, s);
     }
   }
-  const list = [...sessions.values()];
+  // A family both ends configure is negotiated (RFC 4760 §8, the Multiprotocol capability); with
+  // one end configured, or an end that lists none, its families stand.
+  const list = [...sessions.values()].map(({ sides, ...s }) => {
+    const [x, y] = Object.values(sides);
+    if (y && x.length && y.length) s.families = s.families.filter((f) => x.includes(f) && y.includes(f));
+    return s;
+  });
   if (list.length) {
     const rrs = [...new Set([...devices].filter(([, f]) => f.bgp?.instances?.some((i) => i.route_reflector)).map(([n]) => n))];
     report.add('bgp', 'facts', `${list.length} iBGP sessions`, `neighbours matched to the device owning each address${rrs.length ? `; route reflector ${rrs.join(', ')}` : ''}`);
@@ -902,6 +915,113 @@ function buildEvpn(devices, report) {
   return instances;
 }
 
+// Linux hosts (schema 1.8): CE nodes with their addresses and static routes, and facts-like
+// interfaces so buildLinks links them by subnet (their port is the attached interface's name, as the
+// file's links[] cable it). A host named like a device with facts is left out.
+function buildHosts(file, devices, report) {
+  const nodes = [];
+  const facts = new Map();
+  const ignored = [];
+  for (const h of factsHosts(file)) {
+    if (devices.has(h.name)) {
+      report.warn(`host ${h.name}: also a device with facts; the device is shown`);
+      continue;
+    }
+    const addrs = h.interfaces.flatMap((i) => i.addresses);
+    const routes = h.routes.filter((r) => r.next_hop).map((r) => ({ prefix: prefixOf(r.prefix), nextHop: r.next_hop, metric: r.metric ?? 0 }));
+    routes.sort((x, y) => x.metric - y.metric);
+    nodes.push({ id: h.name, role: 'ce', host: true, kind: h.kind ?? null, addresses: addrs.map((a) => ipSubnet(a)?.ip).filter(Boolean), routes, pos: { x: 0, z: 0 } });
+    const interfaces = h.interfaces.filter((i) => i.addresses.length).map((i) => {
+      const v4 = i.addresses.filter((a) => ipv4Subnet(a));
+      const v6 = i.addresses.filter((a) => ipv6Subnet(a));
+      return { name: i.name, kind: 'ip', ip: v4[0] ?? v6[0], ipv4: v4, ipv6: v6, vrf: null };
+    });
+    facts.set(h.name, { host: true, interfaces, ports: Object.fromEntries(h.interfaces.filter((i) => i.attached).map((i) => [i.name, i.name])) });
+    if (h.ignored_commands.length) ignored.push(`${h.name}: ${h.ignored_commands.join('; ')}`);
+  }
+  if (nodes.length) {
+    const sources = [...new Set(factsHosts(file).flatMap((h) => h.sources))].join(' and ');
+    report.add('physical', 'facts', `${nodes.length} Linux hosts`, `${nodes.map((n) => n.id).join(', ')} from hosts[] (${sources}): CEs with their addresses and static routes (longest match, the lowest metric of equal prefixes); linked by subnet, else by the file's links[]`);
+  }
+  if (ignored.length) report.add('physical', 'facts', 'host exec lines not read', `${ignored.join(' | ')}: the extractor reads only ip addr add and ip route add|replace`);
+  return { nodes, facts };
+}
+
+const FAMILIES = ['ipv4 unicast', 'ipv6 unicast'];
+
+// One VRF interface as engine VRF members: a loopback's addresses as host routes, an IP interface's
+// subnets with the link they are on.
+function vrfInterfaces(name, f, v, links, report) {
+  const out = [];
+  for (const ifname of v.interfaces ?? []) {
+    const i = (f.interfaces ?? []).find((x) => x.name === ifname);
+    if (!i) continue;
+    for (const cidr of [...v4Of(i), ...v6Of(i)]) {
+      const s = ipSubnet(cidr);
+      if (!s) continue;
+      if (i.kind === 'loopback') {
+        out.push({ name: ifname, kind: 'loopback', ip: s.ip, prefix: hostPrefix(s.ip) });
+        continue;
+      }
+      const link = links.find((l) => [l.a, l.b].some((e) => e.node === name && e.if === ifname));
+      out.push({ name: ifname, kind: 'ip', ip: s.ip, prefix: s.subnet, ...(link ? { link: link.id } : {}) });
+    }
+  }
+  return out;
+}
+
+// VRFs (schema 1.7), joined across devices by name: one site per device, with what the engine's
+// L3VPN needs (engine/bgp.js): RD, route targets per family, families, redistribution, label
+// allocation, SRv6 locators, interfaces and static routes.
+function buildVrfs(devices, nodes, links, report) {
+  const routers = new Set(nodes.filter((n) => n.role !== 'ce').map((n) => n.id));
+  const byName = new Map();
+  for (const [name, f] of devices) {
+    for (const v of vrfInstances(f)) {
+      if (!routers.has(name)) {
+        report.warn(`${name}: VRF ${v.name} on a device the view does not run the IGP on; left out`);
+        continue;
+      }
+      if (!byName.has(v.name)) byName.set(v.name, { name: v.name, role: v.role ?? null, description: v.description ?? null, rt: { import: [], export: [] }, sites: [] });
+      const g = byName.get(v.name);
+      g.role ??= v.role ?? null;
+      const rts = Object.fromEntries(FAMILIES.map((fam) => [fam, { import: vrfRouteTargets(v, fam, 'import'), export: vrfRouteTargets(v, fam, 'export') }]));
+      const statics = staticRoutes(f, v.name).map((r) => ({
+        prefix: prefixOf(r.prefix),
+        nextHop: r.next_hop && r.next_hop !== 'blackhole' ? r.next_hop : null,
+        preference: num(r.preference) ?? 1,
+        discard: !r.next_hop || r.next_hop === 'blackhole' ? /^null0$/i.test(r.interface ?? '') || r.next_hop === 'blackhole' : false,
+      }));
+      g.sites.push({
+        pe: name,
+        rd: v.route_distinguisher ?? null,
+        families: v.address_families ?? [],
+        rts,
+        redistribute: v.redistribute ?? {},
+        labelAllocation: v.label_allocation ?? {},
+        srv6Locators: v.srv6_locators ?? {},
+        interfaces: vrfInterfaces(name, f, v, links, report),
+        statics,
+        ceBgpPeers: (f.peers ?? []).filter((p) => p.kind === 'bgp' && p.vrf === v.name).map((p) => ({ ip: p.ip, remoteAs: p.remote_as ?? null })),
+      });
+    }
+  }
+  const vrfs = [...byName.values()];
+  if (vrfs.length) {
+    report.add('vrf', 'facts', `${vrfs.length} VRFs`, vrfs.map((v) => `${v.name}${v.role === 'management' ? ' (management)' : ''} on ${v.sites.map((s) => `${s.pe} RD ${s.rd ?? '-'}`).join(', ')}`).join('; ') + ': joined across devices by name; route targets per address family, interfaces, static routes, label allocation and SRv6 locators as configured');
+    report.add('vrf', 'derived', 'L3VPN route exchange', 'a PE exports its VRF\'s connected (interfaces, loopbacks) and static routes per address family BGP runs in the VRF, over iBGP sessions carrying vpnv4 / vpnv6 unicast (directly or through a route reflector); another PE imports a route into each VRF whose import route targets it carries (RFC 4364), best path per RFC 4271');
+    const noRedis = vrfs.flatMap((v) => v.sites.filter((s) => !Object.keys(s.redistribute).length && s.families.length).map((s) => `${s.pe} ${v.name}`));
+    if (noRedis.length) report.add('vrf', 'default', 'redistribution', `${noRedis.join(', ')}: no redistribute configured; the view exports connected and static routes`);
+    const srv6 = vrfs.some((v) => v.sites.some((s) => Object.keys(s.srv6Locators).length));
+    if (srv6) report.add('vrf', 'derived', 'SRv6 L3 service SIDs', 'the facts carry locators, not SIDs: per VRF and address family the view allocates End.DT4 (0xe300) or End.DT6 (0xe400) plus the VRF\'s ordinal on the device, in the 16 bits after the locator; the route\'s next hop resolves over the route to that locator (RFC 9252)');
+    const labels = vrfs.some((v) => v.sites.some((s) => !Object.keys(s.srv6Locators).length || s.families.some((fam) => !s.srv6Locators[fam])));
+    if (labels) report.add('vrf', 'derived', 'VPN labels', 'computed (RFC 4364): per VRF where label_allocation says per-vrf, else per prefix (the default); the next hop resolves over an LSP');
+    const ce = vrfs.flatMap((v) => v.sites.flatMap((s) => s.ceBgpPeers.map((p) => `${s.pe} ${v.name} ${p.ip ?? '?'} AS ${p.remoteAs ?? '?'}`)));
+    if (ce.length) report.add('vrf', 'default', 'PE-CE routing', `CE BGP neighbours (${ce.join(', ')}) are listed, not run: PE-CE routes are the VRF's connected and static routes`);
+  }
+  return vrfs;
+}
+
 // Services: one per pseudowire, with its MEG.
 function buildServices(pseudowires, megs) {
   return pseudowires.map((pw) => ({
@@ -937,13 +1057,16 @@ export function importFacts(input, { name, positions } = {}) {
   const devices = devicesByName(file);
   const report = new Report();
   if (!devices.size) throw new Error('no device in this facts file has facts (status ok or partial)');
-  for (const r of file.devices) if (!devices.has(r.device)) report.warn(`${r.device}: ${r.status}${r.reason ? ` (${r.reason})` : ''}; not shown`);
+  const hostNames = new Set(factsHosts(file).map((h) => h.name));
+  for (const r of file.devices) if (!devices.has(r.device) && !hostNames.has(r.device)) report.warn(`${r.device}: ${r.status}${r.reason ? ` (${r.reason})` : ''}; not shown`);
 
   const igp = chooseIgp(devices, report);
   // The IS-IS level the view runs: the first instance's (level 1-2 runs as 2).
   const levels = [...new Set([...devices.values()].map((f) => levelNumber(f.isis?.instances?.[0]?.level)).filter(Boolean))];
   const nodes = buildNodes(devices, igp, report);
-  const links = buildLinks(devices, nodes, igp, levels[0] ?? 2, report);
+  const hostImport = buildHosts(file, devices, report);
+  nodes.push(...hostImport.nodes);
+  const links = buildLinks(devices, nodes, igp, levels[0] ?? 2, report, hostImport.facts);
   topologyLinks(file, links, nodes, report);
   const owner = ownerIndex(devices);
   const bgp = buildBgp(devices, owner, report);
@@ -956,12 +1079,16 @@ export function importFacts(input, { name, positions } = {}) {
   const srv6 = buildSrv6(devices, nodes, report);
   const flexAlgos = buildFlexAlgos(devices, nodes, report);
   const evpn = buildEvpn(devices, report);
+  const vrfs = buildVrfs(devices, nodes, links, report);
 
-  // Roles: a router is a PE when it speaks BGP, ends a pseudowire or faces a CE.
-  const edge = new Set([...bgp.sessions.flatMap((s) => [s.a, s.b]), ...pseudowires.flatMap((p) => p.ends.map((e) => e.node)), ...evpn.flatMap((i) => i.members.map((m) => m.node))]);
+  // Roles: a router is a PE when it has a service: it ends a pseudowire or an EVPN instance, has a
+  // (customer) VRF, or faces a CE or host. Speaking BGP alone (a route reflector) or a management VRF
+  // (a loopback for the DCN, on every node) leaves a transit router a P; a route reflector is marked.
+  const edge = new Set([...pseudowires.flatMap((p) => p.ends.map((e) => e.node)), ...evpn.flatMap((i) => i.members.map((m) => m.node)), ...vrfs.filter((v) => v.role !== 'management').flatMap((v) => v.sites.map((s) => s.pe))]);
   for (const l of links) if (l.kind === 'access') for (const e of [l.a, l.b]) edge.add(e.node);
   for (const n of nodes) if (n.role !== 'ce' && edge.has(n.id)) n.role = 'pe';
-  report.add('physical', 'derived', 'roles', `CE: no ${igp === 'ospf' ? 'OSPF' : 'IS-IS'} and no MPLS-TP tunnel; PE: a router that speaks BGP, ends a pseudowire or an EVPN instance, or faces a CE; P: the other routers`);
+  for (const n of nodes) if (n.role !== 'ce' && devices.get(n.id)?.bgp?.instances?.some((i) => i.route_reflector)) n.rr = true;
+  report.add('physical', 'derived', 'roles', `CE: no ${igp === 'ospf' ? 'OSPF' : 'IS-IS'} and no MPLS-TP tunnel (a Linux host is a host); PE: a router with a service (it ends a pseudowire or an EVPN instance, has a VRF other than a management VRF, or faces a CE or host); P: the other routers, a BGP route reflector shown as P / RR`);
 
   const routers = nodes.filter((n) => n.role !== 'ce');
   if (igp === 'isis') {
@@ -990,7 +1117,7 @@ export function importFacts(input, { name, positions } = {}) {
     ...(srgb ? { srgb } : {}),
     nodes,
     links,
-    vrfs: [],
+    vrfs,
     bgp: { sessions: bgp.sessions },
     srPolicies,
     tpTunnels,

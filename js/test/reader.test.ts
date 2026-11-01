@@ -5,7 +5,7 @@ import { test } from "node:test";
 import {
   bgpPeers, ccmIntervalMs, devicesByName, evpnInstances, evpnMembers, FactsFormatError, flexAlgorithms, interfacesOnPort, isisArea, isisAreaId,
   isisMetric, isisSystemId, isRouted, loopbacks, parseFacts, readFacts, ringMembers, ringsOf, srv6Locators, staticRoutes, vrfInstances,
-  vrfMembers, vrfRouteTargets,
+  vrfMembers, vrfRouteTargets, hosts, hostByName, hostGateway,
 } from "../src/node.ts";
 import type { DeviceFacts, Interface } from "../src/generated/facts.ts";
 
@@ -15,6 +15,7 @@ const mixed = readFacts(path.join(expected, "mixed.facts.json"));
 const g8032 = readFacts(path.join(expected, "g8032-two-ring.facts.json"));
 const g8032saos6 = readFacts(path.join(expected, "g8032-saos6.facts.json"));
 const srv6 = readFacts(path.join(expected, "srv6-evpn.facts.json"));
+const l3vpn = readFacts(path.join(expected, "l3vpn-hosts.facts.json"));
 
 test("readFacts reads schema 1.x and keeps devices with facts", () => {
   assert.equal(srl2.schema_version.split(".")[0], "1");
@@ -197,4 +198,22 @@ test("staticRoutes and VRF BGP peers (schema 1.7)", () => {
     ["198.51.100.1", "CUST-A", 64510],
     ["2001:db8:100::1", "CUST-A", 64510],
   ]);
+});
+
+test("hosts, hostByName and hostGateway: Linux hosts from clab exec lines and a hosts file (schema 1.8)", () => {
+  assert.deepEqual(hosts(l3vpn).map((h) => [h.name, h.sources, h.interfaces.map((i) => [i.name, i.attached?.device ?? null])]), [
+    ["h1", ["clab"], [["eth1", "PE1"]]],
+    ["h2", ["clab"], [["eth1", "PE2"], ["lo", null]]],
+    ["dcn1", ["clab"], [["eth1", "PE1"]]],
+    ["dcn2", ["clab"], [["eth1", "PE1"]]],
+  ]);
+  const h1 = hostByName(l3vpn, "h1")!;
+  assert.deepEqual(h1.interfaces[0]!.addresses, ["192.168.10.10/24", "2001:db8:10::10/64"]);
+  assert.equal(hostGateway(h1, "ipv6"), "2001:db8:10::1");
+  assert.deepEqual(h1.ignored_commands, ["ip link set eth1 up"]);
+  assert.equal(hostGateway(hostByName(l3vpn, "dcn1")!, "ipv4"), null);
+  assert.deepEqual(hostByName(srv6, "ce-b")!.sources, ["hosts-file"]);
+  assert.equal(hostGateway(hostByName(srv6, "ce-b")!, "ipv4"), "203.0.113.0");
+  assert.deepEqual(hosts(mixed), []);
+  assert.equal(hostByName(srv6, "nope"), undefined);
 });

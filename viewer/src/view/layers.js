@@ -7,29 +7,72 @@ import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { hostPrefix } from '../engine/ip.js';
 import { DEFAULT_LABELS, bgpLabel, lagLabel, nodeLabel } from './labels.js';
 
-// One plane per layer, LAYER_GAP apart in this order. An optional layer gets a plane only when the
-// network has something on it (SRv6 locators, EVPN instances), so other labs keep their stack.
+// One plane per layer, LAYER_GAP apart in this order, for the layers the network has something on.
+// Every layer says whether a network gives it anything to draw (`has`, mirroring its build_*): a layer
+// with nothing is neither listed nor drawn, so the sidebar offers only what the loaded facts carry.
 export const LAYERS = [
-  { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8 },
-  { id: 'ring', name: 'G.8032 rings', color: 0xe3b341 },
-  { id: 'isis', name: 'IGP (IS-IS / OSPF)', color: 0x3fb950 },
-  { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', color: 0xd29922 },
-  { id: 'srv6', name: 'SRv6 locators / Flex-Algo', color: 0xffa657, optional: (net) => (net.srv6?.locators.length ?? 0) > 0 || (net.srv6?.algorithms.length ?? 0) > 1 },
-  { id: 'bgp', name: 'BGP', color: 0xa371f7 },
-  { id: 'pw', name: 'Pseudowires (VPWS)', color: 0xf778ba },
-  { id: 'evpn', name: 'EVPN instances', color: 0xd2a8ff, optional: (net) => (net.evpn?.instances.length ?? 0) > 0 },
-  { id: 'cfm', name: 'CFM MEG', color: 0x39c5cf },
+  { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8, has: (net) => net.topo.nodes.length > 0 },
+  { id: 'ring', name: 'G.8032 rings', color: 0xe3b341, has: (net) => (net.g8032?.rings.length ?? 0) > 0 },
+  { id: 'isis', name: 'IGP (IS-IS / OSPF)', color: 0x3fb950, has: (net) => net.igp.routers.length > 0 },
+  { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', color: 0xd29922, has: (net) => net.tp.tunnels.length > 0 || net.sr.policies.length > 0 || peLsps(net).length > 0 },
+  { id: 'srv6', name: 'SRv6 locators / Flex-Algo', color: 0xffa657, has: (net) => (net.srv6?.locators.length ?? 0) > 0 || (net.srv6?.algorithms.length ?? 0) > 1 },
+  { id: 'bgp', name: 'BGP', color: 0xa371f7, has: (net) => net.bgp.sessions.length > 0 },
+  { id: 'vrf', name: 'VRFs / L3VPN', color: 0xa5d6ff, has: (net) => (net.l3vpn?.vrfs.length ?? 0) > 0 },
+  { id: 'pw', name: 'Pseudowires (VPWS)', color: 0xf778ba, has: (net) => net.vpws.pseudowires.length > 0 },
+  { id: 'evpn', name: 'EVPN instances', color: 0xd2a8ff, has: (net) => (net.evpn?.instances.length ?? 0) > 0 },
+  { id: 'cfm', name: 'CFM MEG', color: 0x39c5cf, has: (net) => net.cfm.megs.length > 0 },
 ];
 const LAYER_GAP = 6;
 // Flex-Algo topologies in the SRv6 plane, one colour per algorithm after algorithm 0's.
 const ALGO_COLORS = [0xff7b72, 0x79c0ff, 0x56d364, 0xe3b341];
+// VRFs in the L3VPN plane, one colour each (the panels use the same: vrfColor).
+export const VRF_COLORS = [0x58a6ff, 0xffa657, 0x7ee787, 0xff7b72, 0xd2a8ff, 0xf2cc60];
+export const vrfColor = (net, name) => VRF_COLORS[Math.max(0, (net.l3vpn?.vrfs ?? []).findIndex((v) => v.name === name)) % VRF_COLORS.length];
 const SUB_RING = 0x79c0ff; // a sub-ring, apart from the major rings in the layer colour
 const RPL = 0xf0883e;
 
-// The layers a network shows (every layer but an empty optional one), in stacking order.
+// The layers a network shows (those with something to draw), in stacking order; every layer before
+// a network is loaded.
 export function presentLayers(net) {
-  return LAYERS.filter((l) => !l.optional || (net && l.optional(net)));
+  return LAYERS.filter((l) => !net || l.has(net));
 }
+
+// The label-switched paths between every pair of PEs, along FTN / LFIB next hops (the MPLS plane
+// draws them when there are no SR policies): [{ src, dst, hops, labels: [{ from, to, label }] }].
+export function peLsps(net) {
+  const out = [];
+  const pes = net.topo.nodes.filter((n) => n.role === 'pe').map((n) => n.id);
+  for (const src of pes) {
+    for (const dst of pes) {
+      if (src === dst) continue;
+      const fec = hostPrefix(net.topo.nodes.find((n) => n.id === dst).loopback);
+      const hops = [src];
+      let hop = net.mpls.ftn[src]?.[fec]?.nextHops[0];
+      const labels = [];
+      let cur = src;
+      let guard = 0;
+      while (hop && guard++ < 16) {
+        labels.push({ from: cur, to: hop.node, label: hop.label });
+        hops.push(hop.node);
+        cur = hop.node;
+        if (cur === dst) break;
+        const e = net.mpls.lfib[cur]?.[hop.label];
+        if (!e) break;
+        const nh = e.nextHops[0];
+        hop = { node: nh.node, label: nh.op === 'pop' ? 3 : nh.outLabel };
+      }
+      if (hops.at(-1) === dst) out.push({ src, dst, hops, labels });
+    }
+  }
+  return out;
+}
+
+// The toggle state after a build: kept for the layers shown, forgotten (visible again) for the others,
+// so a layer a later network brings back does not come back hidden.
+export function toggleState(visible, present) {
+  return Object.fromEntries(LAYERS.map((l) => [l.id, present.includes(l.id) ? visible[l.id] !== false : true]));
+}
+
 let shown = presentLayers(null);
 export const layerY = (id) => Math.max(0, shown.findIndex((l) => l.id === id)) * LAYER_GAP;
 // Gap report layers that share a plane.
@@ -46,6 +89,21 @@ function label(text, cls, pos) {
   const el = document.createElement('div');
   el.className = cls;
   el.textContent = text;
+  const o = new CSS2DObject(el);
+  o.position.copy(pos);
+  return o;
+}
+
+// A label of several lines, each in its own colour.
+function colourLines(lines, pos) {
+  const el = document.createElement('div');
+  el.className = 'edge-label';
+  for (const l of lines) {
+    const line = document.createElement('div');
+    line.textContent = l.text;
+    line.style.color = hex(l.color);
+    el.appendChild(line);
+  }
   const o = new CSS2DObject(el);
   o.position.copy(pos);
   return o;
@@ -128,7 +186,10 @@ export class LayerView {
     this.scene.add(this.root);
   }
 
-  build(net) {
+  // `present`: the ids of the layers to show (main.js decides them once per loaded network, so a
+  // failure replay does not reshuffle the stack); default, the layers this network has content for.
+  // A layer not shown forgets its toggle: it comes back visible when a later network has it.
+  build(net, present = null) {
     this.dispose();
     this.net = net;
     this.groups = {};
@@ -139,8 +200,9 @@ export class LayerView {
     const box = { x0: Math.min(...xs) - 6, x1: Math.max(...xs) + 6, z0: Math.min(...zs) - 6, z1: Math.max(...zs) + 6 };
     this.box = box;
 
-    shown = presentLayers(net);
+    shown = present ? LAYERS.filter((l) => present.includes(l.id)) : presentLayers(net);
     this.present = shown.map((l) => l.id);
+    this.visible = toggleState(this.visible, this.present);
     for (const base of shown) {
       const L = { ...base, y: layerY(base.id) };
       const g = new THREE.Group();
@@ -166,8 +228,11 @@ export class LayerView {
     }
     // Node pillars tie the layers together.
     const pillarMat = new THREE.LineBasicMaterial({ color: 0x3a4655, transparent: true, opacity: 0.6 });
+    const vrfRouters = new Set((net.l3vpn?.vrfs ?? []).flatMap((v) => v.sites.map((s) => s.pe)));
+    const vrfHosts = new Set((net.l3vpn?.vrfs ?? []).flatMap((v) => v.sites.flatMap((s) => s.attached.map((a) => a.node))));
     for (const n of net.topo.nodes) {
-      const top = n.role === 'ce' ? 0 : n.role === 'pe' ? layerY(shown.at(-1).id) : layerY(this.present.includes('srv6') ? 'srv6' : 'mpls');
+      const core = ['srv6', 'mpls', 'isis'].find((id) => this.present.includes(id)) ?? 'physical';
+      const top = n.role === 'ce' ? (vrfHosts.has(n.id) && this.present.includes('vrf') ? layerY('vrf') : 0) : n.role === 'pe' || vrfRouters.has(n.id) ? layerY(shown.at(-1).id) : layerY(core);
       const pillar = new THREE.Line(new THREE.BufferGeometry().setFromPoints([this.pos(n.id), this.pos(n.id).setY(top)]), pillarMat);
       this.root.add(pillar);
     }
@@ -315,39 +380,16 @@ export class LayerView {
       return;
     }
     // Otherwise one LSP per (ingress PE, egress PE) along FTN/LFIB next hops.
-    const pes = net.topo.nodes.filter((n) => n.role === 'pe').map((n) => n.id);
-    let k = 0;
-    for (const src of pes) {
-      for (const dst of pes) {
-        if (src === dst) continue;
-        const fec = hostPrefix(net.topo.nodes.find((n) => n.id === dst).loopback);
-        const hops = [src];
-        let hop = net.mpls.ftn[src]?.[fec]?.nextHops[0];
-        const labels = [];
-        let cur = src;
-        let guard = 0;
-        while (hop && guard++ < 16) {
-          labels.push({ from: cur, to: hop.node, label: hop.label });
-          hops.push(hop.node);
-          cur = hop.node;
-          if (cur === dst) break;
-          const e = net.mpls.lfib[cur]?.[hop.label];
-          if (!e) break;
-          const nh = e.nextHops[0];
-          hop = { node: nh.node, label: nh.op === 'pop' ? 3 : nh.outLabel };
-        }
-        if (hops.at(-1) !== dst) continue;
-        const lift = 0.5 + base + k * 1.2;
-        const color = k % 2 ? 0xf2cc60 : L.color;
-        this.tube(g, hops, L.y + lift, color);
-        for (const s of labels) {
-          const at = k % 2 ? 0.62 : 0.38; // keep the two directions' labels apart
-          const mid = new THREE.Vector3().lerpVectors(this.pos(s.from, 'mpls'), this.pos(s.to, 'mpls'), at).setY(L.y + lift + 0.5);
-          g.add(label(s.label === 3 ? 'imp-null' : String(s.label), 'edge-label', mid));
-        }
-        k++;
+    peLsps(net).forEach(({ hops, labels }, k) => {
+      const lift = 0.5 + base + k * 1.2;
+      const color = k % 2 ? 0xf2cc60 : L.color;
+      this.tube(g, hops, L.y + lift, color);
+      for (const s of labels) {
+        const at = k % 2 ? 0.62 : 0.38; // keep the two directions' labels apart
+        const mid = new THREE.Vector3().lerpVectors(this.pos(s.from, 'mpls'), this.pos(s.to, 'mpls'), at).setY(L.y + lift + 0.5);
+        g.add(label(s.label === 3 ? 'imp-null' : String(s.label), 'edge-label', mid));
       }
-    }
+    });
   }
 
   build_bgp(g, net, L) {
@@ -451,6 +493,52 @@ export class LayerView {
       const text = `EVI ${inst.evi} ${(inst.type ?? '?').toUpperCase()}${ids}${locs ? ` · ${locs}` : ''} · ${inst.state}`;
       g.add(label(text, 'edge-label', (mid ?? this.pos(nodes[0], 'evpn')).clone().setY((mid?.y ?? L.y) - 0.8)));
     });
+  }
+
+  // VRFs / L3VPN: per VRF (its own colour) a ring around each PE that has it with the RD and the
+  // transport, an arc between each pair of PEs whose routes cross (solid both ways, dashed one way
+  // only, dashed red when neither gets the other's), and a line from the PE to each host or CE on
+  // the VRF's interfaces.
+  build_vrf(g, net, L) {
+    const perPe = new Map(); // PE -> [{ text, color }]: one label per PE, a line per VRF
+    net.l3vpn.vrfs.forEach((v, k) => {
+      const color = VRF_COLORS[k % VRF_COLORS.length];
+      const mat = new THREE.MeshStandardMaterial({ color });
+      for (const site of v.sites) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5 + k * 0.4, 0.09, 8, 32), mat);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.copy(this.pos(site.pe, 'vrf'));
+        g.add(ring);
+        const tr = Object.values(site.transport);
+        const how = tr.every((t) => t.kind === 'srv6') ? `SRv6 ${[...new Set(tr.map((t) => t.locator))].join('/')}` : tr.every((t) => t.kind === 'mpls') ? `MPLS ${[...new Set(tr.map((t) => t.allocation))].join('/')}` : 'SRv6 + MPLS';
+        if (!perPe.has(site.pe)) perPe.set(site.pe, []);
+        perPe.get(site.pe).push({ text: `${v.name} ${site.rd ?? ''} · ${how}`, color });
+        for (const a of site.attached) {
+          const [p, h] = [this.pos(site.pe, 'vrf'), this.pos(a.node, 'vrf')];
+          g.add(dashed([p, h], color, 0.9));
+          const dot = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 12), mat);
+          dot.position.copy(h);
+          g.add(dot);
+        }
+      }
+      const pes = [...new Set(v.sites.map((s) => s.pe))];
+      for (let i = 0; i < pes.length; i++) {
+        for (let j = i + 1; j < pes.length; j++) {
+          const between = v.pairs.filter((p) => [p.from, p.to].includes(pes[i]) && [p.from, p.to].includes(pes[j]));
+          if (!between.length) continue;
+          const ways = [pes[i], pes[j]].filter((to) => between.some((p) => p.to === to && p.ok)).length;
+          const both = between.every((p) => p.ok) && ways === 2;
+          const [a, b] = [this.pos(pes[i], 'vrf'), this.pos(pes[j], 'vrf')];
+          const m = new THREE.Vector3().lerpVectors(a, b, 0.5).setY(L.y + 2.5 + k * 1.2);
+          const pts = new THREE.QuadraticBezierCurve3(a, m, b).getPoints(40);
+          g.add(both ? solid(pts, color) : dashed(pts, ways ? color : RED));
+        }
+      }
+    });
+    for (const [pe, lines] of perPe) g.add(colourLines(lines, this.pos(pe, 'vrf').setY(L.y - 1.2)));
+    // The VRFs and their state, as a legend in the plane's near corner.
+    const legend = net.l3vpn.vrfs.map((v, k) => ({ text: `${v.name}${v.role === 'management' ? ' (management)' : ''} · ${v.state}`, color: v.state === 'Down' ? RED : VRF_COLORS[k % VRF_COLORS.length] }));
+    g.add(colourLines(legend, new THREE.Vector3(this.box.x1 - 2, L.y, this.box.z1 - 1)));
   }
 
   build_cfm(g, net, L) {
