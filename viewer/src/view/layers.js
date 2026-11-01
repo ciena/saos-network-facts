@@ -4,19 +4,34 @@
 
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { hostPrefix } from '../engine/ip.js';
+import { DEFAULT_LABELS, bgpLabel, lagLabel, nodeLabel } from './labels.js';
 
+// One plane per layer, LAYER_GAP apart in this order. An optional layer gets a plane only when the
+// network has something on it (SRv6 locators, EVPN instances), so other labs keep their stack.
 export const LAYERS = [
-  { id: 'physical', name: 'Physical / LAG', y: 0, color: 0x8b98a8 },
-  { id: 'ring', name: 'G.8032 rings', y: 6, color: 0xe3b341 },
-  { id: 'isis', name: 'IGP (IS-IS / OSPF)', y: 12, color: 0x3fb950 },
-  { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', y: 18, color: 0xd29922 },
-  { id: 'bgp', name: 'BGP', y: 24, color: 0xa371f7 },
-  { id: 'pw', name: 'Pseudowires (VPWS)', y: 30, color: 0xf778ba },
-  { id: 'cfm', name: 'CFM MEG', y: 36, color: 0x39c5cf },
+  { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8 },
+  { id: 'ring', name: 'G.8032 rings', color: 0xe3b341 },
+  { id: 'isis', name: 'IGP (IS-IS / OSPF)', color: 0x3fb950 },
+  { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', color: 0xd29922 },
+  { id: 'srv6', name: 'SRv6 locators / Flex-Algo', color: 0xffa657, optional: (net) => (net.srv6?.locators.length ?? 0) > 0 || (net.srv6?.algorithms.length ?? 0) > 1 },
+  { id: 'bgp', name: 'BGP', color: 0xa371f7 },
+  { id: 'pw', name: 'Pseudowires (VPWS)', color: 0xf778ba },
+  { id: 'evpn', name: 'EVPN instances', color: 0xd2a8ff, optional: (net) => (net.evpn?.instances.length ?? 0) > 0 },
+  { id: 'cfm', name: 'CFM MEG', color: 0x39c5cf },
 ];
+const LAYER_GAP = 6;
+// Flex-Algo topologies in the SRv6 plane, one colour per algorithm after algorithm 0's.
+const ALGO_COLORS = [0xff7b72, 0x79c0ff, 0x56d364, 0xe3b341];
 const SUB_RING = 0x79c0ff; // a sub-ring, apart from the major rings in the layer colour
 const RPL = 0xf0883e;
-export const layerY = (id) => LAYERS.find((l) => l.id === id)?.y ?? 0;
+
+// The layers a network shows (every layer but an empty optional one), in stacking order.
+export function presentLayers(net) {
+  return LAYERS.filter((l) => !l.optional || (net && l.optional(net)));
+}
+let shown = presentLayers(null);
+export const layerY = (id) => Math.max(0, shown.findIndex((l) => l.id === id)) * LAYER_GAP;
 // Gap report layers that share a plane.
 const LAYER_ALIAS = { ospf: 'isis', 'mpls-tp': 'mpls' };
 export const layerColor = (id) => LAYERS.find((l) => l.id === (LAYER_ALIAS[id] ?? id))?.color ?? 0xffffff;
@@ -73,6 +88,13 @@ export class LayerView {
     this.visible = Object.fromEntries(LAYERS.map((l) => [l.id, true]));
     this.pickables = [];
     this.linkMeshes = {}; // link id -> [materials] for highlighting
+    this.labels = { ...DEFAULT_LABELS };
+    this.present = shown.map((l) => l.id);
+  }
+
+  // Label options (view/labels.js); applied on the next build.
+  setLabels(opts) {
+    this.labels = { ...DEFAULT_LABELS, ...opts };
   }
 
   pos(nodeId, layer = 'physical') {
@@ -117,7 +139,10 @@ export class LayerView {
     const box = { x0: Math.min(...xs) - 6, x1: Math.max(...xs) + 6, z0: Math.min(...zs) - 6, z1: Math.max(...zs) + 6 };
     this.box = box;
 
-    for (const L of LAYERS) {
+    shown = presentLayers(net);
+    this.present = shown.map((l) => l.id);
+    for (const base of shown) {
+      const L = { ...base, y: layerY(base.id) };
       const g = new THREE.Group();
       g.name = L.id;
       g.visible = this.visible[L.id];
@@ -142,7 +167,7 @@ export class LayerView {
     // Node pillars tie the layers together.
     const pillarMat = new THREE.LineBasicMaterial({ color: 0x3a4655, transparent: true, opacity: 0.6 });
     for (const n of net.topo.nodes) {
-      const top = n.role === 'ce' ? 0 : n.role === 'pe' ? LAYERS.at(-1).y : layerY('mpls');
+      const top = n.role === 'ce' ? 0 : n.role === 'pe' ? layerY(shown.at(-1).id) : layerY(this.present.includes('srv6') ? 'srv6' : 'mpls');
       const pillar = new THREE.Line(new THREE.BufferGeometry().setFromPoints([this.pos(n.id), this.pos(n.id).setY(top)]), pillarMat);
       this.root.add(pillar);
     }
@@ -157,8 +182,7 @@ export class LayerView {
       mesh.userData.node = n.id;
       this.pickables.push(mesh);
       g.add(mesh);
-      const sub = n.loopback ? ` ${n.loopback}` : n.lan ? ` ${n.lan}` : '';
-      g.add(label(`${n.id}${sub}`, 'node-label', this.pos(n.id).setY(-1.3)));
+      g.add(label(nodeLabel(n, this.labels), 'node-label', this.pos(n.id).setY(-1.3)));
     }
     for (const l of net.topo.links) {
       const st = net.links[l.id];
@@ -180,7 +204,8 @@ export class LayerView {
         const dir = new THREE.Vector3().subVectors(b, a).normalize();
         ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
         g.add(ring);
-        g.add(label(`${l.a.if} LAG ${st.distributing.length}/${l.members.length}`, 'edge-label', mid.clone().setY(2)));
+        const text = lagLabel(l, st.distributing.length, this.labels);
+        if (text) g.add(label(text, 'edge-label', mid.clone().setY(2)));
       }
     }
   }
@@ -295,7 +320,7 @@ export class LayerView {
     for (const src of pes) {
       for (const dst of pes) {
         if (src === dst) continue;
-        const fec = `${net.topo.nodes.find((n) => n.id === dst).loopback}/32`;
+        const fec = hostPrefix(net.topo.nodes.find((n) => n.id === dst).loopback);
         const hops = [src];
         let hop = net.mpls.ftn[src]?.[fec]?.nextHops[0];
         const labels = [];
@@ -338,8 +363,8 @@ export class LayerView {
       const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
       const pts = curve.getPoints(40);
       g.add(s.state === 'Established' ? solid(pts, L.color) : dashed(pts, RED));
-      const kind = net.topo.bgp?.sessions ? (s.client ? `RR client ${s.client}` : '') : 'VPNv4';
-      g.add(label(`iBGP ${s.state}${kind ? ` · ${kind}` : ''}`, 'edge-label', mid.clone().setY(L.y + 2.4)));
+      const text = bgpLabel(s, this.labels, Boolean(net.topo.bgp?.sessions));
+      if (text) g.add(label(text, 'edge-label', mid.clone().setY(L.y + 2.4)));
     }
   }
 
@@ -356,6 +381,75 @@ export class LayerView {
       }
       const via = [...new Set(pw.ends.map((e) => e.transport.tunnel ?? e.transport.policy ?? e.underlay))].join(' / ');
       g.add(label(`${pw.service} PW ${pw.pwid} ${pw.state} · ${via}`, 'edge-label', mid.clone().setY(mid.y - 0.8)));
+    });
+  }
+
+  // SRv6 / Flex-Algo: each router's locators in a label (algorithm in brackets); algorithm 0's
+  // topology (the IGP's links) in the layer colour; each Flex-Algo's topology above it in its own
+  // colour, its routers as small spheres, its definition (winner, metric type, constraints) in a
+  // label at the router that advertises it.
+  build_srv6(g, net, L) {
+    const { locators, algorithms } = net.srv6;
+    const routers = net.igp.routers;
+    for (const r of routers) {
+      const s = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), new THREE.MeshStandardMaterial({ color: L.color }));
+      s.position.copy(this.pos(r, 'srv6'));
+      g.add(s);
+      const mine = locators.filter((l) => l.node === r);
+      if (mine.length) {
+        const text = mine.map((l) => `${l.name} ${l.prefix}${l.algorithm ? ` [${l.algorithm}]` : ''}`).join('\n');
+        const lbl = label(text, 'edge-label locator-label', this.pos(r, 'srv6').setY(L.y - 1.1));
+        g.add(lbl);
+      }
+    }
+    algorithms.forEach((a, k) => {
+      const y = L.y + 0.05 + k * 0.7;
+      const color = k === 0 ? L.color : ALGO_COLORS[(k - 1) % ALGO_COLORS.length];
+      for (const id of a.links) {
+        const link = net.topo.links.find((x) => x.id === id);
+        g.add(solid([this.pos(link.a.node).setY(y), this.pos(link.b.node).setY(y)], color, k === 0 ? 0.6 : 1));
+      }
+      if (k === 0) return;
+      for (const r of a.participants) {
+        const s = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), new THREE.MeshStandardMaterial({ color }));
+        s.position.copy(this.pos(r)).setY(y);
+        g.add(s);
+      }
+      const d = a.definition;
+      const ag = d?.adminGroups ?? {};
+      const excl = (ag.excludeAny ?? []).length ? ` · excl ${ag.excludeAny.join(',')}` : '';
+      const text = d ? `Flex-Algo ${a.algorithm} · ${d.metricType}${excl} · FAD ${d.node}${d.priority !== null ? ` prio ${d.priority}` : ''}` : `Flex-Algo ${a.algorithm} · no definition advertised`;
+      const at = this.pos(d?.node ?? a.participants[0] ?? routers[0]).setY(y + 1.2 + (k - 1) * 0.6);
+      const lbl = label(text, 'edge-label', at);
+      lbl.element.style.color = hex(color);
+      g.add(lbl);
+    });
+  }
+
+  // EVPN instances: an arc between each pair of members (one for a VPWS), dashed red when the
+  // instance is down, with the EVI, the service type, the VPWS service ids and the SRv6 locator.
+  build_evpn(g, net, L) {
+    net.evpn.instances.forEach((inst, k) => {
+      const up = inst.state === 'Up';
+      const nodes = inst.members.map((m) => m.node);
+      let mid = null;
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const [a, b] = [this.pos(nodes[i], 'evpn'), this.pos(nodes[j], 'evpn')];
+          const m = new THREE.Vector3().lerpVectors(a, b, 0.5).setY(L.y + 3 + k * 1.2);
+          mid ??= m;
+          g.add((up ? solid : dashed)(new THREE.QuadraticBezierCurve3(a, m, b).getPoints(40), up ? L.color : RED));
+        }
+      }
+      for (const n of nodes) {
+        const s = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 12), new THREE.MeshStandardMaterial({ color: L.color }));
+        s.position.copy(this.pos(n, 'evpn'));
+        g.add(s);
+      }
+      const locs = [...new Set(inst.members.map((m) => m.srv6Locator).filter(Boolean))].join('/');
+      const ids = inst.type === 'vpws' ? ` ${inst.members.map((m) => m.localServiceId ?? '-').join('↔')}` : '';
+      const text = `EVI ${inst.evi} ${(inst.type ?? '?').toUpperCase()}${ids}${locs ? ` · ${locs}` : ''} · ${inst.state}`;
+      g.add(label(text, 'edge-label', (mid ?? this.pos(nodes[0], 'evpn')).clone().setY((mid?.y ?? L.y) - 0.8)));
     });
   }
 

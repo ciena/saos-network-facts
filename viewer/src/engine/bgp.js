@@ -16,7 +16,7 @@
 //   interfaces: [{ name, kind: 'loopback' | 'ip', ip, prefix, link? }]
 //   statics:    [{ prefix, nextHop, preference }]
 
-import { compareIp, inPrefix, ipToInt } from './ip.js';
+import { compareIp, hostPrefix, inPrefix } from './ip.js';
 import { nodeById, nodeOrdinal } from './topology.js';
 
 export const ORIGIN = { IGP: 0, EGP: 1, INCOMPLETE: 2 };
@@ -37,6 +37,9 @@ export function fsmToEstablished() {
 // preference (LOCAL_PREF). Returns { best, reason } where reason names the
 // step that decided. Candidate fields:
 //   localPref, asPath[], origin, med, neighborAs, ebgp, igpCost, bgpId, peerAddr
+// The rank of a route's address among the routes' (IPv4 or IPv6), a number to compare.
+const addressRank = (set, key, r) => [...new Set(set.map((x) => x[key]))].sort(compareIp).indexOf(r[key]);
+
 export function bestPath(candidates) {
   if (!candidates.length) return { best: null, reason: 'no candidates' };
   let set = [...candidates];
@@ -63,8 +66,8 @@ export function bestPath(candidates) {
   const more = [
     ['eBGP over iBGP (§9.1.2.2 d)', (r) => (r.ebgp ? 0 : 1)],
     ['lowest IGP cost to NEXT_HOP (§9.1.2.2 e)', (r) => r.igpCost],
-    ['lowest BGP Identifier (§9.1.2.2 f)', (r) => ipToInt(r.bgpId)],
-    ['lowest peer address (§9.1.2.2 g)', (r) => ipToInt(r.peerAddr)],
+    ['lowest BGP Identifier (§9.1.2.2 f)', (r) => addressRank(set, 'bgpId', r)],
+    ['lowest peer address (§9.1.2.2 g)', (r) => addressRank(set, 'peerAddr', r)],
   ];
   for (const [reason, key] of more) {
     const min = Math.min(...set.map(key));
@@ -158,7 +161,7 @@ export function computeBgp(topo, isis, mpls, vendor, linkStates = null) {
   const linkUp = (id) => !linkStates || linkStates[id]?.up !== false;
   const pes = topo.nodes.filter((n) => n.role === 'pe').map((n) => n.id);
   const lo = (id) => nodeById(topo, id).loopback;
-  const reach = (from, to) => Boolean(isis.rib[from]?.[`${lo(to)}/32`]);
+  const reach = (from, to) => Boolean(isis.rib[from]?.[hostPrefix(lo(to))]);
 
   // TCP between loopbacks needs IGP reachability both ways, and both ends
   // must configure the other: an unconfigured end refuses the connection, so
@@ -250,12 +253,12 @@ export function computeBgp(topo, isis, mpls, vendor, linkStates = null) {
         // §9.1.2.1: a route whose NEXT_HOP is unresolvable is excluded; for a
         // VPN route the next hop also needs an LSP (RFC 4364 §5).
         const usable = routes
-          .filter((r) => isis.rib[pe][`${r.nextHop}/32`] && mpls.ftn[pe]?.[`${r.nextHop}/32`])
+          .filter((r) => isis.rib[pe][hostPrefix(r.nextHop)] && mpls.ftn[pe]?.[hostPrefix(r.nextHop)])
           .map((r) => ({
             ...r,
             neighborAs: topo.asn,
             ebgp: false,
-            igpCost: isis.rib[pe][`${r.nextHop}/32`].metric,
+            igpCost: isis.rib[pe][hostPrefix(r.nextHop)].metric,
             bgpId: r.originator === r.from ? r.nextHop : lo(r.from),
             peerAddr: lo(r.from),
           }));

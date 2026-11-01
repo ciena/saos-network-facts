@@ -512,7 +512,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.9.0"
+    "version": "0.10.0"
   },
   "schema_version": "1.7.0"
 }

@@ -7,26 +7,34 @@
 //
 //   IGP          IS-IS, or OSPF when more devices run OSPF than IS-IS (the engine runs one)
 //   nodes        every device with facts; a router when it runs the IGP or an MPLS-TP tunnel, else a CE
-//   links        two routed interfaces on different devices in one IPv4 subnet (management interfaces
+//   links        two routed interfaces on different devices in one IPv4 or IPv6 subnet (management interfaces
 //                never link: they share the management network); with more interfaces in the subnet,
 //                the two that run the IGP; core when both run the IGP; a LAG when both interfaces ride
-//                a LAG (lags / ports[].lag), members paired by port in natural order at both ends
+//                a LAG (lags / ports[].lag), members paired by port in natural order at both ends; an IPv6
+//                subnet joining the same two interfaces as an IPv4 one is that link's second family; IPv6
+//                link-local addresses never link
+//   loopbacks    the IGP loopback's IPv4 address, or its IPv6 one when the device has no IPv4 loopback or its
+//                IGP interfaces carry IPv6 only (an IPv6 core); every loopback address is advertised
 //   IS-IS        per link each end's interface metric at the level the view runs (wide, else narrow, else 10)
 //   OSPF         per link the area and cost of each end's interface, BFD when both ends enable it
 //   SRGB, SIDs   segment_routing.srgb / prefix_sids (node SID of the loopback)
 //   SR policies  segment_routing.policies, the preferred candidate path's first segment list
 //   MPLS-TP      tp_corouted_tunnels: each node's segment, stitched from the ingress along next hops
-//   BGP          peers of kind bgp, matched to the device owning the address
+//   BGP          peers of kind bgp, matched to the device owning the address (IPv4 or IPv6)
 //   pseudowires  the two ends that name each other (peer address + PW id); static on an MPLS-TP tunnel
 //   CFM          MEPs of one MD / MA on two devices, over that service's pseudowire, at the MA's CCM interval
 //   L2 links     top-level links[] (schema 1.5, from the extractor's --clab topology) between two ports no
 //                addressed link already joins: drawn as plain links with no subnet (no IGP, no routes)
+//   SRv6         segment_routing.srv6.locators (schema 1.6) per device, with their Flex-Algo (0 when none)
+//   Flex-Algo    segment_routing.flex_algorithms (schema 1.6): each device's definitions, grouped by algorithm
+//   EVPN         evpn_instances (schema 1.6) grouped by EVI across devices, the attachment circuit the flow
+//                point on the instance's forwarding domain
 //   G.8032       rings[] (schema 1.5) joined across devices by ring id: the links whose two ends are ring ports
 //                of the ring, the RPL from the owner's and neighbour's port, a sub-ring's interconnection nodes
 
-import { ccmIntervalMs, devicesByName, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts, ringsOf } from '../../../js/src/index.ts';
+import { ccmIntervalMs, devicesByName, evpnInstances, flexAlgorithms, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts, ringsOf, srv6Locators } from '../../../js/src/index.ts';
 import { CCM_INTERVALS_MS } from '../engine/cfm.js';
-import { intToIp, parsePrefix } from '../engine/ip.js';
+import { hostPrefix, ip6ToBig, isV6, networkOf } from '../engine/ip.js';
 import { BACKBONE, normArea } from '../engine/ospf.js';
 import { rfcVendor } from '../engine/vendor.js';
 import { layoutNodes, scalePositions } from './layout.js';
@@ -38,13 +46,45 @@ export function ipv4Subnet(cidr) {
   const m = /^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/.exec(cidr ?? '');
   if (!m) return null;
   const len = Number(m[2]);
-  if (len > 32) return null;
-  return { ip: m[1], len, subnet: `${intToIp(parsePrefix(`${m[1]}/${len}`).net)}/${len}` };
+  if (len > 32 || m[1].split('.').some((o) => Number(o) > 255)) return null;
+  return { ip: m[1], len, subnet: networkOf(m[1], len) };
+}
+
+// An IPv6 `ip/len` as { ip, len, subnet } (the subnet in RFC 5952 text), or null for anything else and
+// for a link-local address (RFC 4291 §2.5.6, the first 10 bits 1111111010: every interface has one, so
+// it says nothing about a link).
+export function ipv6Subnet(cidr) {
+  const m = /^([0-9a-f:]+)\/(\d{1,3})$/i.exec(cidr ?? '');
+  if (!m || !m[1].includes(':')) return null;
+  const len = Number(m[2]);
+  if (len > 128) return null;
+  try {
+    if (ip6ToBig(m[1]) >> 118n === 0x3fan) return null;
+    const ip = networkOf(m[1], 128).split('/')[0];
+    return { ip, len, subnet: networkOf(m[1], len) };
+  } catch {
+    return null;
+  }
+}
+
+// Either family.
+export const ipSubnet = (cidr) => ipv4Subnet(cidr) ?? ipv6Subnet(cidr);
+
+// An interface's addresses by family, as written (`ip` is the first IPv4 address in schema 1.x).
+const v4Of = (i) => (i.ipv4?.length ? i.ipv4 : [i.ip]).filter((c) => ipv4Subnet(c));
+const v6Of = (i) => [...(i.ipv6 ?? []), ...(isV6(i.ip) ? [i.ip] : [])].filter((c) => ipv6Subnet(c));
+
+// The facts with every IPv6-only interface given its first IPv6 address as `ip`, so the npm reader's
+// port and loopback helpers (which look at `ip`, the IPv4 address) see an IPv6-only interface too.
+function withIpv6(f) {
+  const interfaces = (f.interfaces ?? []).map((i) => (i.ip || !v6Of(i).length ? i : { ...i, ip: v6Of(i)[0] }));
+  return { ...f, interfaces };
 }
 
 // The port an interface rides on: the port whose flow points (SAOS 10) or VLANs (SAOS 6) reach it;
 // the LAG when that port is a member of one (a member reaches the LAG's interfaces).
-function portOf(facts, ifname) {
+function portOf(f, ifname) {
+  const facts = withIpv6(f);
   for (const port of Object.keys(facts.ports ?? {})) {
     if (interfacesOnPort(facts, port).some((i) => i.name === ifname)) return facts.ports[port].lag ?? port;
   }
@@ -148,18 +188,37 @@ function inIgp(igp, f, iface) {
   return Boolean(o) && !o.passive;
 }
 
+// A device's loopback addresses: `loIp` the one the view runs the IGP, BGP and labels on (the IGP
+// loopback's IPv4 address; its IPv6 one when the device has no IPv4 loopback, or when IS-IS runs on
+// IPv6-only interfaces, an IPv6 core whose BGP sessions and SRv6 locators use the IPv6 loopback),
+// `all` every address of that loopback. OSPF (OSPFv2) is IPv4 only.
+function loopbackOf(f, lo, igp) {
+  const iface = lo ? (f.interfaces ?? []).find((i) => i.name === lo.name) : null;
+  if (!iface) return { loIp: null, all: [], family: null };
+  const v4 = v4Of(iface).map((c) => ipv4Subnet(c).ip);
+  const v6 = v6Of(iface).map((c) => ipv6Subnet(c).ip);
+  const igpIfs = (f.interfaces ?? []).filter((i) => i.kind !== 'loopback' && inIgp(igp, f, i));
+  const v6Core = igp === 'isis' && igpIfs.length > 0 && igpIfs.every((i) => !v4Of(i).length && v6Of(i).length);
+  const family = v6.length && (!v4.length || v6Core) ? 'ipv6' : v4.length ? 'ipv4' : null;
+  return { loIp: family === 'ipv6' ? v6[0] : v4[0] ?? null, all: [...v4, ...v6], family };
+}
+
 function buildNodes(devices, igp, report) {
   const nodes = [];
+  const v6Nodes = [];
+  const sidElsewhere = [];
   for (const [name, f] of devices) {
     const ospf = ospfOf(f);
-    const los = loopbacks(f);
+    const los = loopbacks(withIpv6(f));
     const lo = (igp === 'ospf' ? los.find((l) => ospf.interfaces.has(l.name)) : los.find((l) => l.isis)) ?? los[0] ?? null;
-    const loIp = lo ? ipv4Subnet(lo.ip)?.ip ?? null : null;
     const isis = f.isis?.instances?.[0] ?? null;
+    const { loIp, all, family } = loopbackOf(f, lo, igp);
     const runsIgp = igp === 'ospf' ? ospf.instances.length > 0 : Boolean(isis);
     const router = (runsIgp || (f.tp_corouted_tunnels ?? []).length > 0) && Boolean(loIp);
     const node = { id: name, role: router ? 'p' : 'ce', pos: { x: 0, z: 0 } };
     if (loIp) node.loopback = loIp;
+    if (all.length > 1) node.loopbacks = all;
+    if (family === 'ipv6' && router) v6Nodes.push(name);
     if (isis?.system_id) node.systemId = isis.system_id;
     if (igp === 'ospf' && router) {
       const rid = ospf.instances[0]?.router_id;
@@ -168,14 +227,17 @@ function buildNodes(devices, igp, report) {
       if (area) node.loopbackArea = area;
     }
     if (router) {
-      const sid = (f.segment_routing?.prefix_sids ?? []).find((s) => s.prefix === `${loIp}/32`);
+      const sid = (f.segment_routing?.prefix_sids ?? []).find((s) => all.some((ip) => s.prefix === hostPrefix(ip)));
       if (sid?.value_type === 'index') node.sidIndex = Number(sid.sid);
+      if (sid && sid.prefix !== hostPrefix(loIp)) sidElsewhere.push(`${name} (${sid.prefix})`);
       if (igp === 'isis' && isis && !isis.system_id) report.warn(`${name}: IS-IS instance ${isis.name} has no NET; its LSP ID is made up`);
     } else if (runsIgp) {
       report.warn(`${name}: runs ${igp === 'ospf' ? 'OSPF' : 'IS-IS'} but has no loopback address; shown as a host`);
     }
     nodes.push(node);
   }
+  if (sidElsewhere.length) report.add('mpls', 'derived', 'node SIDs on the other loopback address', `${sidElsewhere.join(', ')}: the prefix SID is configured on the loopback's other address family; the view gives it to the loopback it runs on`);
+  if (v6Nodes.length) report.add('physical', 'derived', 'IPv6 loopbacks', `${v6Nodes.join(', ')}: IS-IS runs on IPv6-only interfaces (or the loopback has no IPv4 address), so the view runs IS-IS, BGP and the label tables on the IPv6 loopback`);
   return nodes;
 }
 
@@ -205,19 +267,25 @@ function isisLink(link, devices, level, defaults) {
 }
 
 function buildLinks(devices, nodes, igp, isisLevel, report) {
+  // IPv4 subnets first, then IPv6: an IPv6 subnet on two interfaces an IPv4 subnet already links is
+  // the same link's second address family.
   const bySubnet = new Map();
-  for (const [name, f] of devices) {
-    for (const i of f.interfaces ?? []) {
-      if (!isRouted(i)) continue;
-      for (const cidr of i.ipv4?.length ? i.ipv4 : [i.ip]) {
-        const s = ipv4Subnet(cidr);
-        if (!s || s.len >= 32) continue;
-        if (!bySubnet.has(s.subnet)) bySubnet.set(s.subnet, []);
-        const port = portOf(f, i.name);
-        bySubnet.get(s.subnet).push({ node: name, if: i.name, ip: s.ip, port, lag: lagOf(f, port), igp: inIgp(igp, f, i) });
+  for (const [family, addrs, parse] of [['ipv4', v4Of, ipv4Subnet], ['ipv6', v6Of, ipv6Subnet]]) {
+    for (const [name, f] of devices) {
+      for (const i of f.interfaces ?? []) {
+        if (!isRouted({ ...i, ip: i.ip ?? v6Of(i)[0] ?? null })) continue;
+        for (const cidr of addrs(i)) {
+          const s = parse(cidr);
+          if (!s || s.len >= (family === 'ipv6' ? 128 : 32)) continue;
+          if (!bySubnet.has(s.subnet)) bySubnet.set(s.subnet, []);
+          const port = portOf(f, i.name);
+          bySubnet.get(s.subnet).push({ node: name, if: i.name, ip: s.ip, port, lag: lagOf(f, port), igp: inIgp(igp, f, i) });
+        }
       }
     }
   }
+  const byPair = new Map(); // `${node}|${if}` pair -> link, to fold an IPv6 subnet into its IPv4 link
+  const pairKey = (a, b) => [`${a.node}|${a.if}`, `${b.node}|${b.if}`].sort().join(' ');
   const role = Object.fromEntries(nodes.map((n) => [n.id, n.role]));
   const links = [];
   const ids = new Set();
@@ -236,6 +304,12 @@ function buildLinks(devices, nodes, igp, isisLevel, report) {
       continue;
     }
     const [a, b] = pair;
+    const same = byPair.get(pairKey(a, b));
+    if (same && !same.subnet6 && isV6(subnet) && !isV6(same.subnet)) {
+      same.subnet6 = subnet;
+      for (const e of [a, b]) same[same.a.node === e.node && same.a.if === e.if ? 'a' : 'b'].ip6 = e.ip;
+      continue;
+    }
     if (ends.length > 2) {
       const rest = ends.filter((e) => e !== a && e !== b);
       report.warn(`${subnet}: ${ends.length} interfaces; drawn between the two that run ${igpName} (${a.node} ${a.if}, ${b.node} ${b.if}), ignoring ${rest.map((e) => `${e.node} ${e.if}`).join(', ')}`);
@@ -246,7 +320,9 @@ function buildLinks(devices, nodes, igp, isisLevel, report) {
     ids.add(id);
     const end = (e) => ({ node: e.node, if: e.if, ip: e.ip, ...(e.port ? { port: e.port } : {}) });
     const { lag, members } = linkMembers(id, a, b, report);
-    links.push({ id, kind: core ? 'core' : 'access', ...(core ? { metric: DEFAULT_METRIC } : {}), subnet, lag, a: end(a), b: end(b), members });
+    const link = { id, kind: core ? 'core' : 'access', ...(core ? { metric: DEFAULT_METRIC } : {}), subnet, lag, a: end(a), b: end(b), members };
+    links.push(link);
+    byPair.set(pairKey(a, b), link);
   }
   const lags = links.filter((l) => l.lag);
   if (lags.length) {
@@ -255,7 +331,10 @@ function buildLinks(devices, nodes, igp, isisLevel, report) {
   }
   const core = links.filter((l) => l.kind === 'core');
   const name = igp === 'ospf' ? 'OSPF' : 'IS-IS';
-  report.add('physical', 'derived', `${links.length} links`, `from interface subnets (two routed interfaces of different devices in one IPv4 subnet; management interfaces and loopbacks never link); ${core.length} core (${name} at both ends), ${links.length - core.length} access`);
+  const v6 = links.filter((l) => isV6(l.subnet)).length;
+  const dual = links.filter((l) => l.subnet6).length;
+  const families = v6 || dual ? `; ${links.length - v6 - dual} IPv4, ${v6} IPv6, ${dual} dual-stack (link-local addresses never link)` : '';
+  report.add('physical', 'derived', `${links.length} links`, `from interface subnets (two routed interfaces of different devices in one IPv4 or IPv6 subnet; management interfaces and loopbacks never link); ${core.length} core (${name} at both ends), ${links.length - core.length} access${families}`);
   if (igp === 'isis' && core.length) {
     const defaults = { metric: 0 };
     for (const l of core) isisLink(l, devices, isisLevel, defaults);
@@ -312,12 +391,17 @@ function topologyLinks(file, links, nodes, report) {
   if (added) report.add('physical', 'facts', `${added} L2 links`, `from the file's links[] (the extractor's topology): between two ports that no addressed link joins; no subnet, so no IGP and no routes over them`);
 }
 
+// An address in the form the owner index keys it by (IPv6 in RFC 5952 text, so 2001:DB8:0::1 finds 2001:db8::1).
+export function canonicalIp(ip) {
+  return ipv6Subnet(`${ip}/128`)?.ip ?? ip;
+}
+
 function ownerIndex(devices) {
   const owner = new Map();
   for (const [name, f] of devices) {
     for (const i of f.interfaces ?? []) {
-      for (const cidr of [i.ip, ...(i.ipv4 ?? [])]) {
-        const s = ipv4Subnet(cidr);
+      for (const cidr of [i.ip, ...(i.ipv4 ?? []), ...(i.ipv6 ?? [])]) {
+        const s = ipSubnet(cidr);
         if (s && !owner.has(s.ip)) owner.set(s.ip, name);
       }
     }
@@ -332,14 +416,15 @@ function buildBgp(devices, owner, report) {
     asn ??= num(f.bgp?.instances?.[0]?.as);
     // a VRF neighbour (schema 1.7: a CE of an L3VPN) is no iBGP session of the core
     for (const p of (f.peers ?? []).filter((x) => x.kind === 'bgp' && !x.vrf)) {
-      const peer = owner.get(p.ip);
+      const peer = owner.get(canonicalIp(p.ip));
       if (!peer) {
         report.warn(`${name}: BGP neighbour ${p.ip} is no device of this file`);
         continue;
       }
       const key = [name, peer].sort().join('|');
-      const s = sessions.get(key) ?? { a: [name, peer].sort()[0], b: [name, peer].sort()[1], client: null, configuredOn: [] };
+      const s = sessions.get(key) ?? { a: [name, peer].sort()[0], b: [name, peer].sort()[1], client: null, configuredOn: [], families: [] };
       s.configuredOn.push(name);
+      for (const fam of p.address_families ?? []) if (!s.families.includes(fam)) s.families.push(fam);
       if (p.route_reflector_client) s.client = peer;
       sessions.set(key, s);
     }
@@ -517,9 +602,9 @@ function buildPseudowires(devices, owner, tpTunnels, report) {
   for (const [name, f] of devices) {
     (f.pseudowires ?? []).forEach((pw, i) => {
       if (used.has(`${name}#${i}`)) return;
-      const peer = owner.get(pw.peer);
+      const peer = owner.get(canonicalIp(pw.peer));
       const g = peer ? devices.get(peer) : null;
-      const j = g ? (g.pseudowires ?? []).findIndex((q, k) => !used.has(`${peer}#${k}`) && q.pw_id === pw.pw_id && owner.get(q.peer) === name) : -1;
+      const j = g ? (g.pseudowires ?? []).findIndex((q, k) => !used.has(`${peer}#${k}`) && q.pw_id === pw.pw_id && owner.get(canonicalIp(q.peer)) === name) : -1;
       if (j < 0) {
         report.warn(`${name}: PW ${pw.name} (id ${pw.pw_id}) to ${pw.peer}: ${peer ? `${peer} has no PW ${pw.pw_id} back` : 'no device has that address'}; not drawn`);
         return;
@@ -735,6 +820,88 @@ function ringPath(g) {
   return { nodes, links: [...used], closed: false };
 }
 
+const algorithmNumber = (a) => (a === null || a === undefined || a === '' ? 0 : Number(a));
+
+// SRv6 locators of every device (schema 1.6), with their algorithm (0: SPF).
+function buildSrv6(devices, nodes, report) {
+  const shown = new Set(nodes.filter((n) => n.role !== 'ce').map((n) => n.id));
+  const locators = [];
+  for (const [name, f] of devices) {
+    for (const l of srv6Locators(f)) {
+      if (!shown.has(name)) {
+        report.warn(`${name}: SRv6 locator ${l.name} on a device the view does not run the IGP on; left out`);
+        continue;
+      }
+      locators.push({ node: name, name: l.name, prefix: l.prefix, algorithm: algorithmNumber(l.algorithm), sidType: l.sid_type ?? null, blockLength: num(l.block_length), nodeLength: num(l.node_length), functionLength: num(l.function_length), endBehavior: l.end_behavior ?? null, instances: l.instances ?? [] });
+    }
+  }
+  const bad = locators.filter((l) => !ipv6Subnet(l.prefix));
+  for (const l of bad) report.warn(`${l.node}: SRv6 locator ${l.name} prefix ${l.prefix ?? '-'} is no IPv6 prefix; left out`);
+  const good = locators.filter((l) => !bad.includes(l));
+  if (good.length) {
+    const algos = [...new Set(good.map((l) => l.algorithm))].sort((x, y) => x - y);
+    report.add('srv6', 'facts', `${good.length} SRv6 locators`, `on ${new Set(good.map((l) => l.node)).size} routers; algorithm ${algos.join(', ')} (a locator without a Flex-Algo is in algorithm 0, the IGP's SPF)`);
+    report.add('srv6', 'derived', 'SRv6 SIDs', 'the facts carry locators, not SIDs: the view allocates the function in the 16 bits after the locator (End 0x0001, End.DX2 0xe000, End.DT2U 0xe100, End.DT2M 0xe200, plus the EVPN instance\'s ordinal on the device)');
+  }
+  return { locators: good };
+}
+
+// Flex-Algo definitions (schema 1.6), grouped by algorithm across devices.
+function buildFlexAlgos(devices, nodes, report) {
+  const shown = new Set(nodes.filter((n) => n.role !== 'ce').map((n) => n.id));
+  const byAlgo = new Map();
+  for (const [name, f] of devices) {
+    if (!shown.has(name)) continue;
+    for (const d of flexAlgorithms(f)) {
+      const a = algorithmNumber(d.algorithm);
+      if (!byAlgo.has(a)) byAlgo.set(a, []);
+      const ag = d.admin_groups ?? {};
+      byAlgo.get(a).push({ node: name, metricType: d.metric_type ?? 'igp', advertise: Boolean(d.advertise_definition), priority: num(d.priority), adminGroups: { includeAny: ag.include_any ?? [], includeAll: ag.include_all ?? [], excludeAny: ag.exclude_any ?? [] }, srlgExclude: d.srlg_exclude ?? [] });
+    }
+  }
+  const algos = [...byAlgo].sort(([x], [y]) => x - y).map(([algorithm, definitions]) => ({ algorithm, definitions }));
+  if (algos.length) {
+    report.add('srv6', 'facts', `${algos.length} Flex-Algo${algos.length > 1 ? 's' : ''}`, algos.map((a) => `${a.algorithm}: defined on ${a.definitions.map((d) => d.node).join(', ')}, advertised by ${a.definitions.filter((d) => d.advertise).map((d) => d.node).join(', ') || 'none'}`).join('; '));
+    report.add('srv6', 'derived', 'Flex-Algo participation', 'a router takes part in an algorithm when it configures a definition of it; the definition in use is the advertised one with the highest priority (128 where none is set), then the highest system id (RFC 9350 §5.3)');
+    report.add('srv6', 'default', 'Flex-Algo link constraints', 'the facts carry no link affinities (admin groups) or link delays: no link is excluded and a latency or TE metric falls back to the IGP metric');
+  }
+  return algos;
+}
+
+// EVPN instances (schema 1.6), one per EVI across the devices that configure it.
+function buildEvpn(devices, report) {
+  const byEvi = new Map();
+  for (const [name, f] of devices) {
+    for (const e of evpnInstances(f)) {
+      const evi = String(e.evi);
+      if (!byEvi.has(evi)) byEvi.set(evi, { id: `evi:${evi}`, evi, type: e.type ?? null, members: [] });
+      const g = byEvi.get(evi);
+      if (e.type && g.type && e.type !== g.type) report.warn(`EVI ${evi}: ${g.type} on ${g.members[0]?.node} and ${e.type} on ${name}`);
+      const fds = e.fds?.length ? e.fds : e.fd ? [e.fd] : [];
+      const fp = (f.fps ?? []).find((x) => fds.includes(x.fd));
+      g.members.push({
+        node: name,
+        fd: e.fd ?? fds[0] ?? null,
+        ac: fp ? { port: fp.logical_port ?? null, name: fp.name } : { port: null, name: null },
+        rd: e.route_distinguisher ?? null,
+        routeTargets: (e.route_targets ?? []).map((t) => ({ rt: t.route_target, type: t.type ?? 'both' })),
+        srv6Locator: e.srv6_locator ?? null,
+        srPolicyColor: num(e.sr_policy_color),
+        localServiceId: e.local_service_id ?? null,
+        remoteServiceId: e.remote_service_id ?? null,
+        controlWord: e.control_word ?? null,
+        description: e.description ?? null,
+      });
+    }
+  }
+  const instances = [...byEvi.values()].sort((x, y) => naturalCompare(x.evi, y.evi));
+  if (instances.length) {
+    report.add('evpn', 'facts', `${instances.length} EVPN instances`, `${instances.map((i) => `EVI ${i.evi} ${(i.type ?? '?').toUpperCase()} on ${i.members.map((m) => m.node).join(', ')}`).join('; ')}: joined across devices by EVI; route targets, VPWS service ids and SRv6 locator as configured`);
+    report.add('evpn', 'derived', 'EVPN route exchange', 'two members exchange EVPN routes over an Established iBGP session carrying l2vpn evpn, or through a route reflector with a session to both; the attachment circuit is the flow point on the instance\'s forwarding domain');
+  }
+  return instances;
+}
+
 // Services: one per pseudowire, with its MEG.
 function buildServices(pseudowires, megs) {
   return pseudowires.map((pw) => ({
@@ -786,12 +953,15 @@ export function importFacts(input, { name, positions } = {}) {
   const pseudowires = buildPseudowires(devices, owner, tpTunnels, report);
   const megs = buildCfm(devices, pseudowires, report);
   const rings = buildRings(devices, links, report);
+  const srv6 = buildSrv6(devices, nodes, report);
+  const flexAlgos = buildFlexAlgos(devices, nodes, report);
+  const evpn = buildEvpn(devices, report);
 
   // Roles: a router is a PE when it speaks BGP, ends a pseudowire or faces a CE.
-  const edge = new Set([...bgp.sessions.flatMap((s) => [s.a, s.b]), ...pseudowires.flatMap((p) => p.ends.map((e) => e.node))]);
+  const edge = new Set([...bgp.sessions.flatMap((s) => [s.a, s.b]), ...pseudowires.flatMap((p) => p.ends.map((e) => e.node)), ...evpn.flatMap((i) => i.members.map((m) => m.node))]);
   for (const l of links) if (l.kind === 'access') for (const e of [l.a, l.b]) edge.add(e.node);
   for (const n of nodes) if (n.role !== 'ce' && edge.has(n.id)) n.role = 'pe';
-  report.add('physical', 'derived', 'roles', `CE: no ${igp === 'ospf' ? 'OSPF' : 'IS-IS'} and no MPLS-TP tunnel; PE: a router that speaks BGP, ends a pseudowire or faces a CE; P: the other routers`);
+  report.add('physical', 'derived', 'roles', `CE: no ${igp === 'ospf' ? 'OSPF' : 'IS-IS'} and no MPLS-TP tunnel; PE: a router that speaks BGP, ends a pseudowire or an EVPN instance, or faces a CE; P: the other routers`);
 
   const routers = nodes.filter((n) => n.role !== 'ce');
   if (igp === 'isis') {
@@ -827,6 +997,9 @@ export function importFacts(input, { name, positions } = {}) {
     pseudowires,
     cfm: { linkMegs: false, megs },
     rings,
+    srv6,
+    flexAlgos,
+    evpn,
   };
   return {
     topology,

@@ -10,3 +10,5 @@ export { replayFailure } from './replay.js';
 export { computeG8032, ringDataPath, rapsHops } from './g8032.js';
 export { rfcVendor } from './vendor.js';
 export { labelProtocols } from './mpls.js';
+export { computeSrv6, computeEvpn, sidOf, locatorPath } from './srv6.js';
+export { evpnWalk, srv6PingWalk, locatorTargets } from './srv6walk.js';

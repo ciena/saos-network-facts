@@ -6,12 +6,13 @@
 // #device=NAME, #service=ID, #topology (panels hidden); anything else is the overview.
 
 import exampleFacts from '../../examples/adaptive-sr-cfm/facts.json?raw';
-import { buildNetwork, ccmWalk, isisFloodWalk, ospfFloodAreas, ospfFloodWalk, replayFailure, tpTunnelWalk, vpwsWalk } from './engine/index.js';
+import { buildNetwork, ccmWalk, evpnWalk, isisFloodWalk, locatorTargets, ospfFloodAreas, ospfFloodWalk, replayFailure, srv6PingWalk, tpTunnelWalk, vpwsWalk } from './engine/index.js';
 import { importFacts } from './import/facts.js';
 import { labParams, loadFromParams, loadLab } from './labs.js';
 import { renderDevice, renderOverview, renderService } from './panels.js';
 import { Animator, DWELL_MS, TRAVEL_MS } from './view/animator.js';
 import { LAYERS, LayerView, hex } from './view/layers.js';
+import { labelOptions } from './view/labels.js';
 import { markStep, renderImportReport, renderStep, renderStepList } from './view/panel.js';
 import { createScene } from './view/scene.js';
 import * as THREE from 'three';
@@ -59,6 +60,7 @@ function rebuild(net = null) {
   const { imp } = state;
   state.net = net ?? buildNetwork(imp.topology, { labelMode: imp.labelMode, failures: state.failures });
   layers.build(state.net);
+  for (const el of document.querySelectorAll('#layer-toggles label')) el.hidden = !layers.present.includes(el.dataset.layer);
   $('topo-name').textContent = `${imp.topology.name} · ${imp.topology.nodes.length} devices, ${imp.topology.links.length} links`;
   $('fail-state').textContent = state.failures.length ? `Down: ${state.failures.join(', ')}` : 'All links up';
   renderOverview($('tab-overview'), imp, state.net);
@@ -136,9 +138,45 @@ $('p-panels').addEventListener('click', () => {
 
 for (const L of LAYERS) {
   const label = document.createElement('label');
+  label.dataset.layer = L.id;
   label.innerHTML = `<input type="checkbox" checked data-layer="${L.id}"/><span class="swatch" style="background:${hex(L.color)}"></span>${L.name}`;
   label.querySelector('input').addEventListener('change', (e) => layers.setVisible(L.id, e.target.checked));
   $('layer-toggles').appendChild(label);
+}
+
+// ---- labels ----------------------------------------------------------------
+// The Labels panel (view/labels.js); the choice is kept in this browser where it can be.
+
+const LABELS_KEY = 'saos-network-facts.labels';
+function storedLabels() {
+  try {
+    return labelOptions(JSON.parse(localStorage.getItem(LABELS_KEY) ?? '{}'));
+  } catch {
+    return labelOptions();
+  }
+}
+
+function applyLabels(opts, rebuildLayers) {
+  layers.setLabels(opts);
+  document.documentElement.style.setProperty('--label-scale', String(opts.scale));
+  try {
+    localStorage.setItem(LABELS_KEY, JSON.stringify(opts));
+  } catch {
+    // no storage (private window): the choice lasts for this page
+  }
+  if (rebuildLayers && state.net) layers.build(state.net);
+}
+
+{
+  const opts = storedLabels();
+  $('lbl-node').value = opts.node;
+  $('lbl-bgp').value = opts.bgp;
+  $('lbl-lag').checked = opts.lag;
+  $('lbl-scale').value = String(opts.scale);
+  applyLabels(opts, false);
+  const read = () => labelOptions({ node: $('lbl-node').value, bgp: $('lbl-bgp').value, lag: $('lbl-lag').checked, scale: Number($('lbl-scale').value) });
+  for (const id of ['lbl-node', 'lbl-bgp', 'lbl-lag']) $(id).addEventListener('change', () => applyLabels(read(), true));
+  $('lbl-scale').addEventListener('input', () => applyLabels(read(), false));
 }
 
 // ---- walks -----------------------------------------------------------------
@@ -169,6 +207,15 @@ function fillWalkParams() {
     const ends = () => options(from, (net.vpws.pseudowires.find((p) => p.id === pw.value)?.ends ?? []).map((e) => ({ value: e.node, label: `from ${e.node}` })));
     pw.addEventListener('change', ends);
     ends();
+  } else if (kind === 'evpn') {
+    const inst = add('wp-a', net.evpn.instances.map((i) => ({ value: i.id, label: `EVI ${i.evi} ${(i.type ?? '').toUpperCase()} (${i.members.map((m) => m.node).join('–')})` })));
+    const from = add('wp-b', []);
+    const ends = () => options(from, (net.evpn.instances.find((i) => i.id === inst.value)?.members ?? []).map((m) => ({ value: m.node, label: `from ${m.node}` })));
+    inst.addEventListener('change', ends);
+    ends();
+  } else if (kind === 'srv6') {
+    add('wp-a', net.igp.routers.map((r) => ({ value: r, label: `from ${r}` })));
+    add('wp-b', locatorTargets(net));
   } else if (kind === 'ccm') {
     add('wp-a', net.cfm.megs.map((m) => ({ value: m.id, label: `MEG ${m.id}` })));
   } else {
@@ -185,7 +232,7 @@ function fillWalkParams() {
 }
 
 function fillSelects() {
-  const has = { vpws: state.net.vpws.pseudowires.length > 0, ccm: state.net.cfm.megs.length > 0, tp: state.net.tp.tunnels.length > 0, isis: state.net.igp.routers.length > 0 };
+  const has = { vpws: state.net.vpws.pseudowires.length > 0, ccm: state.net.cfm.megs.length > 0, tp: state.net.tp.tunnels.length > 0, evpn: state.net.evpn.instances.length > 0, isis: state.net.igp.routers.length > 0, srv6: state.net.srv6.locators.length > 0 };
   $('walk-kind').querySelector('option[value="isis"]').textContent = state.net.igpName === 'ospf' ? 'OSPF LSA flood' : 'IS-IS LSP flood';
   for (const o of $('walk-kind').options) o.disabled = !has[o.value];
   if (!has[$('walk-kind').value]) $('walk-kind').value = Object.keys(has).find((k) => has[k]) ?? 'vpws';
@@ -201,6 +248,7 @@ $('walk-kind').addEventListener('change', fillWalkParams);
 const walkActions = {
   walkPw: (pwId, from) => runWalk(() => vpwsWalk(state.net, pwId, from)),
   walkCcm: (megId) => runWalk(() => ccmWalk(state.net, megId)),
+  walkEvpn: (id, from) => runWalk(() => evpnWalk(state.net, id, from)),
 };
 
 function runWalk(make) {
@@ -222,6 +270,8 @@ $('walk-run').addEventListener('click', () => {
   if (kind === 'vpws') walkActions.walkPw(a, b);
   else if (kind === 'ccm') walkActions.walkCcm(a);
   else if (kind === 'tp') runWalk(() => tpTunnelWalk(state.net, a));
+  else if (kind === 'evpn') walkActions.walkEvpn(a, b);
+  else if (kind === 'srv6') runWalk(() => srv6PingWalk(state.net, a, b));
   else runWalk(() => (state.net.igpName === 'ospf' ? ospfFloodWalk(state.net, a, b ?? null) : isisFloodWalk(state.net, a)));
 });
 

@@ -82,9 +82,12 @@ table.kvt td:last-child { font-family: var(--mono); font-size: 11px; }
 .hdr td { padding: 0 8px 0 0; vertical-align: top; }
 .hdr td:first-child { color: var(--muted); }
 
-.node-label { color: var(--text); font: 600 12px var(--font); background: rgba(13, 17, 23, 0.75); padding: 1px 6px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
+.node-label { color: var(--text); font: 600 calc(12px * var(--label-scale, 1)) var(--font); background: rgba(13, 17, 23, 0.75); padding: 1px 6px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
 .layer-label { color: var(--muted); font: 600 11px var(--font); letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
-.edge-label { color: #c9d1d9; font: 11px var(--mono); background: rgba(13, 17, 23, 0.7); padding: 0 4px; border-radius: 3px; pointer-events: none; white-space: nowrap; }
+.edge-label { color: #c9d1d9; font: calc(11px * var(--label-scale, 1)) var(--mono); background: rgba(13, 17, 23, 0.7); padding: 0 4px; border-radius: 3px; pointer-events: none; white-space: nowrap; }
+.locator-label { white-space: pre; text-align: center; color: #ffa657; }
+#label-options label { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+#label-options select { flex: 1; }
 .pkt-label { color: var(--bg); font: 600 11px var(--mono); background: #ffd166; padding: 1px 5px; border-radius: 3px; pointer-events: none; white-space: nowrap; }
 
 #player button { display: grid; place-items: center; width: 32px; height: 30px; padding: 0; }

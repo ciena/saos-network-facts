@@ -8,6 +8,7 @@
 // Signal Fail, RPL unblock, and after the repair the guard timer, wait-to-
 // restore and R-APS(NR, RB)) on the rings the link is part of.
 
+import { isHostPrefix } from './ip.js';
 import { buildNetwork } from './network.js';
 import { ccmStream, fmtMs } from './cfm.js';
 import { floodLsp } from './isis.js';
@@ -185,7 +186,7 @@ export function replayFailure(topo, failure, { labelMode = 'ldp', vendor, detect
     const t = firstChange[r] + spfDelay;
     const changes = [];
     for (const [prefix, route] of Object.entries(before.igp.rib[r])) {
-      if (!prefix.endsWith('/32')) continue;
+      if (!isHostPrefix(prefix)) continue;
       const now = after.igp.rib[r][prefix];
       const was = route.nextHops.map((h) => h.node).join('+') || 'local';
       const is = now ? now.nextHops.map((h) => h.node).join('+') || 'local' : 'unreachable';

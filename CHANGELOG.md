@@ -17,6 +17,39 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-31
+
+### Added
+
+- **Viewer: IPv6 networks** — links are two routed interfaces in one IPv4 *or IPv6* subnet (`/64`,
+  `/126`, `/127`; link-local addresses never link; an IPv6 subnet on the same two interfaces as an
+  IPv4 one is that link's second family), BGP neighbours and pseudowire peers are matched over IPv6
+  addresses too, and a router whose IS-IS interfaces carry IPv6 only (or whose loopback has no IPv4
+  address) runs IS-IS, BGP and the label tables on its IPv6 loopback, every loopback address being
+  advertised. An IPv6-only lab now draws its routed links, loopbacks, IS-IS adjacencies and iBGP
+  sessions; before, only IPv4 was read and a `--clab` lab got its cables as L2 links only. The
+  engine's address helpers handle both families (`engine/ip.js`). The Import tab says which routers
+  run on IPv6.
+- **Viewer: Labels panel** — device labels with the loopback or by name only, iBGP labels for every
+  session, only sessions that are down, or none, LAG labels on or off, and the label size; the
+  defaults draw every label as before, and the choice is kept in the browser.
+- **Viewer: SRv6 locators / Flex-Algo and EVPN instances (schema 1.6 facts)** — two planes shown only
+  for a network that has them. The SRv6 plane: each router's locators (with their algorithm),
+  algorithm 0's links, and each Flex-Algo's topology (routers that configure its definition, the links
+  between them) with the definition in use (RFC 9350 §5.3: highest priority, then system id), its metric
+  type and admin-group constraints; the facts carry no link affinities or delays, so no link is excluded
+  and a latency metric falls back to the IGP metric, as the Import tab and the overview say. The EVPN
+  plane: each EVI across its PEs (EVPN-VPLS, EVPN-VPWS with its service ids), its SRv6 locator and its
+  state: Up when every pair of members exchanges EVPN routes (an iBGP session carrying `l2vpn evpn`,
+  directly or through a route reflector), shares a route target, mirrors the VPWS service ids and
+  reaches the other's locator in its algorithm. New walks: *EVPN frame over SRv6* (EVPN-VPWS to the far
+  End.DX2 SID, EVPN-VPLS broadcast by ingress replication to each End.DT2M SID, H.Encaps.L2.Red and
+  decapsulation onto the AC) and *SRv6 packet to a locator* (to its End SID along the locator's
+  algorithm). The facts carry locators, not SIDs: the view allocates the functions and says so.
+  Overview, device and service panels list locators, Flex-Algos, routes to locators and EVPN
+  instances (`#service=evi:<n>`). VRFs / L3VPN over SRv6 are not drawn yet.
+- **Site** — the `srv6-evpn` fixture lab is in the lab index (`?lab=srv6-evpn`).
+
 ## [0.9.0] - 2026-10-31
 
 ### Added

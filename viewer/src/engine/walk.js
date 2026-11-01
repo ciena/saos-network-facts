@@ -6,7 +6,7 @@
 //         moves: [{ from, to, link, member, lost? }], status, t? }
 // header: { name, fields: { ... } }   (outermost first)
 
-import { inPrefix, longestMatch } from './ip.js';
+import { hostPrefix, inPrefix, isV6, longestMatch } from './ip.js';
 import { selectMember } from './lag.js';
 import { ends, ifOrdinal, nodeById, nodeOrdinal } from './topology.js';
 import { floodLsp, lspId } from './isis.js';
@@ -17,7 +17,7 @@ import { ccmGroupMac, ccmStream, fmtMs } from './cfm.js';
 import { IMPLICIT_NULL } from './mpls.js';
 import { imposeSr } from './srpolicy.js';
 
-export const ETHERTYPE = { IPV4: '0x0800', MPLS: '0x8847', CFM: '0x8902' };
+export const ETHERTYPE = { IPV4: '0x0800', IPV6: '0x86DD', MPLS: '0x8847', CFM: '0x8902' };
 const IGP_NAME = { isis: 'IS-IS', ospf: 'OSPF' };
 export const DEFAULT_FLOW = { src: '192.168.1.10', dst: '192.168.2.20', proto: 'UDP', sport: 49152, dport: 5001 };
 
@@ -26,13 +26,13 @@ function mac(net, nodeId, ifname) {
 }
 
 // Pick one of several equal-cost next hops by flow hash (like the LAG distributor).
-function pickNextHop(net, hops, flow) {
+export function pickNextHop(net, hops, flow) {
   if (hops.length === 1) return hops[0];
   return hops[net.vendor.lacp.hash(flow) % hops.length];
 }
 
 // Resolve the physical transmission for sending on `linkId` from `nodeId`.
-function transmit(net, nodeId, linkId, flow) {
+export function transmit(net, nodeId, linkId, flow) {
   const link = net.topo.links.find((l) => l.id === linkId);
   const { local, remote } = ends(link, nodeId);
   const state = net.links[linkId];
@@ -40,7 +40,7 @@ function transmit(net, nodeId, linkId, flow) {
   return { link, local, remote, member: sel?.member ?? null, selection: link.lag ? sel : null };
 }
 
-function ethernet(net, tx, ethertype) {
+export function ethernet(net, tx, ethertype) {
   return {
     name: 'Ethernet II',
     fields: {
@@ -59,7 +59,9 @@ function packetHeaders(pkt) {
   if (pkt.inner) {
     h.push(...pkt.inner); // an Ethernet frame carried by a pseudowire
   } else {
-    h.push({ name: 'IPv4', fields: { src: pkt.ip.src, dst: pkt.ip.dst, ttl: pkt.ip.ttl, protocol: pkt.ip.proto } });
+    h.push(isV6(pkt.ip.dst)
+      ? { name: 'IPv6', fields: { src: pkt.ip.src, dst: pkt.ip.dst, hopLimit: pkt.ip.ttl, nextHeader: pkt.ip.proto } }
+      : { name: 'IPv4', fields: { src: pkt.ip.src, dst: pkt.ip.dst, ttl: pkt.ip.ttl, protocol: pkt.ip.proto } });
     const l4 = pkt.ip.proto === 'TCP' ? 'TCP' : 'UDP';
     h.push({ name: l4, fields: { sport: pkt.l4.sport, dport: pkt.l4.dport } });
   }
@@ -67,7 +69,7 @@ function packetHeaders(pkt) {
   return h;
 }
 
-function lagNote(tx) {
+export function lagNote(tx) {
   if (!tx.selection) return [];
   const s = tx.selection;
   if (s.hash === null) return [`LAG ${tx.local.if}: one distributing member -> ${s.member}`];
@@ -85,15 +87,16 @@ function vrfOfArrival(net, nodeId, inLink) {
 
 // Addresses a node owns: its loopback, its link ends and its VRF interfaces.
 function ownsAddress(net, nodeId, ip) {
-  if (nodeById(net.topo, nodeId).loopback === ip) return true;
-  if (net.topo.links.some((l) => [l.a, l.b].some((e) => e.node === nodeId && e.ip === ip))) return true;
+  const n = nodeById(net.topo, nodeId);
+  if (n.loopback === ip || (n.loopbacks ?? []).includes(ip)) return true;
+  if (net.topo.links.some((l) => [l.a, l.b].some((e) => e.node === nodeId && (e.ip === ip || e.ip6 === ip)))) return true;
   return (net.topo.vrfs ?? []).some((v) => v.sites.some((s) => s.pe === nodeId && (s.interfaces ?? []).some((i) => i.ip === ip)));
 }
 
 // An address inside the modeled lab: a link subnet, a loopback or a VRF member.
 function inLab(net, ip) {
-  if (net.topo.links.some((l) => l.subnet && inPrefix(ip, l.subnet))) return true;
-  if (net.topo.nodes.some((n) => n.loopback === ip || (n.lan && inPrefix(ip, n.lan)))) return true;
+  if (net.topo.links.some((l) => [l.subnet, l.subnet6].some((s) => s && inPrefix(ip, s)))) return true;
+  if (net.topo.nodes.some((n) => n.loopback === ip || (n.loopbacks ?? []).includes(ip) || (n.lan && inPrefix(ip, n.lan)))) return true;
   return (net.topo.vrfs ?? []).some((v) => v.sites.some((s) => (s.interfaces ?? []).some((i) => inPrefix(ip, i.prefix))));
 }
 
@@ -256,7 +259,7 @@ export function forward(net, start, pkt, { flow, inLink = null, maxHops = 16, vr
           return done('dropped', `Drop at ${nodeId}`);
         }
         if (r.type === 'bgp') {
-          const fec = `${r.nextHop}/32`;
+          const fec = hostPrefix(r.nextHop);
           const ftn = net.mpls.ftn[nodeId][fec];
           const nh = pickNextHop(net, ftn.nextHops, flow);
           lookup = {
@@ -559,7 +562,7 @@ function pwForward(net, pw, i, inner) {
   const t = end.transport;
   const flow = { src: node, dst: end.peer, proto: 'ETH', sport: 0, dport: pw.pwid };
   const actions = [`frame in on AC ${end.ac.name} (port ${end.ac.port}): VPWS ${pw.service}, PW ${pw.pwid} to ${end.peer}`];
-  const peerFec = `${nodeById(net.topo, end.peer).loopback}/32`;
+  const peerFec = hostPrefix(nodeById(net.topo, end.peer).loopback);
   if (pw.state !== 'Up') {
     const lookup = { table: 'PW table', key: `PW ${pw.pwid}`, result: 'Down' };
     return [{ node, title: `${node}: PW ${pw.pwid} is down`, lookup, actions: [...actions, ...pw.reasons.map((r) => `down: ${r}`)], headers: inner, moves: [], status: 'dropped' }];

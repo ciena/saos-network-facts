@@ -6,7 +6,7 @@
 // Every core link between two routers is a point-to-point circuit. A LAG is one
 // circuit (IS-IS runs over the aggregated interface, not its members).
 
-import { compareIp } from './ip.js';
+import { compareIp, hostPrefix } from './ip.js';
 import { nodeById } from './topology.js';
 
 export const isRouter = (n) => n.role !== 'ce';
@@ -68,7 +68,7 @@ export function computeAdjacencies(topo, linkStates) {
 export function originateLsp(topo, nodeId, adjacencies, seq = 1, vendor) {
   const node = nodeById(topo, nodeId);
   const isReach = [];
-  const ipReach = [{ prefix: `${node.loopback}/32`, metric: 0 }];
+  const ipReach = [...new Set([node.loopback, ...(node.loopbacks ?? [])])].map((ip) => ({ prefix: hostPrefix(ip), metric: 0 }));
   for (const a of adjacencies) {
     if (a.a !== nodeId && a.b !== nodeId) continue;
     const link = topo.links.find((l) => l.id === a.link);
@@ -76,7 +76,7 @@ export function originateLsp(topo, nodeId, adjacencies, seq = 1, vendor) {
     const nbr = a.a === nodeId ? a.b : a.a;
     const metric = a.cost?.[a.a === nodeId ? 'a' : 'b'] ?? a.metric;
     isReach.push({ neighbor: nbr, systemId: nodeById(topo, nbr).systemId, metric, link: a.link });
-    ipReach.push({ prefix: link.subnet, metric });
+    for (const subnet of [link.subnet, link.subnet6].filter(Boolean)) ipReach.push({ prefix: subnet, metric });
   }
   isReach.sort((x, y) => x.neighbor.localeCompare(y.neighbor) || x.link.localeCompare(y.link));
   ipReach.sort((x, y) => compareIp(x.prefix.split('/')[0], y.prefix.split('/')[0]));

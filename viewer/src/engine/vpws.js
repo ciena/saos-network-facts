@@ -18,6 +18,7 @@
 import { activeTunnel } from './mplstp.js';
 import { prefixSidLabel } from './mpls.js';
 import { policyFor } from './srpolicy.js';
+import { hostPrefix } from './ip.js';
 import { nodeById, nodeOrdinal } from './topology.js';
 
 function transport(topo, isis, mpls, sr, vendor, end, peer, tp) {
@@ -30,7 +31,7 @@ function transport(topo, isis, mpls, sr, vendor, end, peer, tp) {
     const path = end.node === t.src ? t.path : [...t.path].reverse();
     return { kind: 'mpls-tp', tunnel: t.id, configured: end.tunnel, switched: t.id !== end.tunnel, dir: h.dir, stack: [h.outLabel], link: h.link, next: h.next, path };
   }
-  const fec = `${nodeById(topo, peer).loopback}/32`;
+  const fec = hostPrefix(nodeById(topo, peer).loopback);
   if (end.underlay === 'sr-policy') {
     const p = policyFor(sr, end.node, end.color, peer);
     if (!p) return { error: `no SR policy color ${end.color} to ${peer}` };
@@ -65,7 +66,7 @@ export function computeVpws(topo, isis, mpls, sr, vendor, tp = null) {
       return label;
     });
     const [a, b] = pw.ends.map((e) => e.node);
-    const lo = (n) => `${nodeById(topo, n).loopback}/32`;
+    const lo = (n) => hostPrefix(nodeById(topo, n).loopback);
     const tldp = pw.static ? 'static' : isis.rib[a]?.[lo(b)] && isis.rib[b]?.[lo(a)] ? 'Operational' : 'Non-existent';
     const ends = pw.ends.map((e, i) => {
       const peer = pw.ends[1 - i].node;

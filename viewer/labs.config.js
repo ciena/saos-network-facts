@@ -24,6 +24,11 @@ export const LABS = [
     title: 'G.8032 ring without ring ids (fixture, joined by name)',
     source: '../tests/fixtures/expected/g8032-by-name.facts.json',
   },
+  {
+    id: 'srv6-evpn',
+    title: 'SRv6, Flex-Algo and EVPN over an IPv6 core (fixture)',
+    source: '../tests/fixtures/expected/srv6-evpn.facts.json',
+  },
 ];
 
 // The files to stage: labs/index.json and one facts.json per lab, as { path: text }.

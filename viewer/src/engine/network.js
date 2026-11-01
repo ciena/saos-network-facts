@@ -12,6 +12,7 @@ import { computeCfm } from './cfm.js';
 import { computeG8032 } from './g8032.js';
 import { computeSrPolicies } from './srpolicy.js';
 import { computeVpws } from './vpws.js';
+import { computeEvpn, computeSrv6 } from './srv6.js';
 import { rfcVendor } from './vendor.js';
 import { validateTopology } from './topology.js';
 
@@ -40,5 +41,7 @@ export function buildNetwork(topo, { failures = [], labelMode = 'ldp', vendor = 
   const vpws = computeVpws(topo, igp, mpls, sr, vendor, tp);
   const cfm = computeCfm(topo, links, vendor, vpws);
   const g8032 = computeG8032(topo, links, vendor, ringOverrides);
-  return { topo, vendor, failures: [...failed].sort(), labelMode, links, igpName, igp, isis, ospf, mpls, bgp, sr, tp, vpws, cfm, g8032 };
+  const srv6 = computeSrv6(topo, igp);
+  const evpn = computeEvpn(topo, bgp, srv6);
+  return { topo, vendor, failures: [...failed].sort(), labelMode, links, igpName, igp, isis, ospf, mpls, bgp, sr, tp, vpws, cfm, g8032, srv6, evpn };
 }
