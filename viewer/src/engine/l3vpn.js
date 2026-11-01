@@ -75,7 +75,7 @@ export function computeL3vpn(topo, bgp) {
     }
     if (sites.length < 2) reasons.push(`only ${sites[0]?.pe ?? 'no device'} has VRF ${vrf.name}`);
     const state = !reasons.length && pairs.length ? 'Up' : pairs.some((p) => p.ok) ? 'Partial' : 'Down';
-    return { name: vrf.name, role: vrf.role ?? null, description: vrf.description ?? null, sites, pairs, state, reasons, notes };
+    return { name: vrf.name, role: vrf.role ?? null, roleFrom: vrf.roleFrom ?? (vrf.role ? 'facts' : null), description: vrf.description ?? null, sites, pairs, state, reasons, notes };
   });
   return { vrfs };
 }

@@ -54,7 +54,9 @@ How files map to devices:
 - a subdirectory is a device; its files are applied in name order;
 - `--clab`: every node is a device; its `startup-config` is its configuration unless `--configs`
   has files for it. A node of kind `linux` is a host: its record is `skipped` and its addresses and
-  routes, read from its `exec` lines, go into `hosts` (below); nodes of other kinds are `skipped`;
+  routes, read from its `exec` lines, go into `hosts` (below), unless the extractor reads it as a SAOS
+  device (a vrnetlab SAOS image run as kind `linux`, whose type, platform map or startup configuration
+  says SAOS): then it is a device and not a host. Nodes of other kinds are `skipped`;
 - `--hosts`: YAML or JSON, `hosts: {NAME: {interfaces: [{name, addresses, attached: {device, port}}],
   routes: [{prefix, next_hop, interface, metric}], gateway: ADDRESS | {ipv4, ipv6}}}`, for hosts no
   `exec` line describes; an entry for a containerlab host adds to it;
@@ -243,6 +245,13 @@ interfaces by their `vrf`, CE neighbours as BGP `peers` with `vrf` set, static r
   locator, else the instance's `segment-routing srv6 locator` (the device's order of precedence). It
   is empty for a VRF that does not run over SRv6: an L3VPN over MPLS or SR-MPLS shows its VPN label
   mode in `label_allocation` (`{"ipv4": "per-vrf"}`), a management VRF has `role` `management`.
+- `role` is `management` for the management VRF, `data` for any other, null when the configuration
+  says neither (the device default is `data`). The extractor sets `management` when the VRF is
+  configured `role management`, or, with no role, `isolate-mgmt true` (only the management VRF takes
+  it); `data` when it is configured `role data`; null otherwise. **The name alone (`MGMT`) does not
+  count**, nor does the description. A hand-built facts file should set `"role": "management"` on the
+  management VRF of each device. (The viewer also recognises a role-less VRF used only for management:
+  see the [viewer](viewer/README.md).)
 - `static_routes` holds one entry per next hop of each `rib vrf <name> ipv4|ipv6 <prefix>`; `vrf` is
   `default` for the global table, and a route through an interface alone (`Null0`) has a null
   `next_hop`.
@@ -252,8 +261,9 @@ interfaces by their `vrf`, CE neighbours as BGP `peers` with `vrf` set, static r
 Since schema 1.8 the file can carry the lab's Linux hosts (a test host, a CE site, a DCN gateway): a
 host has no device facts, but its addresses, routes and cabling are what a packet needs to start and
 end. They come from the `linux` nodes of a containerlab topology, whose `exec` lines are read
-(`ip [-4|-6] addr add <address> dev <if>`, `ip [-4|-6] route add|replace <prefix>|default [via <next hop>]
-[dev <if>] [metric <n>]`), and from a `--hosts` file. Every other `exec` line is listed in
+(`ip [-4|-6] addr add|replace <address> dev <if>`, IPv4 or IPv6, its options in any order;
+`ip [-4|-6] route add|replace <prefix>|default [via <next hop>] [dev <if>] [metric <n>]`), and from a
+`--hosts` file. Every other `exec` line is listed in
 `ignored_commands`, so nothing is dropped silently.
 
 ```json

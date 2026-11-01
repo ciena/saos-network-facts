@@ -1483,7 +1483,7 @@ export interface VrfInstance {
    */
   description: string | null;
   /**
-   * `data` or `management` (a management VRF); null when not configured (the default is `data`).
+   * The VRF's role: `management` for the management VRF (management traffic: the device's own addresses, DCN gateways), `data` for any other VRF, null when the configuration says neither (the device default is `data`). The SAOS 10 extractor sets `management` when the VRF is configured `role management`, or, with no `role`, `isolate-mgmt true` (only the management VRF takes it); `data` when it is configured `role data`; null otherwise. The VRF's name (`MGMT`, `mgmt`) or description never decides it. A hand-built facts file should set `management` on the management VRF of every device that has one.
    */
   role: string | null;
   /**

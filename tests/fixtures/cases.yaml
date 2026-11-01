@@ -29,3 +29,6 @@ srv6-evpn:
 l3vpn-hosts:
   clab: labs/l3vpn-hosts/topo.clab.yml
   recipe: l3vpn-hosts
+vpws-hosts:
+  clab: labs/vpws-hosts/topo.clab.yml
+  recipe: vpws-hosts

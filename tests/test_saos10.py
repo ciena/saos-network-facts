@@ -649,3 +649,14 @@ def test_bgp_peer_group_name():
     f = run({"ciena-bgp:bgp": {"instance": [{"as": 64496, "peer": [
         {"address": "2001:db8::2", "peer-group": "RR-CLIENTS"}, {"address": "2001:db8::3", "remote-as": 64497}]}]}})
     assert [(p["ip"], p["peer_group"]) for p in f["peers"]] == [("2001:db8::2", "RR-CLIENTS"), ("2001:db8::3", None)]
+
+
+def test_vrf_management_role_from_config_never_from_the_name():
+    """``role management``, else ``isolate-mgmt true`` (only the management VRF takes it); a VRF named
+    MGMT with neither stays null, and ``role data`` wins over nothing else."""
+    f = run({"ciena-vrf:vrf": [{"vrfName": "OOB", "isolate-mgmt": True},
+                               {"vrfName": "MGMT", "description": "management VRF"},
+                               {"vrfName": "CUST", "role": "data"},
+                               {"vrfName": "M2", "role": "management"}]})
+    roles = {v["name"]: v["role"] for v in f["vrf_instances"]}
+    assert roles == {"OOB": "management", "MGMT": None, "CUST": "data", "M2": "management"}
