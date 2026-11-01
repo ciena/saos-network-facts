@@ -53,6 +53,8 @@
             <option value="isis">IS-IS LSP flood</option>
             <option value="evpn">EVPN frame over SRv6</option>
             <option value="srv6">SRv6 packet to a locator</option>
+            <option value="l3vpn">L3VPN packet (host / VRF to an address)</option>
+            <option value="vpnupdate">BGP UPDATE of a VPN route</option>
           </select>
           <div id="walk-params" class="row"></div>
           <button id="walk-run" class="primary" type="button">Run walk</button>
@@ -62,7 +64,6 @@
           <h2>Failure</h2>
           <select id="fail-target" aria-label="Link or LAG member to fail"></select>
           <select id="fail-detection" aria-label="Failure detection">
-            <option value="ccm">Silent failure: found by CFM CCM / BFD</option>
             <option value="los">Loss of signal: interfaces go down at once</option>
           </select>
           <div class="row">

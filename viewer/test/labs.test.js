@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { fetchLabIndex, labParams, loadFromParams } from '../src/labs.js';
+import { fetchLabIndex, labChoices, labParams, loadFromParams } from '../src/labs.js';
 import { LABS, labFiles } from '../labs.config.js';
 
 const BASE = 'https://example.test/site/index.html';
@@ -82,13 +82,14 @@ describe('the page URL', () => {
 describe('the labs the site stages', () => {
   test('labs/index.json lists the example as the default lab and the two-ring fixture, each with its facts file', async () => {
     const files = labFiles();
-    expect(Object.keys(files)).toEqual(['labs/index.json', 'labs/adaptive-sr-cfm/facts.json', 'labs/g8032-two-ring/facts.json', 'labs/g8032-by-name/facts.json', 'labs/srv6-evpn/facts.json']);
+    expect(Object.keys(files)).toEqual(['labs/index.json', 'labs/adaptive-sr-cfm/facts.json', 'labs/g8032-two-ring/facts.json', 'labs/g8032-by-name/facts.json', 'labs/srv6-evpn/facts.json', 'labs/l3vpn-hosts/facts.json']);
     expect(JSON.parse(files['labs/index.json'])).toEqual({
       labs: [
         { id: 'adaptive-sr-cfm', title: 'Adaptive-SR-CFM (example)', facts: 'adaptive-sr-cfm/facts.json', default: true },
         { id: 'g8032-two-ring', title: 'G.8032 two-ring lab (fixture, links from --clab)', facts: 'g8032-two-ring/facts.json' },
         { id: 'g8032-by-name', title: 'G.8032 ring without ring ids (fixture, joined by name)', facts: 'g8032-by-name/facts.json' },
-        { id: 'srv6-evpn', title: 'SRv6, Flex-Algo and EVPN over an IPv6 core (fixture)', facts: 'srv6-evpn/facts.json' },
+        { id: 'srv6-evpn', title: 'SRv6, Flex-Algo, EVPN and an L3VPN over SRv6 (fixture, hosts from --hosts)', facts: 'srv6-evpn/facts.json' },
+        { id: 'l3vpn-hosts', title: 'L3VPN with Linux hosts and a management VRF (fixture, links from --clab)', facts: 'l3vpn-hosts/facts.json' },
       ],
     });
     expect(LABS.filter((l) => l.default).map((l) => l.id)).toEqual(['adaptive-sr-cfm']);
@@ -102,5 +103,19 @@ describe('the labs the site stages', () => {
     expect(JSON.parse(dflt.lab.factsText).devices.map((d) => d.device)).toContain('PE1');
     const ring = await loadFromParams(labParams('?lab=g8032-two-ring'), { base: BASE, fetch: fetchFn });
     expect(JSON.parse(ring.lab.factsText).links).toHaveLength(10);
+  });
+});
+
+describe('the lab menu names what is shown', () => {
+  const index = { labs: [{ id: 'a', title: 'Lab A', default: true }, { id: 'b', title: 'Lab B' }] };
+  test('a lab of the index is selected', () => {
+    expect(labChoices(index, { lab: 'b' })).toEqual({ options: [{ value: 'a', label: 'Lab A' }, { value: 'b', label: 'Lab B' }], value: 'b' });
+  });
+  test('a loaded file gets its own entry, selected, instead of the previous lab', () => {
+    expect(labChoices(index, { file: 'my-lab' })).toEqual({ options: [{ value: '', label: 'Your file: my-lab' }, { value: 'a', label: 'Lab A' }, { value: 'b', label: 'Lab B' }], value: '' });
+  });
+  test('the bundled example is the index\'s default lab', () => {
+    expect(labChoices(index, { example: true }).value).toBe('a');
+    expect(labChoices({ labs: [{ id: 'b', title: 'Lab B' }] }, { example: true }).options[0]).toEqual({ value: '', label: 'Example' });
   });
 });

@@ -82,7 +82,7 @@ export function renderNode(el, net, id) {
     el.innerHTML = '';
     return;
   }
-  let html = `<h2 style="color:var(--text);font-size:14px;text-transform:none">${esc(n.id)} <span class="sub">${n.role.toUpperCase()} ${esc(n.loopback ?? n.lan ?? '')}${n.model ? ` · ${esc(n.model)}` : ''}</span></h2>`;
+  let html = `<h2 style="color:var(--text);font-size:14px;text-transform:none">${esc(n.id)} <span class="sub">${n.host ? 'HOST' : `${n.role.toUpperCase()}${n.rr ? ' / RR' : ''}`} ${esc(n.loopback ?? n.lan ?? '')}${n.model ? ` · ${esc(n.model)}` : ''}</span></h2>`;
   const ifs = net.topo.links.filter((l) => l.a.node === id || l.b.node === id).map((l) => {
     const e = l.a.node === id ? l.a : l.b;
     const far = l.a.node === id ? l.b : l.a;

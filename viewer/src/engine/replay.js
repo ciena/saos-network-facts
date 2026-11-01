@@ -24,6 +24,30 @@ function linkOfFailure(topo, failure) {
   return link;
 }
 
+// What finds a silent failure of `failure` (a link or LAG member) in network `net`, as the replay
+// models it: a CFM MEG on the link, BFD on it, the LACP timeout (a LAG or one of its members), or the
+// IGP hold timer (an IGP adjacency on it); null when nothing watches it, so only a loss of signal
+// can be replayed there. The kind is the replay's branch; the text is for a menu.
+export function silentDetection(net, failure) {
+  const link = linkOfFailure(net.topo, failure);
+  if (link.lag && failure !== link.id) return { kind: 'lacp', text: 'the LACP timeout' };
+  if (net.cfm.megs.some((m) => m.link === link.id)) return { kind: 'cfm', text: 'CFM CCM' };
+  if (link.bfd) return { kind: 'bfd', text: 'BFD' };
+  if (link.lag) return { kind: 'lacp', text: 'the LACP timeout' };
+  if (net.igp.adjacencies.some((a) => a.link === link.id)) return { kind: 'igp', text: `the ${net.igpName === 'ospf' ? 'OSPF dead interval' : 'IS-IS hold timer'}` };
+  return null;
+}
+
+// The failure modes a link or member can be replayed with, as { value, label } for a menu: a silent
+// failure only when something detects it there (named), else only a loss of signal.
+export function failureModes(net, failure) {
+  const found = failure ? silentDetection(net, failure) : null;
+  return [
+    ...(found ? [{ value: 'ccm', label: `Silent failure: found by ${found.text}` }] : []),
+    { value: 'los', label: 'Loss of signal: interfaces go down at once' },
+  ];
+}
+
 function lfibByFec(net, r) {
   return Object.fromEntries(Object.values(net.mpls.lfib[r] ?? {}).map((e) => [e.fec, e]));
 }
@@ -201,7 +225,7 @@ export function replayFailure(topo, failure, { labelMode = 'ldp', vendor, detect
     }
     const what = after.mpls.mode === 'none' ? 'SPF' : `SPF + ${after.mpls.mode.toUpperCase()} LFIB update`;
     step(t, after.mpls.mode === 'none' ? 'isis' : 'mpls', `${r}: ${what}`, changes.length ? changes : ['SPF: no best-path change'], { node: r, highlight: { links: [link.id], nodes: [r] } });
-    if (nodeById(topo, r).role === 'pe') {
+    if (Object.keys(before.bgp.vrfs[r] ?? {}).length) {
       const acts = [];
       for (const [vrf, table] of Object.entries(before.bgp.vrfs[r] ?? {})) {
         for (const route of Object.values(table).filter((x) => x.type === 'bgp')) {

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // The facts panels: the overview (devices, services, SR policies, MPLS-TP tunnels, BGP, G.8032
-// rings, SRv6 locators, Flex-Algos, EVPN instances), one device (its facts record, then the engine's tables for it) and one service
-// (its pseudowire ends, transports and MEG; or an EVPN instance's members, SIDs and paths). Links between them are hash
+// rings, SRv6 locators, Flex-Algos, EVPN instances, VRFs, hosts), one device or host (its facts record, then the engine's
+// tables for it) and one service (its pseudowire ends, transports and MEG; an EVPN instance's members, SIDs and paths;
+// or a VRF's sites, transports and route exchange). Links between them are hash
 // routes (#device=PE1, #service=...), handled by main.js.
 
 import { isisArea } from '../../js/src/index.ts';
 import { canonicalIp } from './import/facts.js';
+import { hex, vrfColor } from './view/layers.js';
 import { renderNode } from './view/panel.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -15,7 +17,13 @@ export const deviceHref = (id) => `#device=${encodeURIComponent(id)}`;
 export const serviceHref = (id) => `#service=${encodeURIComponent(id)}`;
 const deviceLink = (id) => `<a href="${deviceHref(id)}">${esc(id)}</a>`;
 const serviceLink = (s) => `<a href="${serviceHref(s.id)}">${esc(s.name)}</a>`;
+const vrfLink = (net, v) => `<a href="${serviceHref(`vrf:${v.name}`)}" style="color:${hex(vrfColor(net, v.name))}">${esc(v.name)}</a>`;
+const transportCell = (t) => (t.kind === 'srv6' ? `SRv6 ${t.behavior} ${t.sid} (${t.locator})` : `MPLS label ${t.allocation}`);
+const rtText = (site) => Object.entries(site.rts ?? {}).filter(([fam]) => !site.families || site.families.includes(fam))
+  .map(([fam, r]) => `${fam.split(' ')[0]}: import ${r.import.join(' ') || '-'} / export ${r.export.join(' ') || '-'}`).join('; ');
 const eviLink = (i) => `<a href="${serviceHref(i.id)}">EVI ${esc(i.evi)}</a>`;
+// A node's role as shown: HOST for a Linux host, P / RR for a route reflector that is no PE.
+export const roleText = (n) => (n.host ? 'host' : `${n.role.toUpperCase()}${n.rr ? ' / RR' : ''}`);
 const algoText = (a) => (a ? `Flex-Algo ${a}` : '0 (SPF)');
 const definitionText = (d) => {
   if (!d) return 'none advertised';
@@ -47,15 +55,16 @@ function transportText(e) {
 export function renderOverview(el, imp, net) {
   const { file, topology: topo, services } = imp;
   const g = file.generator ?? {};
-  const role = Object.fromEntries(topo.nodes.map((n) => [n.id, n.role]));
   let html = `<h2 class="title">${esc(topo.name)}</h2>`;
   html += `<p class="sub">Facts schema ${esc(file.schema_version)} · ${esc(g.name)} ${esc(g.version)}${g.translator ? ` · ${esc(g.translator.replace(/\s*\(.*\)$/, ''))}` : ''}</p>`;
+  // Linux hosts are not SAOS devices: they are listed under Hosts (with their kind), not here.
+  const hostIds = new Set(topo.nodes.filter((n) => n.host).map((n) => n.id));
   html += '<h2>Devices</h2>';
   html += table(
     ['device', 'type', 'role', 'loopback', 'status', 'PWs', 'MEPs'],
-    file.devices.map((r) => {
+    file.devices.filter((r) => !hostIds.has(r.device)).map((r) => {
       const n = topo.nodes.find((x) => x.id === r.device);
-      return [n ? { html: deviceLink(r.device) } : r.device, r.type, n ? role[r.device].toUpperCase() : '-', n ? (n.loopbacks ?? [n.loopback]).filter(Boolean).join(', ') : null, r.status, r.facts?.pseudowires?.length ?? 0, r.facts?.cfm?.meps?.length ?? 0];
+      return [n ? { html: deviceLink(r.device) } : r.device, r.type, n ? roleText(n) : '-', n ? (n.loopbacks ?? [n.loopback]).filter(Boolean).join(', ') : null, r.status, r.facts?.pseudowires?.length ?? 0, r.facts?.cfm?.meps?.length ?? 0];
     }),
   );
   html += '<h2>Services</h2>';
@@ -102,7 +111,102 @@ export function renderOverview(el, imp, net) {
     );
   }
   html += srv6Overview(net);
+  html += l3vpnOverview(net);
   el.innerHTML = html;
+}
+
+// VRFs (L3VPN) and Linux hosts, when the network has any.
+function l3vpnOverview(net) {
+  let html = '';
+  const vrfs = net.l3vpn?.vrfs ?? [];
+  if (vrfs.length) {
+    html += '<h2>VRFs (L3VPN)</h2>';
+    html += table(['VRF', 'role', 'PEs', 'families', 'transport', 'hosts / CEs', 'state'], vrfs.map((v) => [
+      { html: vrfLink(net, v) }, v.role, { html: v.sites.map((x) => deviceLink(x.pe)).join(', ') },
+      [...new Set(v.sites.flatMap((x) => x.families))].map((f) => f.split(' ')[0]).join(', '),
+      [...new Set(v.sites.flatMap((x) => Object.values(x.transport).map((t) => (t.kind === 'srv6' ? 'SRv6' : `MPLS ${t.allocation}`))))].join(', '),
+      { html: v.sites.flatMap((x) => x.attached.map((a) => deviceLink(a.node))).join(', ') || '-' },
+      `${v.state}${v.reasons.length ? ` (${v.reasons.join('; ')})` : ''}`,
+    ]));
+  }
+  const hosts = net.topo.nodes.filter((n) => n.host);
+  if (hosts.length) {
+    html += '<h2>Hosts</h2>';
+    html += table(['host', 'kind', 'role', 'addresses', 'routes', 'cabled to'], hosts.map((n) => [
+      { html: deviceLink(n.id) }, n.kind ?? 'linux', 'host', (n.addresses ?? []).join(', '), n.routes.map((r) => `${r.prefix} via ${r.nextHop}`).join(', '),
+      { html: net.topo.links.filter((l) => l.a.node === n.id || l.b.node === n.id).map((l) => deviceLink(l.a.node === n.id ? l.b.node : l.a.node)).join(', ') || '-' },
+    ]));
+  }
+  return html;
+}
+
+// A PE's VRFs: RD, route targets, interfaces, transport, and each VRF's table.
+function vrfDevice(net, id) {
+  const mine = (net.l3vpn?.vrfs ?? []).map((v) => ({ v, site: v.sites.find((x) => x.pe === id) })).filter((x) => x.site);
+  if (!mine.length) return '';
+  let html = '<h2>VRFs</h2>';
+  html += table(['VRF', 'RD', 'route targets', 'interfaces', 'transport', 'static routes'], mine.map(({ v, site }) => [
+    { html: vrfLink(net, v) }, site.rd, rtText(site), [...new Set(site.interfaces.map((i) => i.name))].join(', '),
+    Object.entries(site.transport).map(([f, t]) => `${f.split(' ')[0]}: ${transportCell(t)}`).join('; '),
+    site.statics.map((st) => `${st.prefix} ${st.discard ? 'Null0' : `via ${st.nextHop}`}${st.preference !== 1 ? ` pref ${st.preference}` : ''}`).join(', '),
+  ]));
+  for (const { v } of mine) {
+    const rows = Object.values(net.bgp.vrfs[id]?.[v.name] ?? {});
+    html += `<h2>VRF ${vrfLink(net, v)} table</h2>`;
+    html += table(['prefix', 'type', 'next hop', 'label / SID', 'note'], rows.map((r) => [
+      r.prefix, r.type === 'static' && r.discard ? 'static (Null0)' : r.type,
+      r.type === 'bgp' ? `${r.nextHop} (${r.originator}, RD ${r.rd})` : r.via?.ip ?? r.via?.node ?? r.if ?? '-',
+      r.type === 'bgp' ? (r.sid ? `${r.behavior} ${r.sid}` : `label ${r.vpnLabel}`) : r.sid ? `local ${r.sid}` : r.vpnLabel ? `local label ${r.vpnLabel}` : null,
+      r.type === 'bgp' ? `best: ${r.reason}${r.candidates > 1 ? ` of ${r.candidates}` : ''}` : r.alternatives?.length > 1 ? r.alternatives.map((a) => `${a.nextHop} pref ${a.preference} ${a.state}`).join(', ') : null,
+    ]));
+  }
+  return html;
+}
+
+// A Linux host (schema 1.8): its addresses, routes and cabling.
+function hostSection(imp, net, id) {
+  const h = (imp.file.hosts ?? []).find((x) => x.name === id);
+  if (!h) return '';
+  let html = '<h2>Linux host</h2>';
+  html += kv([['from', h.sources.join(', ')], ['kind', h.kind], ['default gateway', [h.default_gateway?.ipv4, h.default_gateway?.ipv6].filter(Boolean).join(', ') || null]]);
+  html += table(['interface', 'addresses', 'cabled to'], h.interfaces.map((i) => [i.name, i.addresses.join(', '), i.attached ? { html: `${deviceLink(i.attached.device)} port ${esc(i.attached.port)}` } : null]));
+  html += table(['route', 'next hop', 'interface', 'metric'], h.routes.map((r) => [r.prefix, r.next_hop, r.interface, r.metric]));
+  if (h.ignored_commands.length) html += `<p class="sub">exec lines not read: ${h.ignored_commands.map(esc).join('; ')}</p>`;
+  const vrfs = (net.l3vpn?.vrfs ?? []).filter((v) => v.sites.some((x) => x.attached.some((a) => a.node === id)));
+  if (vrfs.length) html += `<p class="sub">In VRF ${vrfs.map((v) => vrfLink(net, v)).join(', ')}.</p>`;
+  return html;
+}
+
+// A VRF: its sites (RD, route targets, transport, hosts), the route exchange between them, and walks.
+function renderVrfService(el, net, id, actions) {
+  const v = (net.l3vpn?.vrfs ?? []).find((x) => `vrf:${x.name}` === id);
+  if (!v) {
+    el.innerHTML = `<p class="sub">No VRF ${esc(id)}.</p>`;
+    return;
+  }
+  let html = `<h2 class="title">VRF ${vrfLink(net, v)} <span class="sub">L3VPN${v.role === 'management' ? ' · management' : ''} · ${esc(v.state)}</span></h2>`;
+  if (v.description) html += `<p class="sub">${esc(v.description)}</p>`;
+  if (v.reasons.length || v.notes.length) html += `<ul class="gaps">${v.reasons.map((x) => `<li class="warn">${esc(x)}</li>`).join('')}${v.notes.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  html += '<h2>Sites</h2>';
+  html += table(['PE', 'RD', 'families', 'route targets', 'transport', 'interfaces', 'hosts / CEs'], v.sites.map((x) => [
+    { html: deviceLink(x.pe) }, x.rd, x.families.map((f) => f.split(' ')[0]).join(', '), rtText(x),
+    Object.entries(x.transport).map(([f, t]) => `${f.split(' ')[0]}: ${transportCell(t)}`).join('; '),
+    [...new Set(x.interfaces.map((i) => i.name))].join(', '), { html: x.attached.map((a) => deviceLink(a.node)).join(', ') || '-' },
+  ]));
+  html += '<h2>Route exchange</h2>';
+  html += table(['from', 'to', 'family', 'state'], v.pairs.map((p) => [{ html: deviceLink(p.from) }, { html: deviceLink(p.to) }, p.family, p.ok ? 'imported and installed' : p.reasons.join('; ')]));
+  const hosts = v.sites.flatMap((x) => x.attached.filter((a) => a.host).map((a) => ({ ...a, pe: x.pe })));
+  const targets = (n) => net.topo.nodes.find((x) => x.id === n)?.addresses ?? [];
+  html += '<div class="row">';
+  for (const a of hosts) for (const b of hosts) if (a.node !== b.node && a.pe !== b.pe) for (const ip of targets(b.node).slice(0, 2)) html += `<button type="button" data-walk-host="${esc(a.node)}" data-dst="${esc(ip)}">Packet ${esc(a.node)} → ${esc(ip)}</button>`;
+  for (const x of v.sites) {
+    const r = net.bgp.originated[x.pe]?.find((o) => o.vrf === v.name && o.type !== 'local') ?? net.bgp.originated[x.pe]?.find((o) => o.vrf === v.name);
+    if (r) html += `<button type="button" data-walk-update="${esc(`${x.pe}|${v.name}|${r.prefix}`)}">UPDATE ${esc(r.prefix)} from ${esc(x.pe)}</button>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+  for (const b of el.querySelectorAll('[data-walk-host]')) b.addEventListener('click', () => actions.walkHost(b.dataset.walkHost, b.dataset.dst));
+  for (const b of el.querySelectorAll('[data-walk-update]')) b.addEventListener('click', () => actions.walkUpdate(b.dataset.walkUpdate));
 }
 
 // SRv6 locators, Flex-Algos and EVPN instances, when the network has any.
@@ -190,6 +294,13 @@ function renderEvpnService(el, net, id, actions) {
 }
 
 export function renderDevice(el, imp, net, id) {
+  const host = imp.topology.nodes.find((x) => x.id === id && x.host);
+  if (host) {
+    // A Linux host: no device facts (its containerlab record is only a placeholder), its own panel.
+    el.innerHTML = `<h2 class="title">${esc(id)} <span class="sub">HOST · ${esc(host.kind ?? 'linux')}</span></h2>${hostSection(imp, net, id)}<div class="engine-node"></div>`;
+    renderNode(el.querySelector('.engine-node'), net, id);
+    return;
+  }
   const r = imp.file.devices.find((x) => x.device === id);
   if (!r) {
     el.innerHTML = `<p class="sub">No device ${esc(id)} in this facts file.</p>`;
@@ -202,7 +313,7 @@ export function renderDevice(el, imp, net, id) {
   const bgp = f.bgp?.instances?.[0];
   const sid = sr?.prefix_sids?.find((s) => s.node);
   const srgb = sr?.srgb?.[0];
-  let html = `<h2 class="title">${esc(id)} <span class="sub">${esc(n ? n.role.toUpperCase() : 'not shown')}</span></h2>`;
+  let html = `<h2 class="title">${esc(id)} <span class="sub">${esc(n ? roleText(n) : 'not shown')}</span></h2>`;
   html += kv([
     ['type', r.type],
     ['platform', r.platform],
@@ -287,13 +398,16 @@ export function renderDevice(el, imp, net, id) {
     }));
   }
   html += srv6Device(net, id);
+  html += vrfDevice(net, id);
   el.innerHTML = `${html}<div class="engine-node"></div>`;
   if (n) renderNode(el.querySelector('.engine-node'), net, id);
 }
 
-// actions: { walkPw(pwId, from), walkCcm(megId), walkEvpn(id, from) } to run the walks from the panel's buttons.
+// actions: { walkPw(pwId, from), walkCcm(megId), walkEvpn(id, from), walkHost(from, dst, vrf), walkUpdate(key) }
+// to run the walks from the panel's buttons.
 export function renderService(el, imp, net, id, actions) {
   if (String(id).startsWith('evi:')) return renderEvpnService(el, net, id, actions);
+  if (String(id).startsWith('vrf:')) return renderVrfService(el, net, id, actions);
   const s = imp.services.find((x) => x.id === id);
   if (!s) {
     el.innerHTML = `<p class="sub">No service ${esc(id)}.</p>`;

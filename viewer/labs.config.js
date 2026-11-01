@@ -26,8 +26,13 @@ export const LABS = [
   },
   {
     id: 'srv6-evpn',
-    title: 'SRv6, Flex-Algo and EVPN over an IPv6 core (fixture)',
+    title: 'SRv6, Flex-Algo, EVPN and an L3VPN over SRv6 (fixture, hosts from --hosts)',
     source: '../tests/fixtures/expected/srv6-evpn.facts.json',
+  },
+  {
+    id: 'l3vpn-hosts',
+    title: 'L3VPN with Linux hosts and a management VRF (fixture, links from --clab)',
+    source: '../tests/fixtures/expected/l3vpn-hosts.facts.json',
   },
 ];
 

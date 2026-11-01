@@ -13,6 +13,7 @@ import { computeG8032 } from './g8032.js';
 import { computeSrPolicies } from './srpolicy.js';
 import { computeVpws } from './vpws.js';
 import { computeEvpn, computeSrv6 } from './srv6.js';
+import { computeL3vpn } from './l3vpn.js';
 import { rfcVendor } from './vendor.js';
 import { validateTopology } from './topology.js';
 
@@ -35,13 +36,14 @@ export function buildNetwork(topo, { failures = [], labelMode = 'ldp', vendor = 
   const labels = labelProtocols[labelMode];
   if (!labels) throw new Error(`unknown label mode ${labelMode}`);
   const mpls = labels.build(topo, igp, vendor);
-  const bgp = computeBgp(topo, igp, mpls, vendor, links);
+  const srv6 = computeSrv6(topo, igp);
+  const bgp = computeBgp(topo, igp, mpls, vendor, links, srv6);
   const sr = computeSrPolicies(topo, igp, mpls, vendor);
   const tp = computeMplsTp(topo, links, vendor);
   const vpws = computeVpws(topo, igp, mpls, sr, vendor, tp);
   const cfm = computeCfm(topo, links, vendor, vpws);
   const g8032 = computeG8032(topo, links, vendor, ringOverrides);
-  const srv6 = computeSrv6(topo, igp);
   const evpn = computeEvpn(topo, bgp, srv6);
-  return { topo, vendor, failures: [...failed].sort(), labelMode, links, igpName, igp, isis, ospf, mpls, bgp, sr, tp, vpws, cfm, g8032, srv6, evpn };
+  const l3vpn = computeL3vpn(topo, bgp);
+  return { topo, vendor, failures: [...failed].sort(), labelMode, links, igpName, igp, isis, ospf, mpls, bgp, sr, tp, vpws, cfm, g8032, srv6, evpn, l3vpn };
 }

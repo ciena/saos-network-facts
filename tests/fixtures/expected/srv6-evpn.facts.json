@@ -1482,7 +1482,97 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.10.0"
+    "version": "0.11.0"
   },
-  "schema_version": "1.7.0"
+  "hosts": [
+    {
+      "default_gateway": {
+        "ipv4": "198.51.100.0",
+        "ipv6": "2001:db8:100::"
+      },
+      "ignored_commands": [],
+      "interfaces": [
+        {
+          "addresses": [
+            "198.51.100.1/31",
+            "2001:db8:100::1/127"
+          ],
+          "attached": {
+            "device": "PE1",
+            "port": "5"
+          },
+          "name": "eth1"
+        },
+        {
+          "addresses": [
+            "198.51.100.129/25"
+          ],
+          "attached": null,
+          "name": "lan0"
+        }
+      ],
+      "kind": null,
+      "name": "ce-a",
+      "routes": [
+        {
+          "family": "ipv4",
+          "interface": null,
+          "metric": null,
+          "next_hop": "198.51.100.0",
+          "prefix": "0.0.0.0/0"
+        },
+        {
+          "family": "ipv6",
+          "interface": null,
+          "metric": null,
+          "next_hop": "2001:db8:100::",
+          "prefix": "::/0"
+        }
+      ],
+      "sources": [
+        "hosts-file"
+      ]
+    },
+    {
+      "default_gateway": {
+        "ipv4": "203.0.113.0",
+        "ipv6": null
+      },
+      "ignored_commands": [],
+      "interfaces": [
+        {
+          "addresses": [
+            "203.0.113.1/31"
+          ],
+          "attached": {
+            "device": "PE2",
+            "port": "5"
+          },
+          "name": "eth1"
+        },
+        {
+          "addresses": [
+            "203.0.113.129/25"
+          ],
+          "attached": null,
+          "name": "lan0"
+        }
+      ],
+      "kind": null,
+      "name": "ce-b",
+      "routes": [
+        {
+          "family": "ipv4",
+          "interface": null,
+          "metric": null,
+          "next_hop": "203.0.113.0",
+          "prefix": "0.0.0.0/0"
+        }
+      ],
+      "sources": [
+        "hosts-file"
+      ]
+    }
+  ],
+  "schema_version": "1.8.0"
 }

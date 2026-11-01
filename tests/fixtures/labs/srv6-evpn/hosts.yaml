@@ -1,0 +1,19 @@
+# Synthetic Linux hosts of the srv6-evpn lab (documentation addresses only), for `extract --hosts`:
+# the CE sites of VRF CUST-A, cabled to the CE-facing ports of PE1 and PE2 (logical port 5).
+hosts:
+  ce-a:
+    interfaces:
+      - name: eth1
+        addresses: [198.51.100.1/31, 2001:db8:100::1/127]
+        attached: {device: PE1, port: "5"}
+      - name: lan0
+        addresses: [198.51.100.129/25]
+    gateway: {ipv4: 198.51.100.0, ipv6: "2001:db8:100::"}
+  ce-b:
+    interfaces:
+      - name: eth1
+        addresses: [203.0.113.1/31]
+        attached: {device: PE2, port: "5"}
+      - name: lan0
+        addresses: [203.0.113.129/25]
+    gateway: 203.0.113.0

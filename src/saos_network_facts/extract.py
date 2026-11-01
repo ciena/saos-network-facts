@@ -11,7 +11,8 @@ Each device has an extractor:
   ``platform`` or the device type; a device with neither is ``status: error`` without a call.
 * anything else (a Linux host, a line system): no facts, ``status: skipped``.
 
-A containerlab topology also gives the facts file its ``links`` (``links_from_clab``).
+A containerlab topology also gives the facts file its ``links`` (``links_from_clab``) and, with a hosts
+file, its Linux ``hosts`` (``collect_hosts``): addresses and routes from a ``linux`` node's ``exec`` lines.
 
 The extractor comes from, in order: the platform map's ``extractor``, the device type (``-6x`` / ``-8x``
 -> saos6, ``-10x`` -> saos10), the containerlab kind (``ciena_saos`` -> saos10), and last the files
@@ -20,7 +21,9 @@ themselves (XML, or CLI that is not in the SAOS 6 ``verb [noun] action`` form, i
 A device's files are merged in order, so a loopback created in the first file is known in the third.
 """
 
+import ipaddress
 import re
+import shlex
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +39,7 @@ SAOS10_KINDS = {"ciena_saos", "ciena_saos10"}
 SAOS6_LINE = re.compile(r"^[a-z][\w-]*(?: [\w-]+)? (?:create|set|add|remove|delete|enable|disable|attach|detach|unset|clear)\b")
 CONFIG_SUFFIXES = {".cfg", ".conf", ".txt", ".xml", ".partial", ".cli", ".j2"}
 EXTRACTORS = ("saos6", "saos10")
+HOST_KINDS = {"linux"}
 
 
 @dataclass
@@ -165,6 +169,202 @@ def _link_end(endpoint):
     return None
 
 
+# ---------------------------------------------------------------- Linux hosts
+
+def _family(address):
+    """``ipv4`` or ``ipv6`` for an address or prefix; None when it is neither."""
+    try:
+        return "ipv6" if ipaddress.ip_interface(address).version == 6 else "ipv4"
+    except ValueError:
+        return None
+
+
+def _with_length(address):
+    """An address as ``a/len``: a bare address is a host address (/32, /128), as ``ip addr add`` takes it."""
+    if "/" in address:
+        return address
+    return f"{address}/{128 if _family(address) == 'ipv6' else 32}"
+
+
+def _option(words, name):
+    """The word after ``name`` (``dev eth1`` -> ``eth1``), or None."""
+    return words[words.index(name) + 1] if name in words[:-1] else None
+
+
+def parse_host_exec(lines):
+    """A Linux host's addresses and routes from its containerlab ``exec`` commands.
+
+    Read: ``ip [-4|-6] addr add <address>[/<len>] dev <if>`` (an interface address) and
+    ``ip [-4|-6] route add|replace <prefix>|default [via <next hop>] [dev <if>] [metric <n>]`` (a
+    route; ``default`` is 0.0.0.0/0, or ::/0 with ``-6`` or an IPv6 next hop). Every other command
+    (``ip link set``, ``sysctl``, a script) sets nothing the facts describe and is returned in
+    ``ignored`` as written, so a reader can see what was not read.
+    Returns ``{"addresses": [(if, address)], "routes": [route], "ignored": [command]}``."""
+    out = {"addresses": [], "routes": [], "ignored": []}
+    for raw in lines or []:
+        command = str(raw).strip()
+        if not command:
+            continue
+        try:
+            words = shlex.split(command)
+        except ValueError:
+            out["ignored"].append(command)
+            continue
+        if words[:1] == ["sudo"]:
+            words = words[1:]
+        family = None
+        if words[:1] == ["ip"] and len(words) > 1 and words[1] in ("-4", "-6"):
+            family = "ipv6" if words[1] == "-6" else "ipv4"
+            words = [words[0], *words[2:]]
+        if len(words) >= 4 and words[0] == "ip" and words[1] in ("a", "addr", "address") and words[2] == "add" and _option(words, "dev"):
+            out["addresses"].append((_option(words, "dev"), _with_length(words[3])))
+            continue
+        if len(words) >= 4 and words[0] == "ip" and words[1] in ("r", "ro", "route") and words[2] in ("add", "replace"):
+            via, dev, metric = _option(words, "via"), _option(words, "dev"), _option(words, "metric")
+            target = words[3]
+            if target == "default":
+                family = family or (_family(via) if via else None) or "ipv4"
+                target = "::/0" if family == "ipv6" else "0.0.0.0/0"
+            elif _family(target) is None:
+                out["ignored"].append(command)
+                continue
+            target = _with_length(target)
+            out["routes"].append({"prefix": target, "family": _family(target), "next_hop": via, "interface": dev,
+                                  "metric": int(metric) if metric and metric.isdigit() else None})
+            continue
+        out["ignored"].append(command)
+    return out
+
+
+def _new_host(name, kind=None):
+    return {"name": name, "kind": kind, "sources": [], "interfaces": [], "routes": [],
+            "default_gateway": {"ipv4": None, "ipv6": None}, "ignored_commands": []}
+
+
+def _host_interface(host, name):
+    for iface in host["interfaces"]:
+        if iface["name"] == name:
+            return iface
+    iface = {"name": name, "addresses": [], "attached": None}
+    host["interfaces"].append(iface)
+    return iface
+
+
+def _add_route(host, route):
+    """Add a route, replacing one to the same prefix (``ip route replace``, a hosts file's later word)."""
+    host["routes"] = [r for r in host["routes"] if r["prefix"] != route["prefix"]] + [route]
+
+
+def hosts_from_clab(path):
+    """The Linux hosts of a containerlab topology, ``{name: host}`` in node order: each node of kind
+    ``linux`` (from the node, its kind or the defaults), its interfaces from the links it is cabled on
+    (``attached``: the device and port at the other end) and from its ``exec`` lines, which also give
+    its routes (``parse_host_exec``)."""
+    path = Path(path)
+    data = yaml.safe_load(path.read_text()) or {}
+    topology = data.get("topology") or {}
+    defaults = topology.get("defaults") or {}
+    kinds = topology.get("kinds") or {}
+    hosts = {}
+    for name, node in (topology.get("nodes") or {}).items():
+        node = node or {}
+        kind = node.get("kind") or defaults.get("kind")
+        if kind not in HOST_KINDS:
+            continue
+        merged = {**defaults, **(kinds.get(kind) or {}), **node}
+        host = hosts[str(name)] = _new_host(str(name), kind)
+        host["sources"].append("clab")
+        for link in links_from_clab(path):
+            for me, other in ((link["a"], link["b"]), (link["b"], link["a"])):
+                if me["device"] == host["name"]:
+                    _host_interface(host, me["port"])["attached"] = dict(other)
+        parsed = parse_host_exec(merged.get("exec"))
+        for ifname, address in parsed["addresses"]:
+            iface = _host_interface(host, ifname)
+            if address not in iface["addresses"]:
+                iface["addresses"].append(address)
+        for route in parsed["routes"]:
+            _add_route(host, route)
+        host["ignored_commands"] = parsed["ignored"]
+    return hosts
+
+
+def load_hosts(path):
+    """``{name: host}`` from a hosts file (YAML or JSON), for hosts no containerlab ``exec`` describes:
+    ``hosts: {NAME: {kind, interfaces: [{name, addresses, attached: {device, port}}], routes: [{prefix,
+    next_hop, interface, metric}], gateway: <address> | {ipv4, ipv6}}}`` (or the mapping alone).
+    ``gateway`` is a default route through that address."""
+    path = Path(path)
+    data = yaml.safe_load(path.read_text()) or {}
+    entries = data.get("hosts", data) if isinstance(data, dict) else {}
+    out = {}
+    for name, entry in (entries or {}).items():
+        entry = entry or {}
+        host = out[str(name)] = _new_host(str(name), entry.get("kind"))
+        host["sources"].append("hosts-file")
+        for given in entry.get("interfaces") or []:
+            if not given.get("name"):
+                raise ValueError(f"{path}: host {name}: every interface needs a name")
+            iface = _host_interface(host, str(given["name"]))
+            iface["addresses"] = [_with_length(str(a)) for a in given.get("addresses") or []]
+            if given.get("attached"):
+                attached = given["attached"]
+                iface["attached"] = {"device": str(attached["device"]), "port": str(attached["port"])}
+        for given in entry.get("routes") or []:
+            prefix = _with_length(str(given["prefix"]))
+            if _family(prefix) is None:
+                raise ValueError(f"{path}: host {name}: route prefix {given['prefix']!r} is not an address")
+            _add_route(host, {"prefix": prefix, "family": _family(prefix),
+                              "next_hop": None if given.get("next_hop") is None else str(given["next_hop"]),
+                              "interface": given.get("interface"), "metric": given.get("metric")})
+        gateway = entry.get("gateway")
+        for address in ([gateway] if isinstance(gateway, str) else (gateway or {}).values()):
+            if address:
+                family = _family(str(address))
+                _add_route(host, {"prefix": "::/0" if family == "ipv6" else "0.0.0.0/0", "family": family,
+                                  "next_hop": str(address), "interface": None, "metric": None})
+    return out
+
+
+def _merge_host(host, given):
+    """A hosts-file entry over a containerlab one: its interfaces' addresses and attachments where it
+    gives them, its routes added (replacing those to the same prefix)."""
+    host["kind"] = host["kind"] or given["kind"]
+    host["sources"] += [s for s in given["sources"] if s not in host["sources"]]
+    for iface in given["interfaces"]:
+        mine = _host_interface(host, iface["name"])
+        if iface["addresses"]:
+            mine["addresses"] = iface["addresses"]
+        if iface["attached"]:
+            mine["attached"] = iface["attached"]
+    for route in given["routes"]:
+        _add_route(host, route)
+
+
+def collect_hosts(clab=None, hosts_file=None, devices=()):
+    """The ``hosts`` of the facts file: the containerlab Linux nodes, then the hosts file's (an entry
+    for a containerlab host merges into it), each with its ``default_gateway`` per address family (the
+    next hop of its lowest-metric default route). None when neither input was given. A hosts-file
+    host named like a device the extractor reads is an error."""
+    if not clab and not hosts_file:
+        return None
+    hosts = hosts_from_clab(clab) if clab else {}
+    readable = {d.name for d in devices if d.kind not in HOST_KINDS}
+    for name, given in (load_hosts(hosts_file) if hosts_file else {}).items():
+        if name in readable:
+            raise ValueError(f"{hosts_file}: host {name} is also a device of the configurations")
+        if name in hosts:
+            _merge_host(hosts[name], given)
+        else:
+            hosts[name] = given
+    for host in hosts.values():
+        for family, default in (("ipv4", "0.0.0.0/0"), ("ipv6", "::/0")):
+            routes = [r for r in host["routes"] if r["prefix"] == default and r["next_hop"]]
+            routes.sort(key=lambda r: r["metric"] if r["metric"] is not None else 0)
+            host["default_gateway"][family] = routes[0]["next_hop"] if routes else None
+    return list(hosts.values())
+
+
 def load_platform_map(path):
     """``{device: {"type", "platform", "extractor", "configs"}}`` from a YAML or JSON file: either
     ``devices: {name: {...}}`` or ``{name: {...}}``, where a bare string is the device type."""
@@ -222,6 +422,9 @@ def device_facts(device, translator=None, jobs=1, recipe=None):
         return record
     record["extractor"] = resolve_extractor(device, [t for _, t in texts])
     if record["extractor"] is None:
+        if device.kind in HOST_KINDS:
+            record.update(status="skipped", reason=f"a Linux host (kind {device.kind}): see hosts[]")
+            return record
         record.update(status="skipped", reason="no extractor for this device" + (f" (kind {device.kind})" if device.kind else ""))
         return record
     if not texts:
@@ -286,9 +489,10 @@ def saos10_device_facts(record, texts, platform, translator, jobs=1):
         record["reason"] = "; ".join(f"{f['template']}: {f['error']}" for f in failed)[:300]
 
 
-def document(records, translator=None, links=None):
-    """The facts file: ``schema_version``, what produced it, the device records, and (when a
-    topology was given) the physical ``links`` between the devices."""
+def document(records, translator=None, links=None, hosts=None):
+    """The facts file: ``schema_version``, what produced it, the device records, (when a topology
+    was given) the physical ``links`` between the devices, and (with a topology or a hosts file) the
+    Linux ``hosts``."""
     doc = {
         "schema_version": SCHEMA_VERSION,
         "generator": {"name": "saos-network-facts", "version": __version__,
@@ -297,6 +501,8 @@ def document(records, translator=None, links=None):
     }
     if links is not None:
         doc["links"] = links
+    if hosts is not None:
+        doc["hosts"] = hosts
     return doc
 
 
@@ -324,3 +530,11 @@ def summary_line(record):
             f"loopbacks={lb} ip-interfaces={ip} lags={len(f['lags'])} ports={len(f['ports'])} "
             f"vlans={len(f['vlans'])} peers={len(f['peers'])} pseudowires={len(f['pseudowires'])} "
             f"meps={len(f['cfm']['meps'])} recognised={f['recognised']}/{f['lines']}{tail}")
+
+
+def host_summary_line(host):
+    addresses = sum(len(i["addresses"]) for i in host["interfaces"])
+    gateways = " ".join(f"{f}-gateway={g}" for f, g in host["default_gateway"].items() if g)
+    ignored = f" ignored-exec={len(host['ignored_commands'])}" if host["ignored_commands"] else ""
+    return (f"HOST    {host['name']} ({'+'.join(host['sources'])}) interfaces={len(host['interfaces'])} "
+            f"addresses={addresses} routes={len(host['routes'])}{' ' + gateways if gateways else ''}{ignored}")

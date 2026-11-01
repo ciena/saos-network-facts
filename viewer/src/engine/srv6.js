@@ -25,8 +25,9 @@ import { nodeById } from './topology.js';
 export const DEFAULT_FAD_PRIORITY = 128;
 
 // SID functions the view allocates after a locator: the facts carry locators, not SIDs. 16 bits
-// right after the locator prefix; End for the node, then one per EVPN instance and behaviour.
-export const SRV6_FUNCTIONS = { end: 0x0001, dx2: 0xe000, dt2u: 0xe100, dt2m: 0xe200 };
+// right after the locator prefix; End for the node, then one per EVPN instance and behaviour, and
+// one per VRF for the L3VPN behaviours (End.DT4, End.DT6, RFC 8986 §4.6-4.7).
+export const SRV6_FUNCTIONS = { end: 0x0001, dx2: 0xe000, dt2u: 0xe100, dt2m: 0xe200, dt4: 0xe300, dt6: 0xe400 };
 
 // The SID `fn` of a locator prefix (`2001:db8:f0:1::/64`, 0xe000 -> `2001:db8:f0:1:e000::`).
 export function sidOf(prefix, fn) {

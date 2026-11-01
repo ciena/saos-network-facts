@@ -3,11 +3,11 @@
 // interfaces ride a port (SAOS 10: flow point -> forwarding domain -> interface; SAOS 6: the VLANs
 // the port carries), loopbacks, BGP neighbours, the parts of an IS-IS NET, IS-IS interface metrics,
 // CCM intervals, G.8032 rings and the devices on a ring, SRv6 locators, Flex-Algo definitions,
-// EVPN instances, VRFs and static routes. Pure functions, no Node APIs, so this entry
+// EVPN instances, VRFs and static routes, Linux hosts. Pure functions, no Node APIs, so this entry
 // point works in a browser too; `@ciena/saos-network-facts/node` adds `readFacts(file)`.
 
 import type {
-  DeviceFacts, DeviceRecord, EvpnInstance, FactsFile, FlexAlgorithm, Interface, IsisInstance, Mep, Ring, RingInstance, RingPort, Srv6Locator,
+  DeviceFacts, DeviceRecord, EvpnInstance, FactsFile, FlexAlgorithm, Host, Interface, IsisInstance, Mep, Ring, RingInstance, RingPort, Srv6Locator,
   StaticRoute, VrfInstance,
 } from "./generated/facts.ts";
 
@@ -310,4 +310,22 @@ export function vrfMembers(file: FactsFile, name: string): VrfMember[] {
 export function staticRoutes(device: DeviceFacts | DeviceRecord | null | undefined, vrf?: string): StaticRoute[] {
   const routes = factsOf(device)?.static_routes ?? [];
   return vrf === undefined ? routes : routes.filter((r) => r.vrf === vrf);
+}
+
+/** The file's Linux hosts (schema 1.8: from a containerlab topology's `linux` nodes and a hosts file),
+ * with their addresses, routes and the device ports they are cabled to; empty when the file has none or
+ * predates 1.8. */
+export function hosts(file: FactsFile): Host[] {
+  return file.hosts ?? [];
+}
+
+/** The host of this name, or undefined. */
+export function hostByName(file: FactsFile, name: string): Host | undefined {
+  return hosts(file).find((h) => h.name === name);
+}
+
+/** A host's default gateway in one address family (the next hop of its lowest-metric default route), or
+ * null when it has none. */
+export function hostGateway(host: Pick<Host, "default_gateway">, family: "ipv4" | "ipv6"): string | null {
+  return host.default_gateway?.[family] ?? null;
 }

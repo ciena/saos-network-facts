@@ -565,7 +565,7 @@
       "device": "CE1",
       "extractor": null,
       "facts": null,
-      "reason": "no extractor for this device (kind linux)",
+      "reason": "a Linux host (kind linux): see hosts[]",
       "recipe": "sr-l2",
       "status": "skipped",
       "templates": [],
@@ -575,8 +575,33 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.10.0"
+    "version": "0.11.0"
   },
+  "hosts": [
+    {
+      "default_gateway": {
+        "ipv4": null,
+        "ipv6": null
+      },
+      "ignored_commands": [],
+      "interfaces": [
+        {
+          "addresses": [],
+          "attached": {
+            "device": "PE1",
+            "port": "3"
+          },
+          "name": "eth1"
+        }
+      ],
+      "kind": "linux",
+      "name": "CE1",
+      "routes": [],
+      "sources": [
+        "clab"
+      ]
+    }
+  ],
   "links": [
     {
       "a": {
@@ -599,5 +624,5 @@
       }
     }
   ],
-  "schema_version": "1.7.0"
+  "schema_version": "1.8.0"
 }

@@ -25,3 +25,7 @@ g8032-by-name:
 srv6-evpn:
   configs: [labs/srv6-evpn]
   platform_map: labs/srv6-evpn/platform-map.yaml
+  hosts: labs/srv6-evpn/hosts.yaml
+l3vpn-hosts:
+  clab: labs/l3vpn-hosts/topo.clab.yml
+  recipe: l3vpn-hosts

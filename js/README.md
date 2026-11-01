@@ -6,7 +6,8 @@ The facts-file schema, TypeScript types generated from it, and a reader, for fil
 ```ts
 import { readFacts } from "@ciena/saos-network-facts/node";   // Node: read a file
 import { parseFacts, devicesByName, interfacesOnPort, isRouted, loopbacks, bgpPeers, isisArea, isisAreaId, isisSystemId, isisMetric, ccmIntervalMs, ringsOf, ringMembers,
-         srv6Locators, flexAlgorithms, evpnInstances, evpnMembers, vrfInstances, vrfMembers, vrfRouteTargets, staticRoutes }
+         srv6Locators, flexAlgorithms, evpnInstances, evpnMembers, vrfInstances, vrfMembers, vrfRouteTargets, staticRoutes,
+         hosts, hostByName, hostGateway }
   from "@ciena/saos-network-facts";                          // anywhere: no Node APIs
 import type { FactsFile, DeviceFacts } from "@ciena/saos-network-facts";
 import schema from "@ciena/saos-network-facts/schema" with { type: "json" };
@@ -37,5 +38,8 @@ import schema from "@ciena/saos-network-facts/schema" with { type: "json" };
   `vrfMembers(file, name)`: every device with a VRF of that name, with its VRF;
   `vrfRouteTargets(vrf, addressFamily, "import" | "export")`: the route targets the VRF imports or
   exports in one address family (its own and the VRF-wide ones, `both` counting as each).
+- `hosts(file)`, `hostByName(file, name)`: the Linux hosts (schema 1.8: addresses, routes, the device
+  port each interface is cabled to, `ignored_commands`; empty for older files);
+  `hostGateway(host, "ipv4" | "ipv6")`: its default gateway in that family, or null.
 
 Types and `schema/` are generated from the Python package's schema (`npm run generate`).
