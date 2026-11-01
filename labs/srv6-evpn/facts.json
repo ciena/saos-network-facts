@@ -1482,7 +1482,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.11.0"
+    "version": "0.11.1"
   },
   "hosts": [
     {
