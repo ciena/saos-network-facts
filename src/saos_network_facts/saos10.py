@@ -649,7 +649,9 @@ def _new_vrf(name):
 
 def _vrf_entry(facts, name, vrf):
     """A VRF (a routing and forwarding instance of its own) with its description, its role (``data``,
-    or ``management`` for a management VRF), the SRv6 locator address and SID type it allocates its
+    or ``management`` for a management VRF: ``vrf <name> role management``, or, with no role configured,
+    ``isolate-mgmt true``, which only the management VRF takes; the name never decides it), the SRv6
+    locator address and SID type it allocates its
     service SIDs with (``segment-routing-srv6 locator <ipv6> sid-type u-sid``) and the SR policy color
     that steers its traffic (``sr-policy color``)."""
     if not name:
@@ -675,6 +677,8 @@ def _vrf_entry(facts, name, vrf):
         _set(current, "srv6_sid_type", text(get(srv6, "sid-type")))
     for key in removed_leaves(vrf) & {"description", "role"}:
         current[key] = None
+    if current["role"] is None and str(text(get(vrf, "isolate-mgmt"))).lower() == "true":
+        current["role"] = "management"
 
 
 def _rib(facts, container):

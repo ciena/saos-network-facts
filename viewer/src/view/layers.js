@@ -510,7 +510,7 @@ export class LayerView {
         ring.position.copy(this.pos(site.pe, 'vrf'));
         g.add(ring);
         const tr = Object.values(site.transport);
-        const how = tr.every((t) => t.kind === 'srv6') ? `SRv6 ${[...new Set(tr.map((t) => t.locator))].join('/')}` : tr.every((t) => t.kind === 'mpls') ? `MPLS ${[...new Set(tr.map((t) => t.allocation))].join('/')}` : 'SRv6 + MPLS';
+        const how = !tr.length ? 'no VPN family' : tr.every((t) => t.kind === 'srv6') ? `SRv6 ${[...new Set(tr.map((t) => t.locator))].join('/')}` : tr.every((t) => t.kind === 'mpls') ? `MPLS ${[...new Set(tr.map((t) => t.allocation))].join('/')}` : 'SRv6 + MPLS';
         if (!perPe.has(site.pe)) perPe.set(site.pe, []);
         perPe.get(site.pe).push({ text: `${v.name} ${site.rd ?? ''} · ${how}`, color });
         for (const a of site.attached) {

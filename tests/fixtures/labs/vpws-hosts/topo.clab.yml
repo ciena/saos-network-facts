@@ -1,0 +1,33 @@
+# Synthetic VPWS lab with Linux hosts (documentation addresses only): two SAOS 6 PEs run as
+# containerlab kind linux (vrnetlab style; their type says SAOS 6) with a VPWS between them, and two
+# hosts, one behind each PE, in one subnet carried across the pseudowire. The hosts' exec lines use
+# ip -6 addr replace and options before the address.
+name: vpws-hosts
+topology:
+  nodes:
+    PE1:
+      kind: linux
+      type: 3930-6x
+      startup-config: configs/PE1.cfg
+    PE2:
+      kind: linux
+      type: 3930-6x
+      startup-config: configs/PE2.cfg
+    c1:
+      kind: linux
+      image: alpine:3.20
+      exec:
+        - ip link set eth1 up
+        - ip addr add dev eth1 192.168.50.1/24
+        - ip -6 addr replace 2001:db8:50::1/64 dev eth1
+    c2:
+      kind: linux
+      image: alpine:3.20
+      exec:
+        - ip addr replace 192.168.50.2/24 dev eth1
+        - ip -6 addr add dev eth1 2001:db8:50::2/64 nodad
+        - ip -6 route replace default via 2001:db8:50::1
+  links:
+    - endpoints: ["PE1:1", "PE2:1"]
+    - endpoints: ["PE1:3", "c1:eth1"]
+    - endpoints: ["PE2:3", "c2:eth1"]

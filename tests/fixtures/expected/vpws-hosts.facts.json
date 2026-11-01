@@ -1,0 +1,368 @@
+{
+  "devices": [
+    {
+      "device": "PE1",
+      "extractor": "saos6",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "gateway": null,
+        "hostname": "PE1",
+        "interfaces": [
+          {
+            "ip": "192.0.2.1/32",
+            "kind": "loopback",
+            "name": "lb0",
+            "vlan": null,
+            "vs": null
+          },
+          {
+            "ip": "198.51.100.0/31",
+            "kind": "ip",
+            "name": "core",
+            "vlan": "100",
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "area": "49.0001",
+              "area_id": "49.0001",
+              "level": "L2",
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2001.00",
+              "nets": [
+                "49.0001.1920.0000.2001.00"
+              ],
+              "sr_enabled": null,
+              "system_id": "1920.0000.2001"
+            }
+          ],
+          "interfaces": [
+            {
+              "instance": "CORE",
+              "interface": "core",
+              "level": "L2",
+              "metrics": [],
+              "type": null
+            }
+          ]
+        },
+        "lags": [],
+        "lines": 15,
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": "to PE2",
+            "lag": null,
+            "roles": [],
+            "vlans": [
+              "100"
+            ]
+          },
+          "3": {
+            "description": "customer host c1",
+            "lag": null,
+            "roles": [
+              "virtual-switch"
+            ],
+            "vlans": [
+              "300"
+            ]
+          }
+        },
+        "pseudowires": [
+          {
+            "in_label": null,
+            "kind": "dynamic",
+            "mode": "spoke",
+            "name": "VC300",
+            "out_label": null,
+            "peer": "192.0.2.2",
+            "pw_id": "300",
+            "service": "VS300",
+            "service_type": null,
+            "tunnel": null,
+            "tunnel_color": null,
+            "tunnel_type": null
+          }
+        ],
+        "recognised": 14,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": []
+        },
+        "sub_ports": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "1"
+            ]
+          },
+          "300": {
+            "ports": [
+              "3"
+            ]
+          }
+        }
+      },
+      "recipe": "vpws-hosts",
+      "status": "ok",
+      "templates": [
+        "configs/PE1.cfg"
+      ],
+      "type": "3930-6x"
+    },
+    {
+      "device": "PE2",
+      "extractor": "saos6",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "gateway": null,
+        "hostname": "PE2",
+        "interfaces": [
+          {
+            "ip": "192.0.2.2/32",
+            "kind": "loopback",
+            "name": "lb0",
+            "vlan": null,
+            "vs": null
+          },
+          {
+            "ip": "198.51.100.1/31",
+            "kind": "ip",
+            "name": "core",
+            "vlan": "100",
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "area": "49.0001",
+              "area_id": "49.0001",
+              "level": "L2",
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2002.00",
+              "nets": [
+                "49.0001.1920.0000.2002.00"
+              ],
+              "sr_enabled": null,
+              "system_id": "1920.0000.2002"
+            }
+          ],
+          "interfaces": [
+            {
+              "instance": "CORE",
+              "interface": "core",
+              "level": "L2",
+              "metrics": [],
+              "type": null
+            }
+          ]
+        },
+        "lags": [],
+        "lines": 15,
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": "to PE1",
+            "lag": null,
+            "roles": [],
+            "vlans": [
+              "100"
+            ]
+          },
+          "3": {
+            "description": "customer host c2",
+            "lag": null,
+            "roles": [
+              "virtual-switch"
+            ],
+            "vlans": [
+              "300"
+            ]
+          }
+        },
+        "pseudowires": [
+          {
+            "in_label": null,
+            "kind": "dynamic",
+            "mode": "spoke",
+            "name": "VC300",
+            "out_label": null,
+            "peer": "192.0.2.1",
+            "pw_id": "300",
+            "service": "VS300",
+            "service_type": null,
+            "tunnel": null,
+            "tunnel_color": null,
+            "tunnel_type": null
+          }
+        ],
+        "recognised": 14,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": []
+        },
+        "sub_ports": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "1"
+            ]
+          },
+          "300": {
+            "ports": [
+              "3"
+            ]
+          }
+        }
+      },
+      "recipe": "vpws-hosts",
+      "status": "ok",
+      "templates": [
+        "configs/PE2.cfg"
+      ],
+      "type": "3930-6x"
+    },
+    {
+      "device": "c1",
+      "extractor": null,
+      "facts": null,
+      "reason": "a Linux host (kind linux): see hosts[]",
+      "recipe": "vpws-hosts",
+      "status": "skipped",
+      "templates": [],
+      "type": null
+    },
+    {
+      "device": "c2",
+      "extractor": null,
+      "facts": null,
+      "reason": "a Linux host (kind linux): see hosts[]",
+      "recipe": "vpws-hosts",
+      "status": "skipped",
+      "templates": [],
+      "type": null
+    }
+  ],
+  "generator": {
+    "name": "saos-network-facts",
+    "translator": "translator 4.2.1 (recorded)",
+    "version": "0.11.1"
+  },
+  "hosts": [
+    {
+      "default_gateway": {
+        "ipv4": null,
+        "ipv6": null
+      },
+      "ignored_commands": [
+        "ip link set eth1 up"
+      ],
+      "interfaces": [
+        {
+          "addresses": [
+            "192.168.50.1/24",
+            "2001:db8:50::1/64"
+          ],
+          "attached": {
+            "device": "PE1",
+            "port": "3"
+          },
+          "name": "eth1"
+        }
+      ],
+      "kind": "linux",
+      "name": "c1",
+      "routes": [],
+      "sources": [
+        "clab"
+      ]
+    },
+    {
+      "default_gateway": {
+        "ipv4": null,
+        "ipv6": "2001:db8:50::1"
+      },
+      "ignored_commands": [],
+      "interfaces": [
+        {
+          "addresses": [
+            "192.168.50.2/24",
+            "2001:db8:50::2/64"
+          ],
+          "attached": {
+            "device": "PE2",
+            "port": "3"
+          },
+          "name": "eth1"
+        }
+      ],
+      "kind": "linux",
+      "name": "c2",
+      "routes": [
+        {
+          "family": "ipv6",
+          "interface": null,
+          "metric": null,
+          "next_hop": "2001:db8:50::1",
+          "prefix": "::/0"
+        }
+      ],
+      "sources": [
+        "clab"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "device": "PE1",
+        "port": "1"
+      },
+      "b": {
+        "device": "PE2",
+        "port": "1"
+      }
+    },
+    {
+      "a": {
+        "device": "PE1",
+        "port": "3"
+      },
+      "b": {
+        "device": "c1",
+        "port": "eth1"
+      }
+    },
+    {
+      "a": {
+        "device": "PE2",
+        "port": "3"
+      },
+      "b": {
+        "device": "c2",
+        "port": "eth1"
+      }
+    }
+  ],
+  "schema_version": "1.8.0"
+}

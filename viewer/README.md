@@ -81,8 +81,16 @@ only for sessions that are down (or none), LAG labels off, and the label size.
 
 Linux hosts (`hosts[]`, schema 1.8) are CE nodes with their addresses and static routes (the lowest
 metric of equal prefixes first), linked to a router by subnet like any device, else by the file's
-`links[]`; the Import tab lists their `exec` lines the extractor did not read. VRFs (`vrf_instances`,
-schema 1.7) get a **VRFs / L3VPN** plane, shown only when the file has one (`engine/l3vpn.js`): VRFs are
+`links[]`; the Import tab lists their `exec` lines the extractor did not read. Two hosts in one subnet that
+are each cabled to another device are not linked: an L2 service (a VPWS, a VPLS) carries that subnet
+between the devices, and only the cables are drawn. VRFs (`vrf_instances`,
+schema 1.7) get a **VRFs / L3VPN** plane, shown only when the file has one (`engine/l3vpn.js`). The global
+table (`default`) and a VRF with nothing to route (no route distinguisher, route target, interface or
+static route, a name only such as `vlan501`) are left out: not drawn, not listed, and no reason for a PE
+role (the Import tab names them). A management VRF is no service either: one with `role: management` in
+the facts, or, with no role, one used only for management (at every site a loopback in it, its other
+interfaces facing only Linux hosts such as DCN gateways, only default static routes, no CE neighbour);
+its name alone never counts, and the overview says "management (by use)" for the second kind. VRFs are
 joined across devices by name, one site per PE with its RD, route targets per address family,
 interfaces (a host or CE on one is the site's attachment), static routes (Null0 discards),
 redistribution, label allocation and SRv6 locators. A PE exports its VRF's connected and static routes

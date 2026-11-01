@@ -122,9 +122,9 @@ function l3vpnOverview(net) {
   if (vrfs.length) {
     html += '<h2>VRFs (L3VPN)</h2>';
     html += table(['VRF', 'role', 'PEs', 'families', 'transport', 'hosts / CEs', 'state'], vrfs.map((v) => [
-      { html: vrfLink(net, v) }, v.role, { html: v.sites.map((x) => deviceLink(x.pe)).join(', ') },
+      { html: vrfLink(net, v) }, v.role ? `${v.role}${v.roleFrom === 'use' ? ' (by use)' : ''}` : null, { html: v.sites.map((x) => deviceLink(x.pe)).join(', ') },
       [...new Set(v.sites.flatMap((x) => x.families))].map((f) => f.split(' ')[0]).join(', '),
-      [...new Set(v.sites.flatMap((x) => Object.values(x.transport).map((t) => (t.kind === 'srv6' ? 'SRv6' : `MPLS ${t.allocation}`))))].join(', '),
+      [...new Set(v.sites.flatMap((x) => Object.values(x.transport).map((t) => (t.kind === 'srv6' ? 'SRv6' : `MPLS ${t.allocation}`))))].join(', ') || 'none (no VPN family)',
       { html: v.sites.flatMap((x) => x.attached.map((a) => deviceLink(a.node))).join(', ') || '-' },
       `${v.state}${v.reasons.length ? ` (${v.reasons.join('; ')})` : ''}`,
     ]));

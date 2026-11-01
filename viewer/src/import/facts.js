@@ -374,7 +374,21 @@ function topologyLinks(file, links, nodes, report) {
     cabled.set(`${l.a.device}|${l.a.port}`, `${l.b.device}|${l.b.port}`);
     cabled.set(`${l.b.device}|${l.b.port}`, `${l.a.device}|${l.a.port}`);
   }
+  // A host's `attached` (schema 1.8) is cabling too, when links[] does not have it.
+  for (const h of file.hosts ?? []) {
+    for (const i of h.interfaces ?? []) {
+      if (!i.attached || cabled.has(`${h.name}|${i.name}`)) continue;
+      cabled.set(`${h.name}|${i.name}`, `${i.attached.device}|${i.attached.port}`);
+      cabled.set(`${i.attached.device}|${i.attached.port}`, `${h.name}|${i.name}`);
+    }
+  }
   const elsewhere = (e, far) => e.port && cabled.has(`${e.node}|${e.port}`) && cabled.get(`${e.node}|${e.port}`) !== `${far.node}|${far.port}`;
+  // Two hosts in one subnet, each cabled to another device: the subnet is carried by an L2 service
+  // (a VPWS, a VPLS) between those devices, which is not a link of its own: only the cables are drawn.
+  const hostIds = new Set(nodes.filter((n) => n.host).map((n) => n.id));
+  const acrossService = links.filter((l) => hostIds.has(l.a.node) && hostIds.has(l.b.node) && (elsewhere(l.a, l.b) || elsewhere(l.b, l.a)));
+  for (const l of acrossService) links.splice(links.indexOf(l), 1);
+  if (acrossService.length) report.add('physical', 'derived', `${acrossService.length} host subnets across an L2 service`, `${acrossService.map((l) => `${l.a.node} and ${l.b.node} (${l.subnet})`).join('; ')}: the two hosts share a subnet but are cabled to other devices, so an L2 service carries it between them; not drawn as a link (only the cables are)`);
   const bridged = links.filter((l) => !l.lag && (elsewhere(l.a, l.b) || elsewhere(l.b, l.a)));
   for (const l of bridged) {
     l.bridged = [l.a, l.b].map((e) => `${e.node} ${e.if} (port ${e.port ?? '?'}, cabled to ${(cabled.get(`${e.node}|${e.port}`) ?? '?').replace('|', ' port ')})`).join(', ');
@@ -973,11 +987,44 @@ function vrfInterfaces(name, f, v, links, report) {
 // VRFs (schema 1.7), joined across devices by name: one site per device, with what the engine's
 // L3VPN needs (engine/bgp.js): RD, route targets per family, families, redistribution, label
 // allocation, SRv6 locators, interfaces and static routes.
+// A VRF the L3VPN view leaves out: the global table (`default`), or a VRF with nothing to route (no
+// route distinguisher, route target, interface or static route: a name only, `vlan501`).
+function vrfLeftOut(f, v) {
+  if (v.name === 'default') return 'the global table';
+  const empty = !v.route_distinguisher && !(v.route_targets ?? []).length && !(v.interfaces ?? []).length && !staticRoutes(f, v.name).length;
+  return empty ? 'no route distinguisher, route target, interface or static route' : null;
+}
+
+// Whether a VRF whose facts carry no role is used as a management VRF: at every site it has a
+// loopback, its other interfaces face only Linux hosts (DCN gateways), its static routes are default
+// routes and it has no CE BGP neighbour. The name never counts.
+function usedForManagement(v, nodes, links) {
+  const hosts = new Set(nodes.filter((n) => n.host).map((n) => n.id));
+  return v.sites.length > 0 && v.sites.every((s) => {
+    if (!s.interfaces.some((i) => i.kind === 'loopback')) return false;
+    if (s.ceBgpPeers.length) return false;
+    if (!s.statics.every((st) => /\/0$/.test(st.prefix))) return false;
+    return s.interfaces.filter((i) => i.kind !== 'loopback').every((i) => {
+      const l = links.find((x) => x.id === i.link);
+      if (!l) return false;
+      const far = l.a.node === s.pe ? l.b.node : l.a.node;
+      return hosts.has(far);
+    });
+  });
+}
+
 function buildVrfs(devices, nodes, links, report) {
   const routers = new Set(nodes.filter((n) => n.role !== 'ce').map((n) => n.id));
   const byName = new Map();
+  const leftOut = new Map(); // name -> [reason, devices]
   for (const [name, f] of devices) {
     for (const v of vrfInstances(f)) {
+      const why = vrfLeftOut(f, v);
+      if (why) {
+        if (!leftOut.has(v.name)) leftOut.set(v.name, [why, []]);
+        leftOut.get(v.name)[1].push(name);
+        continue;
+      }
       if (!routers.has(name)) {
         report.warn(`${name}: VRF ${v.name} on a device the view does not run the IGP on; left out`);
         continue;
@@ -1007,6 +1054,10 @@ function buildVrfs(devices, nodes, links, report) {
     }
   }
   const vrfs = [...byName.values()];
+  if (leftOut.size) report.add('vrf', 'derived', `${leftOut.size} VRFs left out`, [...leftOut].map(([n, [why, on]]) => `${n} (${why}; ${on.join(', ')})`).join('; ') + ': not an L3VPN, so not drawn and no reason for a PE role');
+  const byUse = vrfs.filter((v) => !v.role && usedForManagement(v, nodes, links));
+  for (const v of byUse) Object.assign(v, { role: 'management', roleFrom: 'use' });
+  if (byUse.length) report.add('vrf', 'derived', 'management VRFs by use', `${byUse.map((v) => v.name).join(', ')}: no role in the facts, but every site has a loopback in it, its other interfaces face only Linux hosts (DCN gateways), its static routes are default routes and it has no CE neighbour, so it is taken as a management VRF (not a service: no PE role). The name never counts; a facts file can say so with role: management`);
   if (vrfs.length) {
     report.add('vrf', 'facts', `${vrfs.length} VRFs`, vrfs.map((v) => `${v.name}${v.role === 'management' ? ' (management)' : ''} on ${v.sites.map((s) => `${s.pe} RD ${s.rd ?? '-'}`).join(', ')}`).join('; ') + ': joined across devices by name; route targets per address family, interfaces, static routes, label allocation and SRv6 locators as configured');
     report.add('vrf', 'derived', 'L3VPN route exchange', 'a PE exports its VRF\'s connected (interfaces, loopbacks) and static routes per address family BGP runs in the VRF, over iBGP sessions carrying vpnv4 / vpnv6 unicast (directly or through a route reflector); another PE imports a route into each VRF whose import route targets it carries (RFC 4364), best path per RFC 4271');

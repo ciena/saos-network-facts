@@ -17,6 +17,39 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-02
+
+### Fixed
+
+- **SAOS 10: the management VRF's `role` from its configuration** — `role` was set only from `role
+  management` / `role data`. A VRF configured `isolate-mgmt true` with no role (only the management VRF
+  takes it) now has `role` `management`. The rule is stated in the schema and the README: the name
+  (`MGMT`) or description never decides it, and a hand-built facts file should set `role: management`.
+  No schema change (1.8.0: only the description says more).
+- **Hosts: a containerlab `linux` node read as a SAOS device is not also a host** — a vrnetlab SAOS image
+  run as kind `linux` (its type, platform map or startup configuration says SAOS) came out both as a
+  device record and, empty, in `hosts[]`. A node is now a device or a host, never both.
+- **Hosts: IPv6 and `replace` exec lines are read** — `ip -6 addr replace ...` (and `ip addr replace`)
+  went to `ignored_commands`, and an address written after its options (`ip -6 addr add dev eth1
+  2001:db8::1/64 nodad`) came out as `dev/32`. Address and route commands now take `add` and `replace`
+  and find the address among the options, IPv4 and IPv6 alike.
+- **Viewer: the global and empty VRFs are not L3VPNs** — the `default` VRF and VRFs with no route
+  distinguisher, route target, interface or static route (bare `vlan501`-style VRFs) were drawn and
+  listed as Down L3VPNs (a site with no VPN family labelled "SRv6") and made every router a PE. They are
+  now left out of the plane, the overview and the roles, and named in the Import tab. The extractor keeps
+  them in the facts: they are configuration.
+- **Viewer: a management VRF without a role is recognised by its use** — a role-less management VRF (a
+  loopback at every site, other interfaces only towards Linux hosts such as DCN gateways, only default
+  static routes, no CE neighbour) was taken for a customer VRF, so every router was a PE. It is now a
+  management VRF ("management (by use)" in the overview), not a service; a `role` in the facts wins, and
+  the name alone never counts.
+- **Viewer: no link between hosts that only share a subnet across an L2 service** — two hosts in one
+  subnet, each cabled to a PE, were linked directly although a VPWS carries the subnet between the PEs;
+  only the cables are drawn now (a host's `attached` counts as cabling too).
+- **Fixtures** — a new clab lab `labs/vpws-hosts` (two SAOS 6 PEs run as kind `linux` with a VPWS, two
+  hosts on one subnet behind them, IPv6 `replace` and options-first exec lines); no translator calls.
+  The other expected files only gain the new version.
+
 ## [0.11.0] - 2026-11-01
 
 ### Added

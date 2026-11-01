@@ -419,3 +419,23 @@ def test_hosts_are_optional():
     assert "hosts" not in run_case("mixed")
     assert [h["name"] for h in run_case("sr-l2")["hosts"]] == ["CE1"]
     assert [h["name"] for h in run_case("srv6-evpn")["hosts"]] == ["ce-a", "ce-b"]
+
+
+def test_a_linux_node_read_as_a_saos_device_is_no_host():
+    """L1: a containerlab node of kind linux whose type says SAOS (a vrnetlab image) is a device only."""
+    doc = run_case("vpws-hosts")
+    assert [(r["device"], r["status"], r["extractor"]) for r in doc["devices"]] == [
+        ("PE1", "ok", "saos6"), ("PE2", "ok", "saos6"), ("c1", "skipped", None), ("c2", "skipped", None)]
+    assert [h["name"] for h in doc["hosts"]] == ["c1", "c2"]
+
+
+def test_ipv6_and_replace_exec_lines_are_read():
+    """L2: ip -6 addr replace / add, and options before the address, like the IPv4 lines."""
+    hosts = {h["name"]: h for h in run_case("vpws-hosts")["hosts"]}
+    assert hosts["c1"]["interfaces"][0]["addresses"] == ["192.168.50.1/24", "2001:db8:50::1/64"]
+    assert hosts["c2"]["interfaces"][0]["addresses"] == ["192.168.50.2/24", "2001:db8:50::2/64"]
+    assert hosts["c1"]["ignored_commands"] == ["ip link set eth1 up"]
+    parsed = extract.parse_host_exec(["ip -6 a replace 2001:db8::5/64 dev eth2", "ip -4 addr add 2001:db8::6/64 dev eth2",
+                                      "ip addr add dev eth3 label eth3:1 192.0.2.9/24", "ip addr add dev eth4"])
+    assert parsed["addresses"] == [("eth2", "2001:db8::5/64"), ("eth3", "192.0.2.9/24")]
+    assert parsed["ignored"] == ["ip -4 addr add 2001:db8::6/64 dev eth2", "ip addr add dev eth4"]

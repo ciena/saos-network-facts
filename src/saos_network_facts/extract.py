@@ -194,7 +194,8 @@ def _option(words, name):
 def parse_host_exec(lines):
     """A Linux host's addresses and routes from its containerlab ``exec`` commands.
 
-    Read: ``ip [-4|-6] addr add <address>[/<len>] dev <if>`` (an interface address) and
+    Read: ``ip [-4|-6] addr add|replace <address>[/<len>] dev <if>`` (an interface address, IPv4 or
+    IPv6, its options in any order: ``ip -6 addr add dev eth1 2001:db8::1/64 nodad``) and
     ``ip [-4|-6] route add|replace <prefix>|default [via <next hop>] [dev <if>] [metric <n>]`` (a
     route; ``default`` is 0.0.0.0/0, or ::/0 with ``-6`` or an IPv6 next hop). Every other command
     (``ip link set``, ``sysctl``, a script) sets nothing the facts describe and is returned in
@@ -216,12 +217,16 @@ def parse_host_exec(lines):
         if words[:1] == ["ip"] and len(words) > 1 and words[1] in ("-4", "-6"):
             family = "ipv6" if words[1] == "-6" else "ipv4"
             words = [words[0], *words[2:]]
-        if len(words) >= 4 and words[0] == "ip" and words[1] in ("a", "addr", "address") and words[2] == "add" and _option(words, "dev"):
-            out["addresses"].append((_option(words, "dev"), _with_length(words[3])))
+        if len(words) >= 4 and words[0] == "ip" and words[1] in ("a", "addr", "address") and words[2] in ("add", "replace"):
+            address = _operand(words[3:])
+            if address and _family(address) and _option(words, "dev") and (family is None or _family(address) == family):
+                out["addresses"].append((_option(words, "dev"), _with_length(address)))
+                continue
+            out["ignored"].append(command)
             continue
         if len(words) >= 4 and words[0] == "ip" and words[1] in ("r", "ro", "route") and words[2] in ("add", "replace"):
             via, dev, metric = _option(words, "via"), _option(words, "dev"), _option(words, "metric")
-            target = words[3]
+            target = _operand(words[3:]) or words[3]
             if target == "default":
                 family = family or (_family(via) if via else None) or "ipv4"
                 target = "::/0" if family == "ipv6" else "0.0.0.0/0"
@@ -234,6 +239,28 @@ def parse_host_exec(lines):
             continue
         out["ignored"].append(command)
     return out
+
+
+# ip(8) options that take a value, and those that stand alone, around an address or route operand.
+IP_VALUE_OPTIONS = {"dev", "via", "metric", "label", "scope", "valid_lft", "preferred_lft", "peer", "broadcast",
+                    "brd", "anycast", "table", "proto", "protocol", "src", "mtu", "realm", "weight"}
+IP_FLAGS = {"nodad", "noprefixroute", "home", "mngtmpaddr", "optimistic", "autojoin", "permanent", "onlink"}
+
+
+def _operand(words):
+    """The address or prefix operand of an ``ip addr`` / ``ip route`` command: its first word that is not
+    an option or the value of one (in ``ip -6 addr add dev eth1 2001:db8::1/64`` it is the address)."""
+    skip = False
+    for word in words:
+        if skip:
+            skip = False
+        elif word in IP_FLAGS:
+            continue
+        elif word in IP_VALUE_OPTIONS:
+            skip = True
+        else:
+            return word
+    return None
 
 
 def _new_host(name, kind=None):
@@ -345,13 +372,15 @@ def collect_hosts(clab=None, hosts_file=None, devices=()):
     """The ``hosts`` of the facts file: the containerlab Linux nodes, then the hosts file's (an entry
     for a containerlab host merges into it), each with its ``default_gateway`` per address family (the
     next hop of its lowest-metric default route). None when neither input was given. A hosts-file
-    host named like a device the extractor reads is an error."""
+    host named like a device the extractor reads is an error. A node is a host or a device, never both:
+    a containerlab ``linux`` node the extractor reads as a SAOS device (a vrnetlab SAOS image is often
+    kind ``linux``; its type, platform map or startup configuration say SAOS) is a device, not a host."""
     if not clab and not hosts_file:
         return None
-    hosts = hosts_from_clab(clab) if clab else {}
-    readable = {d.name for d in devices if d.kind not in HOST_KINDS}
+    readable = {d.name for d in devices if reads_as_device(d)}
+    hosts = {name: h for name, h in (hosts_from_clab(clab) if clab else {}).items() if name not in readable}
     for name, given in (load_hosts(hosts_file) if hosts_file else {}).items():
-        if name in readable:
+        if name in readable or name in {d.name for d in devices if d.kind not in HOST_KINDS}:
             raise ValueError(f"{hosts_file}: host {name} is also a device of the configurations")
         if name in hosts:
             _merge_host(hosts[name], given)
@@ -363,6 +392,15 @@ def collect_hosts(clab=None, hosts_file=None, devices=()):
             routes.sort(key=lambda r: r["metric"] if r["metric"] is not None else 0)
             host["default_gateway"][family] = routes[0]["next_hop"] if routes else None
     return list(hosts.values())
+
+
+def reads_as_device(device):
+    """True when the extractor reads this device (it has an extractor): a SAOS device, not a host."""
+    try:
+        texts = [path.read_text() for _, path in device.configs]
+    except (OSError, UnicodeDecodeError):
+        texts = []
+    return resolve_extractor(device, texts) is not None
 
 
 def load_platform_map(path):
