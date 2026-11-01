@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SAOS network facts viewer</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='9' width='14' height='2' fill='%238b98a8'/%3E%3Crect x='1' y='5' width='14' height='2' fill='%233fb950'/%3E%3Crect x='1' y='1' width='14' height='2' fill='%23f778ba'/%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="./assets/index-JhOuEaUf.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BGaFeRba.css">
+    <script type="module" crossorigin src="./assets/index-B2_GpjIE.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BcanWysO.css">
   </head>
   <body>
     <div id="app">
@@ -54,6 +54,8 @@
             <option value="isis">IS-IS LSP flood</option>
             <option value="evpn">EVPN frame over SRv6</option>
             <option value="srv6">SRv6 packet to a locator</option>
+            <option value="l3vpn">L3VPN packet (host / VRF to an address)</option>
+            <option value="vpnupdate">BGP UPDATE of a VPN route</option>
           </select>
           <div id="walk-params" class="row"></div>
           <button id="walk-run" class="primary" type="button">Run walk</button>
@@ -63,7 +65,6 @@
           <h2>Failure</h2>
           <select id="fail-target" aria-label="Link or LAG member to fail"></select>
           <select id="fail-detection" aria-label="Failure detection">
-            <option value="ccm">Silent failure: found by CFM CCM / BFD</option>
             <option value="los">Loss of signal: interfaces go down at once</option>
           </select>
           <div class="row">
