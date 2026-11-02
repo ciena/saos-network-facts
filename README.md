@@ -42,6 +42,9 @@ saos-network-facts extract --configs configs/ --platform-map devices.yaml -o fac
 # Linux hosts no containerlab exec line describes (test hosts, CE sites, DCN gateways)
 saos-network-facts extract --configs configs/ --platform-map devices.yaml --hosts hosts.yaml -o facts.json
 
+# what the configurations do not say: sites, an optical line system, link labels, notes
+saos-network-facts extract --clab topo.clab.yml --extra extra.yaml -o facts.json
+
 saos-network-facts validate facts.json
 ```
 
@@ -62,7 +65,9 @@ How files map to devices:
   routes: [{prefix, next_hop, interface, metric}], gateway: ADDRESS | {ipv4, ipv6}}}`, for hosts no
   `exec` line describes; an entry for a containerlab host adds to it;
 - `--platform-map`: YAML or JSON, `devices: {NAME: {type, platform, extractor, configs}}` (or
-  `NAME: TYPE`), for what the inputs do not say.
+  `NAME: TYPE`), for what the inputs do not say;
+- `--extra`: YAML or JSON with sites, line-system members, link kinds and labels and notes, carried into
+  the file as given: see [Sites, line systems and notes](#sites-line-systems-and-notes).
 
 Which parser reads a device: the platform map's `extractor`, else the device type (`*-6x`, `*-8x`:
 SAOS 6/8; `*-10x`: SAOS 10), else the containerlab kind (`ciena_saos`: SAOS 10), else the files
@@ -116,7 +121,7 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 
 ```json
 {
-  "schema_version": "1.8.0",
+  "schema_version": "1.9.0",
   "generator": {"name": "saos-network-facts", "version": "0.11.0", "translator": "translator 4.2.1 (mcp, https://...)"},
   "devices": [
     {
@@ -138,6 +143,8 @@ A file the translator rejects is listed in the device's `failed_templates` and t
 
 `links` (since schema 1.5) is present only when `--clab` was given: the topology's links, as declared.
 `hosts` (since schema 1.8) is present when `--clab` or `--hosts` was given: see [Linux hosts](#linux-hosts).
+`notes`, `links[].kind` / `label` and `devices[].site` / `role` (since schema 1.9) come from `--extra`: see
+[Sites, line systems and notes](#sites-line-systems-and-notes).
 
 The full schema, with a description on every field, is
 [`src/saos_network_facts/schema/facts-v1.schema.json`](src/saos_network_facts/schema/facts-v1.schema.json)
@@ -282,6 +289,41 @@ they joined). Every other `exec` line is listed in `ignored_commands`, so nothin
 
 `attached` is the device and port at the other end of the host's cable (the topology's `links`, or the
 hosts file's `attached`); `default_gateway` is the next hop of the lowest-metric default route per family.
+
+### Sites, line systems and notes
+
+Since schema 1.9 the file can carry what no configuration says and a drawing needs: the site of each
+device, the members of an optical line system and the spans between them, a label per link, and notes.
+The library reads no inventory: the caller writes them in an `--extra` file (from its own inventory or lab
+description) and the extractor carries them into the facts as given; the viewer, the frames and the
+snapshot draw them.
+
+```yaml
+devices:                      # a known device gets its site (and role); a new name is a record with no facts
+  PE1: {site: east}
+  ROADM-A: {type: roadm-2d, role: roadm, site: east}
+  AMP-1: {type: ila, role: amplifier}
+links:                        # ends DEVICE:PORT or {device, port}, or endpoints: [A, B] as in containerlab
+  - {a: "PE1:1", b: "ROADM-A:add-1", kind: optical, label: "ch 25"}
+  - {a: "ROADM-A:line", b: "AMP-1:west", kind: optical, label: "span 1 · 40 km"}
+notes:                        # free text, on a device or not, on a view layer (default physical)
+  - {text: "in-line amplifier hut", device: AMP-1}
+  - "the core link rides ch 25"
+```
+
+- A name no other input knows (a ROADM, an amplifier, a terminal) becomes a device record with its `type`
+  and `role` and no facts (`extractor` null, `status` `skipped`): a line-system member. A known device or
+  host gets its `site` and `role`.
+- A link joining the same two ports as a topology link gives it its `kind` (`ethernet`, `optical`, `lag`;
+  other values are kept) and `label`; any other is added to `links`.
+- `notes[]` is top-level: `{text, device?, layer?}`. Notes describe this lab, like the line system and the
+  labels written beside them, so they live in the facts; a view is a presentation that many labs share.
+- A link end or note on a name no input knows, or an unknown key, is an error before anything is extracted.
+
+Drawn: optical spans as a blue double line with their label, line-system members as solid blue boxes
+tagged with their role (ROADM, AMP, OT), a dashed frame round each site's devices, notes in yellow beside
+their device (the snapshot numbers them and lists them in the plane's corner) or along the edge. The layout
+puts a chain of plain boxes between two routers (a ROADM, amplifiers, a ROADM) on the core with them.
 
 ### Rings
 
@@ -473,7 +515,7 @@ same positions), and shared by every renderer:
 
 1. **The core**: the IGP routers (P and PE); in a lab without one, the G.8032 ring members; else the
    devices on the longest cycle; else (a chain or a tree) the devices that link others. A plain box
-   between two core devices is core too, and so is a second cycle linked to the core (such as MPLS-TP
+   between two core devices is core too, as is a chain of them (an optical line system), and so is a second cycle linked to the core (such as MPLS-TP
    nodes without an IGP on a ring of their own).
 2. **A ladder**: the ring (else the core's longest cycle) as a racetrack of two rows, at the rotation
    and split that keep the other core links short and uncrossed and put the devices facing customers at
@@ -513,7 +555,8 @@ with the same layout as the 3D page:
   IGP; EVPN instances; CFM MEGs. The view picks them (`layers`, `frames.rule` / `frames.list`) and the
   frame to start on (`frames.start`, by default the lab's signature layer: its services, else its
   transport). Devices stay put from frame to frame; each object carries two or three short labels, each
-  frame a title, devices without facts are dashed plain boxes. Each frame is a group `<g id="f-<layer>">`
+  frame a title, devices without facts are dashed plain boxes (line-system members solid, with their
+  role), optical spans a double line with their label, sites a dashed frame, notes yellow (schema 1.9). Each frame is a group `<g id="f-<layer>">`
   shown by CSS `:target`, so `<img src="frames.svg#f-igp">` shows one frame without any script, and
   `<img src="frames.svg">` shows the start frame. A card rotates through them by stacking one `<img>` per
   frame (or by inlining the SVG and showing one group at a time).
@@ -547,7 +590,7 @@ const full = snapshot(factsText, { preset: 'lab-snapshot' });   // { svg, layers
 
 ```ts
 import { readFacts } from "@ciena/saos-network-facts/node";
-import { ccmIntervalMs, devicesByName, hostByName, hostGateway, hosts, interfacesOnPort, isisArea, isisMetric, ringsOf, ringMembers } from "@ciena/saos-network-facts";
+import { ccmIntervalMs, devicesByName, hostByName, hostGateway, hosts, interfacesOnPort, isisArea, isisMetric, notes, ringsOf, ringMembers, sites } from "@ciena/saos-network-facts";
 
 const facts = readFacts("facts.json");          // schema 1.x (or a pre-schema bare list)
 const pe1 = devicesByName(facts).get("PE1")!;
@@ -559,6 +602,8 @@ ringsOf(pe1);                                   // the device's G.8032 rings wit
 ringMembers(facts, 1);                          // [{ device, ring }] for every device on ring id 1
 hosts(facts);                                   // the Linux hosts (schema 1.8; [] for older files)
 hostGateway(hostByName(facts, "h1")!, "ipv4");  // "192.168.10.1", or null
+sites(facts);                                   // Map { "east" => ["PE1", "ROADM-A"] } (schema 1.9; empty for older files)
+notes(facts, { device: "AMP-1" });              // the notes on AMP-1; { layer: "physical" }, { device: null } (free)
 ```
 
 The main entry point has no Node dependencies (`parseFacts(json)` for browsers); see [`js/`](js/).

@@ -7,7 +7,7 @@ The facts-file schema, TypeScript types generated from it, and a reader, for fil
 import { readFacts } from "@ciena/saos-network-facts/node";   // Node: read a file
 import { parseFacts, devicesByName, interfacesOnPort, isRouted, loopbacks, bgpPeers, isisArea, isisAreaId, isisSystemId, isisMetric, ccmIntervalMs, ringsOf, ringMembers,
          srv6Locators, flexAlgorithms, evpnInstances, evpnMembers, vrfInstances, vrfMembers, vrfRouteTargets, staticRoutes,
-         hosts, hostByName, hostGateway }
+         hosts, hostByName, hostGateway, notes, sites }
   from "@ciena/saos-network-facts";                          // anywhere: no Node APIs
 import type { FactsFile, DeviceFacts } from "@ciena/saos-network-facts";
 import schema from "@ciena/saos-network-facts/schema" with { type: "json" };
@@ -43,6 +43,10 @@ import viewSchema from "@ciena/saos-network-facts/view-schema" with { type: "jso
 - `hosts(file)`, `hostByName(file, name)`: the Linux hosts (schema 1.8: addresses, routes, the device
   port each interface is cabled to, `ignored_commands`; empty for older files);
   `hostGateway(host, "ipv4" | "ipv6")`: its default gateway in that family, or null.
+- `sites(file)`: the sites (schema 1.9, from the extractor's `--extra` file) and the devices and hosts at
+  each, as a `Map`; `notes(file, { layer, device })`: the notes, all or those of a view layer (none given:
+  `physical`) or anchored to a device (`null`: the free ones). Line-system members are device records with
+  a `role` and no facts; `links[].kind` (`optical`...) and `label` describe the spans.
 
 - `resolveView(view?, urlParams?)`: view properties (view schema 1.x, see the main README) merged from
   the defaults, the preset, the view file (JSON value or text) and URL parameters (a query string,

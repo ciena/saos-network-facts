@@ -65,8 +65,8 @@ export function renderOverview(el, imp, net) {
     ['device', 'type', 'role', 'loopback', 'status', 'PWs', 'MEPs'],
     file.devices.filter((r) => !hostIds.has(r.device)).map((r) => {
       const n = topo.nodes.find((x) => x.id === r.device);
-      const box = !n && topo.plain?.nodes.some((x) => x.id === r.device);
-      return [n || box ? { html: deviceLink(r.device) } : r.device, r.type, n ? roleText(n) : box ? 'plain box' : '-', n ? (n.loopbacks ?? [n.loopback]).filter(Boolean).join(', ') : null, r.status, r.facts?.pseudowires?.length ?? 0, r.facts?.cfm?.meps?.length ?? 0];
+      const box = !n && topo.plain?.nodes.find((x) => x.id === r.device);
+      return [n || box ? { html: deviceLink(r.device) } : r.device, r.type, n ? roleText(n) : box ? box.equipment ?? 'plain box' : '-', n ? (n.loopbacks ?? [n.loopback]).filter(Boolean).join(', ') : null, r.status, r.facts?.pseudowires?.length ?? 0, r.facts?.cfm?.meps?.length ?? 0];
     }),
   );
   html += '<h2>Services</h2>';
@@ -316,9 +316,10 @@ export function renderDevice(el, imp, net, id) {
   const sid = sr?.prefix_sids?.find((s) => s.node);
   const srgb = sr?.srgb?.[0];
   const box = !n && imp.topology.plain?.nodes.find((x) => x.id === id);
-  let html = `<h2 class="title">${esc(id)} <span class="sub">${esc(n ? roleText(n) : box ? 'plain box' : 'not shown')}</span></h2>`;
+  let html = `<h2 class="title">${esc(id)} <span class="sub">${esc(n ? roleText(n) : box ? box.equipment ?? 'plain box' : 'not shown')}</span></h2>`;
   html += kv([
     ['type', r.type],
+    ...(r.site ? [['site', r.site]] : []),
     ['platform', r.platform],
     ['extractor', r.extractor],
     ['status', `${r.status}${r.reason ? ` (${r.reason})` : ''}`],
@@ -326,8 +327,8 @@ export function renderDevice(el, imp, net, id) {
     ['files', { html: (r.templates ?? []).map(esc).join('<br/>') || '-' }],
   ]);
   if (box) {
-    const cabled = imp.topology.plain.links.filter((l) => l.a.node === id || l.b.node === id).map((l) => (l.a.node === id ? `port ${l.a.port} to ${l.b.node} ${l.b.port}` : `port ${l.b.port} to ${l.a.node} ${l.a.port}`));
-    html += `<p class="sub">No facts: drawn as a plain box${cabled.length ? `, cabled ${esc(cabled.join(', '))} (the file's links[])` : ''}. No protocol runs on it.</p>`;
+    const cabled = imp.topology.plain.links.filter((l) => l.a.node === id || l.b.node === id).map((l) => `${l.a.node === id ? `port ${l.a.port} to ${l.b.node} ${l.b.port}` : `port ${l.b.port} to ${l.a.node} ${l.a.port}`}${l.caption ? ` (${l.caption})` : ''}`);
+    html += `<p class="sub">No facts: ${box.equipment ? `a ${esc(box.equipment)} the extra file gives (a line-system member)` : 'drawn as a plain box'}${cabled.length ? `, cabled ${esc(cabled.join(', '))} (the file's links[])` : ''}. No protocol runs on it.</p>`;
   }
   if (isis) {
     html += '<h2>IS-IS</h2>';

@@ -14,6 +14,9 @@ import { DEFAULT_LABELS, bgpLabel, lagLabel, nodeLabel } from './labels.js';
 // Plain boxes: devices without facts (fill and outline).
 const PLAIN = 0x3a4351;
 const PLAIN_EDGE = 0x8b98a8;
+const OPTICAL = 0x5c7cfa; // optical spans and line-system members (schema 1.9 links[].kind, devices[].role)
+const SITE = 0x8b98a8;
+const PAGE_LAYER_OF = { igp: 'isis' }; // a note's view layer id -> the page's layer id
 
 export const LAYERS = [
   { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8, has: (net) => net.topo.nodes.length > 0 },
@@ -99,6 +102,21 @@ export function planeBox(topo) {
   const xs = drawn.map((n) => n.pos.x);
   const zs = drawn.map((n) => n.pos.z);
   return { x0: Math.min(...xs) - 6, x1: Math.max(...xs) + 6, z0: Math.min(...zs) - 6, z1: Math.max(...zs) + 6 };
+}
+
+// A site's outline on the physical plane: its drawn devices with a margin, in xz.
+export function siteRect(topo, site, pad = 3.6) {
+  const drawn = [...topo.nodes, ...(topo.plain?.nodes ?? [])].filter((n) => site.nodes.includes(n.id) && n.pos);
+  if (!drawn.length) return null;
+  const xs = drawn.map((n) => n.pos.x), zs = drawn.map((n) => n.pos.z);
+  return { x0: Math.min(...xs) - pad, x1: Math.max(...xs) + pad, z0: Math.min(...zs) - pad, z1: Math.max(...zs) + pad };
+}
+
+// The page layer a note (import/facts.js, schema 1.9) goes on: its view layer when the page shows it,
+// else physical.
+export function noteLayer(note, present) {
+  const id = PAGE_LAYER_OF[note.layer] ?? note.layer;
+  return present.includes(id) ? id : 'physical';
 }
 
 // The toggle state after a build: kept for the layers shown, forgotten (visible again) for the others,
@@ -258,6 +276,7 @@ export class LayerView {
       this.groups[L.id] = g;
       this.root.add(g);
     }
+    this.buildNotes(net);
     // Node pillars tie the layers together.
     const pillarMat = new THREE.LineBasicMaterial({ color: 0x3a4655, transparent: true, opacity: 0.6 });
     const vrfRouters = new Set((net.l3vpn?.vrfs ?? []).flatMap((v) => v.sites.map((s) => s.pe)));
@@ -289,12 +308,13 @@ export class LayerView {
       l.members.forEach((m, i) => {
         const up = st.members[i].up;
         const off = memberOffset(a, b, i, l.members.length);
-        const mat = new THREE.MeshStandardMaterial({ color: up ? (l.kind === 'access' ? 0x6e7681 : 0x9aa7b8) : RED, transparent: !up, opacity: up ? 1 : 0.5 });
+        const mat = new THREE.MeshStandardMaterial({ color: up ? (l.medium === 'optical' ? OPTICAL : l.kind === 'access' ? 0x6e7681 : 0x9aa7b8) : RED, transparent: !up, opacity: up ? 1 : 0.5 });
         mats.push(mat);
         g.add(cylinder(a.clone().add(off), b.clone().add(off), 0.13, mat));
       });
       this.linkMeshes[l.id] = mats;
       const mid = new THREE.Vector3().lerpVectors(a, b, 0.5);
+      if (l.caption) g.add(label(l.caption, `edge-label${l.medium === 'optical' ? ' optical' : ''}`, mid.clone().setY(1.4)));
       if (l.lag) {
         const ring = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.08, 8, 24), new THREE.MeshStandardMaterial({ color: st.up ? 0xf0b429 : RED }));
         ring.position.copy(mid);
@@ -306,6 +326,36 @@ export class LayerView {
       }
     }
     this.buildPlain(g, net);
+    this.buildSites(g, net);
+  }
+
+  // Sites (schema 1.9, import/facts.js annotate): a dashed outline on the physical plane round each
+  // site's devices, its name at the front left corner.
+  buildSites(g, net) {
+    for (const site of net.topo.sites ?? []) {
+      const r = siteRect(net.topo, site);
+      if (!r) continue;
+      const y = 0.03;
+      g.add(dashed([[r.x0, r.z0], [r.x1, r.z0], [r.x1, r.z1], [r.x0, r.z1], [r.x0, r.z0]].map(([x, z]) => new THREE.Vector3(x, y, z)), SITE, 0.85));
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(r.x1 - r.x0, r.z1 - r.z0), new THREE.MeshBasicMaterial({ color: SITE, transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false }));
+      plate.rotation.x = -Math.PI / 2;
+      plate.position.set((r.x0 + r.x1) / 2, y - 0.01, (r.z0 + r.z1) / 2);
+      g.add(plate);
+      g.add(label(site.name, 'site-label', new THREE.Vector3(r.x0 + 1.2, y, r.z1 - 0.6)));
+    }
+  }
+
+  // Notes (schema 1.9): on their layer (physical when the page does not show it), so they follow its
+  // toggle; one on a device above the device, a free one at the plane's front right corner.
+  buildNotes(net) {
+    let free = 0;
+    for (const note of net.topo.notes ?? []) {
+      const id = noteLayer(note, this.present);
+      const g = this.groups[id];
+      if (!g) continue;
+      const at = note.device ? this.pos(note.device, id).setY(layerY(id) + 2.6) : new THREE.Vector3(this.box.x1 - 2, layerY(id), this.box.z1 - 1.5 - 1.6 * free++);
+      g.add(label(note.text, note.device ? 'note-label' : 'note-label free', at));
+    }
   }
 
   // Plain boxes (import/facts.js plainNodes): a device without facts as a dim box with an outline, its
@@ -314,8 +364,11 @@ export class LayerView {
   buildPlain(g, net) {
     const plain = net.topo.plain ?? { nodes: [], links: [] };
     for (const n of plain.nodes) {
+      // A line-system member (a role from the extra file, no facts by design): solid, in the optical colour.
       const geo = new THREE.BoxGeometry(2.4, 1.2, 2.4);
-      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: PLAIN, roughness: 0.8, metalness: 0, transparent: true, opacity: 0.55 }));
+      const mesh = new THREE.Mesh(geo, n.equipment
+        ? new THREE.MeshStandardMaterial({ color: OPTICAL, roughness: 0.6, metalness: 0.1 })
+        : new THREE.MeshStandardMaterial({ color: PLAIN, roughness: 0.8, metalness: 0, transparent: true, opacity: 0.55 }));
       mesh.position.copy(this.pos(n.id)).setY(0.6);
       mesh.userData.node = n.id;
       this.pickables.push(mesh);
@@ -323,9 +376,21 @@ export class LayerView {
       const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: PLAIN_EDGE }));
       edges.position.copy(mesh.position);
       g.add(edges);
-      g.add(label(nodeLabel(n, this.labels), 'node-label plain', this.pos(n.id).setY(-1.3)));
+      g.add(label(nodeLabel(n, this.labels), `node-label ${n.equipment ? 'optical' : 'plain'}`, this.pos(n.id).setY(-1.3)));
     }
-    for (const l of plain.links) g.add(dashed([this.pos(l.a.node).setY(0.6), this.pos(l.b.node).setY(0.6)], PLAIN_EDGE, 0.9));
+    // An optical span (links[].kind) as a solid tube in the optical colour with its caption; the rest dashed.
+    const key = (l) => [l.a.node, l.b.node].sort().join('|');
+    const count = new Map(), seen = new Map();
+    for (const l of plain.links) count.set(key(l), (count.get(key(l)) ?? 0) + 1);
+    for (const l of plain.links) {
+      const a = this.pos(l.a.node).setY(0.6), b = this.pos(l.b.node).setY(0.6);
+      const i = seen.get(key(l)) ?? 0;
+      seen.set(key(l), i + 1);
+      const off = memberOffset(a, b, i, count.get(key(l)), 1.2);
+      if (l.medium === 'optical') g.add(cylinder(a.clone().add(off), b.clone().add(off), 0.16, new THREE.MeshStandardMaterial({ color: OPTICAL, roughness: 0.4 })));
+      else g.add(dashed([a.clone().add(off), b.clone().add(off)], PLAIN_EDGE, 0.9));
+      if (l.caption) g.add(label(l.caption, `edge-label${l.medium === 'optical' ? ' optical' : ''}`, new THREE.Vector3().lerpVectors(a, b, 0.5).add(off).setY(1.4)));
+    }
   }
 
   // One line per ring link at the ring's height (a sub-ring a little above its major ring), a bar

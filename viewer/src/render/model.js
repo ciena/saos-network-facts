@@ -59,6 +59,8 @@ export function renderModel(imp, net) {
       rings: ringRoles.get(n.id) ?? [],
       meps: meps.get(n.id) ?? [],
       locators: (locators.get(n.id) ?? []).map((l) => l.prefix),
+      site: n.site ?? null,
+      equipment: n.equipment ?? null,
     };
   });
   // A lab with no IGP router: its devices are L2 switches, not CEs.
@@ -82,6 +84,8 @@ export function renderModel(imp, net) {
     lag: l.members?.length > 1 ? l.members.length : 0,
     ring: ringOf.get(l.id) ?? null,
     plain: !!l.plain,
+    medium: l.medium ?? null,
+    caption: l.caption ?? null,
   }));
 
   const pws = (net.vpws?.pseudowires ?? []).map((pw) => {
@@ -113,6 +117,8 @@ export function renderModel(imp, net) {
     vrfs,
     algorithms,
     areas: [...new Set(nodes.map((n) => n.isis?.area).filter(Boolean))],
+    sites: topo.sites ?? [],
+    notes: topo.notes ?? [],
   };
 }
 
@@ -133,10 +139,32 @@ export function presentLayers(m) {
   return Object.keys(has).filter((k) => has[k]);
 }
 
+// A short tag for a device's box: its role (P, PE, CE...), or for a box without facts its
+// equipment (a line-system member's role from the extra file: ROADM, AMP, OT), else '?'.
+const EQUIPMENT_TAG = { roadm: 'ROADM', amplifier: 'AMP', ila: 'ILA', terminal: 'OT', transponder: 'OT', muxponder: 'MXP', router: 'R', switch: 'SW' };
+export function equipmentTag(n) {
+  if (!n.equipment) return null;
+  const e = n.equipment.toLowerCase();
+  return EQUIPMENT_TAG[e] ?? e.replace(/[^a-z0-9]/g, '').slice(0, 4).toUpperCase();
+}
+
+// Notes wrapped to short lines (about `width` characters), at most `max` lines, the last cut with an ellipsis.
+export function wrapNote(text, width = 34, max = 3) {
+  const lines = [];
+  let cur = '';
+  for (const w of String(text).split(/\s+/).filter(Boolean)) {
+    if (cur && (cur + ' ' + w).length > width) { lines.push(cur); cur = w; } else cur = cur ? `${cur} ${w}` : w;
+  }
+  if (cur) lines.push(cur);
+  if (lines.length > max) { lines.length = max; lines[max - 1] = `${lines[max - 1].slice(0, width - 1)}…`; }
+  return lines;
+}
+
 // The full properties of a device, one per line: the hover title on every object of it.
 export function deviceDetail(n, m) {
-  const lines = [n.id, [n.type, n.platform, n.os].filter(Boolean).join(' · ')];
-  if (n.plain) lines.push(`no facts: ${n.reason ?? 'not extracted'}`);
+  const lines = [n.id, [n.equipment, n.type, n.platform, n.os].filter(Boolean).join(' · ')];
+  if (n.site) lines.push(`site ${n.site}`);
+  if (n.plain && !n.equipment) lines.push(`no facts: ${n.reason ?? 'not extracted'}`);
   if (n.loopback) lines.push(`${n.host ? 'address' : 'loopback'} ${n.loopback}`);
   if (n.sid) lines.push(`prefix SID ${n.sid.label}${n.sid.index != null ? ` (index ${n.sid.index})` : ''}`);
   if (n.isis) lines.push(`${m.igp === 'ospf' ? 'OSPF' : 'IS-IS'} ${n.isis.area ?? ''} ${n.isis.level ?? ''}${n.isis.systemId ? ` · ${n.isis.systemId}` : ''}`.replace(/\s+/g, ' ').trim());

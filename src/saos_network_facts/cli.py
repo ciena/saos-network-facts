@@ -22,6 +22,7 @@ def cmd_extract(args):
     if not args.configs and not args.clab:
         print("extract: give --configs, --clab or both", file=sys.stderr)
         return 2
+    extra = extract.load_extra(args.extra) if args.extra else None
     devices = extract.collect(args.configs, args.clab, args.platform_map)
     translator = None
     if not args.no_saos10 and extract.needs_translator(devices):
@@ -38,7 +39,10 @@ def cmd_extract(args):
     for host in hosts or []:
         if not args.quiet:
             print(extract.host_summary_line(host), file=sys.stderr)
-    write_json(extract.document(records, translator, links, hosts), args.output)
+    notes = None
+    if extra:
+        links, notes = extract.apply_extra(extra, records, links, hosts, args.recipe)
+    write_json(extract.document(records, translator, links, hosts, notes), args.output)
     counts = {s: sum(1 for r in records if r["status"] == s) for s in ("ok", "partial", "error", "skipped")}
     print(f"devices {len(records)} / ok {counts['ok']} / partial {counts['partial']} / errors {counts['error']} "
           f"/ skipped {counts['skipped']}", file=sys.stderr)
@@ -82,6 +86,10 @@ def parser():
     e.add_argument("--hosts", metavar="FILE",
                    help="YAML/JSON {hosts: {NAME: {interfaces: [{name, addresses, attached: {device, port}}], routes: "
                         "[{prefix, next_hop}], gateway}}}: Linux hosts no containerlab exec line describes")
+    e.add_argument("--extra", metavar="FILE",
+                   help="YAML/JSON {devices: {NAME: {type, role, site}}, links: [{a: DEV:PORT, b: DEV:PORT, kind, label}], "
+                        "notes: [{text, device, layer}]}: what the configurations do not say (sites, optical line-system "
+                        "members and spans, link labels, notes), carried into the facts file as given")
     e.add_argument("--platform-map", metavar="FILE",
                    help="YAML/JSON {devices: {NAME: {type, platform, extractor, configs}}} for what the files do not say; "
                         "a SAOS 10 device needs a type (5164-10x) or platform (cn5164), else it is an error")

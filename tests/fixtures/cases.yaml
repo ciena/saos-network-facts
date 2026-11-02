@@ -41,3 +41,7 @@ plain-box:
 saos6-unrecognised:
   configs: [labs/saos6-unrecognised]
   platform_map: labs/saos6-unrecognised/platform-map.yaml
+line-system:
+  clab: labs/line-system/topo.clab.yml
+  extra: labs/line-system/extra.yaml
+  recipe: line-system

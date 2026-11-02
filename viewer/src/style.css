@@ -89,6 +89,9 @@ table.kvt td:last-child { font-family: var(--mono); font-size: 11px; }
 .layer-label { color: var(--muted); font: 600 11px var(--font); letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
 .node-label.plain { color: var(--muted); font-weight: 500; font-style: italic; }
 .edge-label { color: #c9d1d9; font: calc(11px * var(--label-scale, 1)) var(--mono); background: rgba(13, 17, 23, 0.7); padding: 0 4px; border-radius: 3px; pointer-events: none; white-space: nowrap; }
+.node-label.optical, .edge-label.optical { color: #a5b4fc; }
+.site-label { color: #8b98a8; font: 700 calc(12px * var(--label-scale, 1)) var(--font); letter-spacing: 0.06em; pointer-events: none; white-space: nowrap; }
+.note-label { color: #3b2f00; background: rgba(255, 236, 153, 0.92); border: 1px solid #d9a400; font: calc(11px * var(--label-scale, 1)) var(--font); padding: 2px 6px; border-radius: 4px; max-width: 18em; white-space: normal; pointer-events: none; }
 .locator-label { white-space: pre; text-align: center; color: #ffa657; }
 #label-options label { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 #label-options select { flex: 1; }

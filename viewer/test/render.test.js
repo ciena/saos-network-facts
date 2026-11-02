@@ -20,6 +20,7 @@ const LABS = {
   'l3vpn-hosts': 'tests/fixtures/expected/l3vpn-hosts.facts.json',
   'ospf-tp': 'tests/fixtures/expected/ospf-tp.facts.json',
   'srv6-ospf': 'viewer/test/fixtures/srv6-ospf.facts.json',
+  'line-system': 'tests/fixtures/expected/line-system.facts.json',
 };
 const GOLDEN = resolve(here, 'golden/render');
 const frameIds = (svg) => [...svg.matchAll(/<g class="frame" id="f-([a-z0-9]+)"/g)].map((m) => m[1]);

@@ -7,7 +7,7 @@
 // functions, no Node APIs, so this entry point works in a browser too; `@ciena/saos-network-facts/node` adds `readFacts(file)`.
 
 import type {
-  DeviceFacts, DeviceRecord, EvpnInstance, FactsFile, FlexAlgorithm, Host, Interface, IsisInstance, Mep, Ring, RingInstance, RingPort, Srv6Locator,
+  DeviceFacts, DeviceRecord, EvpnInstance, FactsFile, FlexAlgorithm, Host, Interface, IsisInstance, Mep, Note, Ring, RingInstance, RingPort, Srv6Locator,
   StaticRoute, VrfInstance,
 } from "./generated/facts.ts";
 
@@ -330,4 +330,24 @@ export function hostByName(file: FactsFile, name: string): Host | undefined {
  * null when it has none. */
 export function hostGateway(host: Pick<Host, "default_gateway">, family: "ipv4" | "ipv6"): string | null {
   return host.default_gateway?.[family] ?? null;
+}
+
+/** The file's notes (schema 1.9, from the extractor's extra file), in order; with `layer`, those of that view
+ * layer (a note without one is on `physical`), with `device`, those anchored to it (null: the free ones). */
+export function notes(file: FactsFile, { layer, device }: { layer?: string; device?: string | null } = {}): Note[] {
+  return (file.notes ?? []).filter((n) => (layer === undefined || (n.layer ?? "physical") === layer)
+    && (device === undefined || (n.device ?? null) === device));
+}
+
+/** The sites (schema 1.9, from the extractor's extra file) and the devices and hosts at each, in file order
+ * (devices first); a device or host without a site is in none. */
+export function sites(file: FactsFile): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const [name, site] of [...file.devices.map((d) => [d.device, d.site] as const), ...hosts(file).map((h) => [h.name, h.site] as const)]) {
+    if (!site) continue;
+    const at = out.get(site) ?? [];
+    if (!at.includes(name)) at.push(name);
+    out.set(site, at);
+  }
+  return out;
 }

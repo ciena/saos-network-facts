@@ -10,7 +10,8 @@ link and LAG member failure replays, found by loss of signal or, for a silent fa
 the LACP timeout or the IGP hold timer, with the G.8032 protection switch and revert when the link
 is on a ring. The
 published site opens the [Adaptive-SR-CFM example](../examples/adaptive-sr-cfm/) and offers the
-`g8032-two-ring`, `g8032-by-name`, `srv6-evpn` and `l3vpn-hosts` fixture labs, from the `labs/index.json` the build stages
+`g8032-two-ring`, `g8032-by-name`, `srv6-evpn`, `l3vpn-hosts` and `line-system` (plain boxes: an optical
+line system, sites and notes) fixture labs, from the `labs/index.json` the build stages
 (`labs.config.js`); *Load
 your facts.json* (or drop a file on the page) reads any facts file of schema 1.x in the browser,
 without uploading it. `?facts=<url>`, `?labs=<index>` and `?lab=<id>` open facts served next to
@@ -64,6 +65,15 @@ engine never sees them and computes exactly what it would without them; `drawnNo
 (`src/import/facts.js`) give every device and link a 2D view or layout draws. The view property `plain`
 (a view file's `"plain": false`, or `?plain=0`) leaves them out, as before: the page resolves the view
 (`src/viewprops.js` `importOptions`) and passes `importFacts(text, { plain })`.
+
+What the extractor's `--extra` file adds (schema 1.9) is drawn, never simulated: a drawn link whose two
+ports match a `links[]` entry gets its `kind` as `medium` and its `label` as `caption` (an optical span is a
+blue tube with its label); a plain box whose record has a `role` (a line-system member: `roadm`,
+`amplifier`) is a solid blue box with no warning, its `role` as `equipment`; devices and hosts get their
+`site`, and `topology.sites` (`[{ name, nodes }]`) is a dashed outline round each site's devices on the
+physical plane; `topology.notes` (`[{ text, device, layer }]`) are yellow labels on their layer (physical
+when the page does not show it), above their device or at the plane's corner. The frames and the snapshot
+draw the same.
 
 IPv6: a link may be an IPv6 subnet (link-local addresses never link), and a router whose IS-IS
 interfaces carry IPv6 only, or whose loopback has no IPv4 address, runs IS-IS, BGP and the label

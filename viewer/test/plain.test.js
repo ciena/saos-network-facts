@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Devices without facts as plain boxes: the synthetic plain-box fixture (the sr-l2 PEs with an
 // optical line system OLS1 between them that the extractor skips) and every other fixture and
-// published lab, whose topology and engine output must not change.
+// published lab, whose engine output must not change; the line-system lab demos them on the site.
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { buildNetwork, vpwsWalk } from '../src/engine/index.js';
@@ -99,7 +99,7 @@ describe('a device the extractor failed on (mixed-detected PE3, status error)', 
 });
 
 // The engine never sees a plain box: for every fixture and the example, the engine computes the same
-// with plain boxes as without. No published lab has one, so the site's pages are as before.
+// with plain boxes as without. The site's line-system lab demos them; no other published lab has one.
 describe('every fixture: the same engine output with or without plain boxes', () => {
   const names = readdirSync(EXPECTED).filter((f) => f.endsWith('.facts.json')).map((f) => f.replace('.facts.json', ''));
   const example = readFileSync(new URL('../../examples/adaptive-sr-cfm/facts.json', import.meta.url), 'utf8');
@@ -115,9 +115,8 @@ describe('every fixture: the same engine output with or without plain boxes', ()
     });
   }
 
-  test('no published lab has a plain box (plain-box is a test fixture, not in the lab menu)', () => {
-    expect(LABS.map((l) => l.id)).not.toContain('plain-box');
+  test('the lab menu demos plain boxes: the line-system lab, and only it, has them', () => {
     const withBoxes = LABS.filter((l) => importFacts(readFileSync(new URL(l.source, new URL('../labs.config.js', import.meta.url)), 'utf8')).topology.plain.nodes.length);
-    expect(withBoxes).toEqual([]);
+    expect(withBoxes.map((l) => l.id)).toEqual(['line-system']);
   });
 });

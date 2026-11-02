@@ -7,7 +7,7 @@
 //   1. The core: the IGP routers (P and PE); in a lab without an IGP router, the G.8032 ring members;
 //      else the devices on the longest cycle; else (a chain or a tree) the devices that link others.
 //      A plain box between two core devices (a line system or a third-party router in the path) is
-//      core too, and so is a second cycle linked to the core (routers without an IGP, such as MPLS-TP
+//      core too, as is a chain of them (a ROADM, amplifiers, a ROADM), and so is a second cycle linked to the core (routers without an IGP, such as MPLS-TP
 //      nodes, on a ring of their own). Linux hosts never are.
 //   2. A core with a cycle (a G.8032 ring, else the longest cycle of the core) is a ladder: the cycle
 //      as a racetrack of a top and a bottom row, at the rotation and split that keep the other core
@@ -191,6 +191,27 @@ function autoLayout(
   for (const r of rings) for (const id of r.members) core.add(id);
   for (const id of ids) {
     if (!core.has(id) && node.get(id)?.plain && [...adj.get(id)!].filter((x) => core.has(x)).length >= 2) core.add(id);
+  }
+  // A chain of plain boxes between two core devices (an optical line system: ROADM, amplifiers,
+  // ROADM) is core too: the boxes on the shortest plain path from one core device to another.
+  if (core.size) {
+    const isPlain = (id: string) => !core.has(id) && !!node.get(id)?.plain && !node.get(id)?.host;
+    for (const from of sorted(core)) {
+      const prev = new Map<string, string>();
+      const queue = sorted([...adj.get(from)!].filter(isPlain));
+      for (const id of queue) prev.set(id, from);
+      while (queue.length) {
+        const id = queue.shift()!;
+        for (const x of sorted([...adj.get(id)!])) {
+          if (core.has(x) && x !== from && prev.get(id) !== x) {
+            for (let at: string | undefined = id; at && at !== from; at = prev.get(at)) core.add(at);
+          } else if (isPlain(x) && !prev.has(x)) {
+            prev.set(x, id);
+            queue.push(x);
+          }
+        }
+      }
+    }
   }
   // A second cycle linked to the core (routers without an IGP, such as MPLS-TP nodes, on a ring of
   // their own) joins it, so it is laid out with the core instead of hung off it.

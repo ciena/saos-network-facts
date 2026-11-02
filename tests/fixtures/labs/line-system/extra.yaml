@@ -1,0 +1,18 @@
+# What the configurations do not say about the line-system lab, as a consumer writes it from its own
+# inventory (synthetic): the members of an optical line system between PE1 and PE2, the spans, the
+# two sites and two notes.
+devices:
+  PE1: {site: east}
+  PE2: {site: west}
+  ROADM-A: {type: roadm-2d, role: roadm, site: east}
+  AMP-1: {type: ila, role: amplifier}
+  ROADM-B: {type: roadm-2d, role: roadm, site: west}
+links:
+  - {a: "PE1:1", b: "ROADM-A:add-1", kind: optical, label: "ch 25"}
+  - {a: "PE1:2", b: "ROADM-A:add-2", kind: optical, label: "ch 26 · dark"}
+  - {a: "ROADM-A:line", b: "AMP-1:west", kind: optical, label: "span 1 · 40 km"}
+  - {endpoints: ["AMP-1:east", "ROADM-B:line"], kind: optical, label: "span 2 · 38 km"}
+  - {a: {device: ROADM-B, port: add-1}, b: {device: PE2, port: "1"}, kind: optical, label: "ch 25"}
+notes:
+  - {text: "in-line amplifier hut, no site of its own", device: AMP-1}
+  - text: "PE1-PE2 core link rides ch 25; ch 26 is lit on ROADM-A only"

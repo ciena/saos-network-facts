@@ -597,10 +597,119 @@ def saos10_device_facts(record, texts, platform, translator, jobs=1):
         record["reason"] = "; ".join(f"{f['template']}: {f['error']}" for f in failed)[:300]
 
 
-def document(records, translator=None, links=None, hosts=None):
+# ---------------------------------------------------------------- extra file
+
+EXTRA_DEVICE_KEYS = {"type", "role", "site"}
+EXTRA_LINK_KEYS = {"a", "b", "endpoints", "kind", "label"}
+EXTRA_NOTE_KEYS = {"text", "device", "layer"}
+
+
+def _extra_end(path, value):
+    end = _link_end(value) if isinstance(value, str) else _link_end(
+        {"node": value.get("device") or value.get("node"), "interface": value.get("port") or value.get("interface")}
+        if isinstance(value, dict) else None)
+    if end is None:
+        raise ValueError(f"{path}: link end {value!r}: write DEVICE:PORT or {{device, port}}")
+    return end
+
+
+def _unknown(path, where, entry, allowed):
+    extra = sorted(set(entry) - allowed)
+    if extra:
+        raise ValueError(f"{path}: {where}: unknown key {', '.join(extra)} (expected {', '.join(sorted(allowed))})")
+
+
+def load_extra(path):
+    """What the configurations cannot say, from a YAML or JSON file the caller writes (an inventory, a
+    lab description), normalised: ``devices: {NAME: {type, role, site}}`` (a device's site, and the
+    members of an optical line system, which have no configuration here: a name no other input knows
+    becomes a record with its type and role and no facts), ``links: [{a, b, kind, label}]`` (each end
+    ``DEVICE:PORT`` or ``{device, port}``, or ``endpoints: [A, B]`` as in containerlab; ``kind`` such as
+    ``ethernet``, ``optical``, ``lag``; a short ``label``) and ``notes: [{text, device, layer}]``. The
+    library only carries these into the facts file; it reads no inventory."""
+    path = Path(path)
+    data = yaml.safe_load(path.read_text()) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: expected a mapping with devices, links and notes")
+    _unknown(path, "top level", data, {"devices", "links", "notes"})
+    devices = {}
+    for name, entry in (data.get("devices") or {}).items():
+        entry = dict(entry or {})
+        _unknown(path, f"device {name}", entry, EXTRA_DEVICE_KEYS)
+        devices[str(name)] = {k: str(v) for k, v in entry.items() if v is not None}
+    links = []
+    for i, entry in enumerate(data.get("links") or []):
+        entry = dict(entry or {})
+        _unknown(path, f"link {i + 1}", entry, EXTRA_LINK_KEYS)
+        ends = entry.get("endpoints") or [entry.get("a"), entry.get("b")]
+        if len(ends) != 2 or not all(ends):
+            raise ValueError(f"{path}: link {i + 1}: give a and b, or endpoints: [A, B]")
+        link = {"a": _extra_end(path, ends[0]), "b": _extra_end(path, ends[1])}
+        link.update({k: str(entry[k]) for k in ("kind", "label") if entry.get(k) is not None})
+        links.append(link)
+    notes = []
+    for i, entry in enumerate(data.get("notes") or []):
+        entry = {"text": entry} if isinstance(entry, str) else dict(entry or {})
+        _unknown(path, f"note {i + 1}", entry, EXTRA_NOTE_KEYS)
+        if not entry.get("text"):
+            raise ValueError(f"{path}: note {i + 1}: every note needs a text")
+        notes.append({k: str(entry[k]) for k in ("text", "device", "layer") if entry.get(k) is not None})
+    return {"devices": devices, "links": links, "notes": notes}
+
+
+def _same_ends(x, y):
+    ends = lambda link: sorted((e["device"], e["port"]) for e in (link["a"], link["b"]))  # noqa: E731
+    return ends(x) == ends(y)
+
+
+def apply_extra(extra, records, links=None, hosts=None, recipe=None):
+    """Carry an extra file (``load_extra``) into the facts: a known device or host gets its ``site``
+    and ``role`` (and its ``type`` when no other input gave one); a name no input knows is added as a
+    record with no facts (``status`` ``skipped``: a line-system member, say); a link joining the same two
+    ports as a topology link gives it its ``kind`` and ``label``, any other is added. Updates
+    ``records`` and ``hosts`` in place and returns ``(links, notes)``: ``links`` stays None when
+    neither input has any, ``notes`` is None when empty. A link end or note on a name no input knows
+    is an error (a typo would otherwise draw nothing)."""
+    by_name = {r["device"]: r for r in records}
+    host_by_name = {h["name"]: h for h in hosts or []}
+    for name, entry in extra["devices"].items():
+        record = by_name.get(name)
+        if record is None and name not in host_by_name:
+            record = {"device": name, "type": entry.get("type"), "extractor": None, "templates": [],
+                      "status": "skipped", "facts": None,
+                      "reason": "no configuration: given by the extra file" + (f" ({entry['role']})" if entry.get("role") else "")}
+            if recipe is not None:
+                record["recipe"] = recipe
+            records.append(record)
+            by_name[name] = record
+        if record is not None:
+            record.update({k: entry[k] for k in ("role", "site") if k in entry})
+            if record["type"] is None and entry.get("type"):
+                record["type"] = entry["type"]
+        if name in host_by_name and "site" in entry:
+            host_by_name[name]["site"] = entry["site"]
+    known = set(by_name) | set(host_by_name)
+    for link in extra["links"]:
+        for end in (link["a"], link["b"]):
+            if end["device"] not in known:
+                raise ValueError(f"extra file: link {end['device']}:{end['port']}: no device or host {end['device']}")
+        if links is None:
+            links = []
+        same = next((x for x in links if _same_ends(x, link)), None)
+        if same is None:
+            links.append(link)
+        else:
+            same.update({k: link[k] for k in ("kind", "label") if k in link})
+    for note in extra["notes"]:
+        if note.get("device") and note["device"] not in known:
+            raise ValueError(f"extra file: note {note['text'][:40]!r}: no device or host {note['device']}")
+    return links, (list(extra["notes"]) or None)
+
+
+def document(records, translator=None, links=None, hosts=None, notes=None):
     """The facts file: ``schema_version``, what produced it, the device records, (when a topology
-    was given) the physical ``links`` between the devices, and (with a topology or a hosts file) the
-    Linux ``hosts``."""
+    was given) the physical ``links`` between the devices, (with a topology or a hosts file) the
+    Linux ``hosts``, and the ``notes`` of an extra file."""
     doc = {
         "schema_version": SCHEMA_VERSION,
         "generator": {"name": "saos-network-facts", "version": __version__,
@@ -611,6 +720,8 @@ def document(records, translator=None, links=None, hosts=None):
         doc["links"] = links
     if hosts is not None:
         doc["hosts"] = hosts
+    if notes:
+        doc["notes"] = notes
     return doc
 
 
