@@ -17,6 +17,24 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-02
+
+### Added
+
+- **Viewer: frames and snapshot, the lab as static SVG** — `frames(facts, view)` writes one `frames.svg`
+  with a 2D frame per layer the lab has content for (physical; G.8032 over physical; IGP; SR policies /
+  MPLS-TP over the IGP when there is no pseudowire; SRv6 and Flex-Algo; BGP; L3VPN VRFs; pseudowires over
+  the IGP; EVPN; CFM), chosen by the view (`layers`, `frames`, `viewFrames`) and starting on the signature
+  layer; each frame a `<g id="f-<layer>">` shown by CSS `:target`, so `<img src="frames.svg#f-igp">` shows
+  one frame without script and the bare file the start frame (the last group, no `:has()`).
+  `snapshot(facts, view)` writes `snapshot.svg`: the exploded (or `stacked`) planes, devices on risers,
+  objects with two or three short labels and hover details, chips that switch planes and close the gaps.
+  Both on `layoutFacts` (the 3D page's positions) with plain boxes, self-contained and byte-stable. CLI
+  `saos-network-facts-render facts.json --view v.json --frames f.svg --snapshot s.svg`; `npm run build:render`
+  bundles it and `render.js` (ES module, importer and engine included, no three.js or yaml), which the
+  viewer release tgz carries as `render/` (the Pages site does not). Golden SVGs for six fixture labs; checked
+  headless in Chromium and Firefox (fragment frames, chips, no console errors).
+
 ## [0.14.0] - 2026-11-02
 
 ### Added

@@ -75,3 +75,8 @@ jobs:
       - name: "vitest (the engine, and the facts importer on the bundled example and synthetic files)"
         run: npm test
       - run: npm run build
+      - name: "static renders: the bundled CLI (release asset only, not the Pages site)"
+        run: |
+          npm run build:render
+          test ! -e dist/render
+          node dist-render/render/saos-network-facts-render.mjs ../examples/adaptive-sr-cfm/facts.json --frames "$RUNNER_TEMP/frames.svg" --snapshot "$RUNNER_TEMP/snapshot.svg"
