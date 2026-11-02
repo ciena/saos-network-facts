@@ -17,6 +17,23 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-11-02
+
+### Fixed
+
+- **Node SID labels follow the configured prefix SID** — SAOS 10 reads `start-sid` as an SRGB index
+  unless `value-type absolute` says otherwise (`ietf-sr-cmn` `sid-value-type`, `default "index"`), but a
+  config that left `value-type` out gave `value_type: null`, and the viewer then dropped the SID and
+  labelled each router SRGB base + its position in the topology: `start-sid 1001-1005` over SRGB 16000
+  showed 16001-16005, in node order, instead of 17001-17005 per router. The extractor now writes
+  `value_type: "index"` when the config leaves it out (schema description updated, shape unchanged,
+  schema still 1.8.0). The viewer reads a null `value_type` as index too, so older facts files label
+  correctly without a re-extract. An `absolute` SID becomes label − SRGB base inside the SRGB. Outside it,
+  the viewer keeps the label and warns. The device panel shows the label the view uses. One function
+  (`nodeSid` in `engine/mpls.js`) gives the label to the SR label tables, the markers, `nodeOfSid` and
+  the SR policy segment checks. Only routers with no prefix SID still get the position, and the import
+  report lists them.
+
 ## [0.13.0] - 2026-11-02
 
 ### Added

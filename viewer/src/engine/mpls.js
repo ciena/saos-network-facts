@@ -108,11 +108,19 @@ export const ldp = {
 // vendor default. Uniform across the domain.
 export const srgbOf = (topo, vendor) => topo.srgb ?? vendor.mpls.srgb;
 
-// Prefix-SID of a router's loopback: SRGB base + index (uniform SRGB). The
-// index is the node's configured `sidIndex`, else its ordinal.
+// Prefix-SID of a router's loopback, as { label, index }: SRGB base + index
+// (uniform SRGB). The index is the node's configured `sidIndex`; a node with
+// an absolute SID outside the SRGB has its `sidLabel` and no index; a node
+// with no prefix SID configured gets its ordinal as the index.
+export function nodeSid(topo, vendor, n) {
+  if (n.sidLabel != null) return { label: n.sidLabel, index: null };
+  const index = n.sidIndex ?? nodeOrdinal(topo, n.id);
+  return { label: srgbOf(topo, vendor).base + index, index };
+}
+
+// The Prefix-SID label of a router's loopback (see nodeSid).
 export function prefixSidLabel(topo, vendor, nodeId) {
-  const n = nodeById(topo, nodeId);
-  return srgbOf(topo, vendor).base + (n.sidIndex ?? nodeOrdinal(topo, n.id));
+  return nodeSid(topo, vendor, nodeById(topo, nodeId)).label;
 }
 
 // The router whose Prefix-SID is `label`, or undefined.
@@ -128,21 +136,18 @@ export const sr = {
   mode: 'sr',
   name: 'SR-MPLS (RFC 8402/8667)',
   build(topo, isis, vendor) {
-    const { base } = srgbOf(topo, vendor);
-    const sidIndex = (fec) => {
-      const n = topo.nodes.find((x) => x.loopback && hostPrefix(x.loopback) === fec);
-      return n.sidIndex ?? nodeOrdinal(topo, n.id);
-    };
+    const sidOf = (fec) => nodeSid(topo, vendor, topo.nodes.find((x) => x.loopback && hostPrefix(x.loopback) === fec));
     const label = (r, fec) => {
       if (!isis.rib[r][fec]) return undefined;
-      return fec === ownFec(topo, r) ? IMPLICIT_NULL : base + sidIndex(fec);
+      return fec === ownFec(topo, r) ? IMPLICIT_NULL : sidOf(fec).label;
     };
     const bindings = {};
     for (const r of isis.routers) {
       bindings[r] = {};
       for (const fec of fecsOf(topo, isis)) {
         if (!isis.rib[r][fec]) continue;
-        bindings[r][fec] = { local: base + sidIndex(fec), sidIndex: sidIndex(fec), php: fec === ownFec(topo, r) };
+        const { label: local, index } = sidOf(fec);
+        bindings[r][fec] = { local, sidIndex: index, php: fec === ownFec(topo, r) };
       }
     }
     const { lfib, ftn } = forwarding(topo, isis, (r, fec) => (fec === ownFec(topo, r) ? undefined : label(r, fec)), label);

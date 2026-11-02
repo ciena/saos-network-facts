@@ -1149,7 +1149,7 @@
             "string",
             "null"
           ],
-          "description": "`index` or `absolute`."
+          "description": "How `sid` is read: `index` (into the SRGB; the YANG default, written when the configuration leaves `value-type` out) or `absolute` (an MPLS label)."
         },
         "node": {
           "type": "boolean",

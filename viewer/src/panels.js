@@ -6,6 +6,7 @@
 // routes (#device=PE1, #service=...), handled by main.js.
 
 import { isisArea } from '../../js/src/index.ts';
+import { prefixSidLabel } from './engine/mpls.js';
 import { canonicalIp } from './import/facts.js';
 import { hex, vrfColor } from './view/layers.js';
 import { renderNode } from './view/panel.js';
@@ -354,10 +355,12 @@ export function renderDevice(el, imp, net, id) {
     );
   }
   if (sr && (srgb || sid)) {
+    // The label the view uses (index or absolute, see engine/mpls.js nodeSid), when it runs SR-MPLS.
+    const label = sid && n && n.role !== 'ce' && net?.mpls?.mode === 'sr' ? prefixSidLabel(net.topo, net.vendor, id) : null;
     html += '<h2>Segment routing</h2>';
     html += kv([
       ['SRGB', srgb ? `${srgb.lower}-${srgb.upper}` : null],
-      ['node SID', sid ? `${sid.prefix} ${sid.value_type} ${sid.sid}${srgb && sid.value_type === 'index' ? ` (label ${Number(srgb.lower) + Number(sid.sid)})` : ''}` : null],
+      ['node SID', sid ? `${sid.prefix} ${sid.value_type ?? 'index'} ${sid.sid}${label != null ? ` (label ${label})` : ''}` : null],
     ]);
   }
   if (bgp) {

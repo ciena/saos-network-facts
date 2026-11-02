@@ -1393,6 +1393,8 @@ def finish(facts):
     loopbacks = {i["name"] for i in facts["interfaces"] if i["kind"] == "loopback"}
     for sid in facts["segment_routing"]["prefix_sids"]:
         sid["node"] = sid["interface"] in loopbacks and _host_prefix(sid["prefix"])
+        if sid["sid"] is not None and sid["value_type"] is None:
+            sid["value_type"] = "index"  # ietf-sr-cmn sid-value-type: a start-sid is an SRGB index unless told otherwise
     _bgp_resolve(facts)
     for instance in facts["bgp"]["instances"]:
         instance["route_reflector"] = any(p["route_reflector_client"] for p in facts["peers"]
