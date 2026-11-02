@@ -54,6 +54,9 @@ documentation ranges) and services are made up.
   instance's `vpnv4` / `vpnv6 unicast` locator `LOC` with PE1 overriding `ipv6 unicast` to
   `LOC-ALGO128` in the VRF; the PEs and RR1 activate VPNv4 / VPNv6 towards the route reflector, which
   reflects them. No Linux hosts; `platform-map.yaml` gives the device types.
+- `labs/saos6-unrecognised/`: two devices typed SAOS 6 in `platform-map.yaml`: AGG1 with a host name and a
+  loopback (`ok`), AGG2 with only NTP and syslog settings, none of which the extractor reads (`error`:
+  nothing recognised, so no facts rather than empty ones).
 - `cases.yaml`: the extraction cases the tests run; `expected/`: their facts files.
 - `pivots.json`: the translator's recorded replies for every SAOS 10 file (`scripts/record_pivots.py`),
   all recorded with translator 4.2.1.

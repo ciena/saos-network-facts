@@ -19,6 +19,7 @@ const LABS = {
   'srv6-evpn': 'tests/fixtures/expected/srv6-evpn.facts.json',
   'l3vpn-hosts': 'tests/fixtures/expected/l3vpn-hosts.facts.json',
   'ospf-tp': 'tests/fixtures/expected/ospf-tp.facts.json',
+  'srv6-ospf': 'viewer/test/fixtures/srv6-ospf.facts.json',
 };
 const GOLDEN = resolve(here, 'golden/render');
 const frameIds = (svg) => [...svg.matchAll(/<g class="frame" id="f-([a-z0-9]+)"/g)].map((m) => m[1]);
@@ -62,6 +63,8 @@ describe('frames', () => {
     const s = frames(read(LABS['srv6-evpn']));
     expect(s.frames.map((f) => f.id)).toEqual(['physical', 'igp', 'srv6', 'bgp', 'vrf', 'evpn']);
     expect(s.start).toBe('evpn');
+    // SRv6 over OSPF (OSPF's SPF is per router and area): an SRv6 frame, no crash
+    expect(frames(read(LABS['srv6-ospf'])).frames.map((f) => f.id)).toEqual(['physical', 'igp', 'srv6', 'pw']);
   });
 
   test('SR policies get a frame only when there is no pseudowire frame', () => {

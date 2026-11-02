@@ -38,3 +38,6 @@ vpws-bonds:
 plain-box:
   clab: labs/plain-box/topo.clab.yml
   recipe: plain-box
+saos6-unrecognised:
+  configs: [labs/saos6-unrecognised]
+  platform_map: labs/saos6-unrecognised/platform-map.yaml

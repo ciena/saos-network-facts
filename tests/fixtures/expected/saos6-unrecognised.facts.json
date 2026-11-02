@@ -1,0 +1,68 @@
+{
+  "devices": [
+    {
+      "device": "AGG1",
+      "extractor": "saos6",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "gateway": null,
+        "hostname": "AGG1",
+        "interfaces": [
+          {
+            "ip": "192.0.2.1/32",
+            "kind": "loopback",
+            "name": "lb0",
+            "vlan": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "lags": [],
+        "lines": 2,
+        "peers": [],
+        "ports": {},
+        "pseudowires": [],
+        "recognised": 2,
+        "rings": [],
+        "segment_routing": {
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": []
+        },
+        "sub_ports": [],
+        "vlans": {}
+      },
+      "status": "ok",
+      "templates": [
+        "AGG1.cfg"
+      ],
+      "type": "3930-6x"
+    },
+    {
+      "device": "AGG2",
+      "extractor": "saos6",
+      "facts": null,
+      "reason": "no SAOS 6/8 command recognised in 3 command lines: not a SAOS 6/8 configuration? (check the device type or --platform-map)",
+      "status": "error",
+      "templates": [
+        "AGG2.cfg"
+      ],
+      "type": "3930-6x"
+    }
+  ],
+  "generator": {
+    "name": "saos-network-facts",
+    "translator": "translator 4.2.1 (recorded)",
+    "version": "0.17.1"
+  },
+  "schema_version": "1.8.0"
+}

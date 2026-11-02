@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// SRv6 (RFC 8986) locators and IS-IS Flex-Algo (RFC 9350) over the IGP of a built network, and
+// SRv6 (RFC 8986) locators and Flex-Algo (RFC 9350) over the IGP (IS-IS or OSPF) of a built network, and
 // EVPN over SRv6 (RFC 9252) on top: which routers take part in each algorithm, the links of each
 // algorithm's topology, the route from every router to every locator in that topology, and the
 // EVPN instances' SIDs and state.
@@ -16,7 +16,7 @@
 // link delays are not in the facts, so exclusions cannot be applied and a latency / TE metric
 // falls back to the IGP metric: both are said in the result (`notes`).
 
-import { bigToIp6, longestMatch, parsePrefix } from './ip.js';
+import { bigToIp6, hostPrefix, longestMatch, parsePrefix } from './ip.js';
 import { spf } from './isis.js';
 import { nodeById } from './topology.js';
 
@@ -61,11 +61,44 @@ function algoLsdb(topo, adjacencies, members) {
   }));
 }
 
+// Algorithm 0's shortest paths, per router: { dist, nextHops } to every other router. IS-IS keeps
+// one SPF per router; OSPF keeps one per router and area (RFC 2328 §16.1), so its areas are merged:
+// an intra-area path wins (the shortest over the router's areas, equal-cost next hops merged), and a
+// router in another area is reached the way its loopback is, over the inter-area route through an
+// area border router (§16.2): a locator is advertised from its owner like the owner's loopback.
+function igpSpf(topo, igp) {
+  if (igp.protocol !== 'ospf') return igp.spf;
+  const out = {};
+  for (const r of igp.routers) {
+    const dist = {};
+    const nextHops = {};
+    for (const s of Object.values(igp.spf[r] ?? {})) {
+      for (const [n, d] of Object.entries(s.dist)) {
+        if (dist[n] === undefined || d < dist[n]) [dist[n], nextHops[n]] = [d, [...s.nextHops[n]]];
+        else if (d === dist[n]) nextHops[n] = mergeHops(nextHops[n], s.nextHops[n]);
+      }
+    }
+    for (const n of igp.routers) {
+      const lo = nodeById(topo, n).loopback;
+      const rt = dist[n] === undefined && lo ? igp.rib[r]?.[hostPrefix(lo)] : null;
+      if (rt && rt.metric !== undefined && !rt.local) [dist[n], nextHops[n]] = [rt.metric, [...rt.nextHops]];
+    }
+    out[r] = { dist, nextHops };
+  }
+  return out;
+}
+
+function mergeHops(a, b) {
+  const all = [...a];
+  for (const h of b) if (!all.some((x) => x.node === h.node && x.link === h.link)) all.push(h);
+  return all.sort((x, y) => x.node.localeCompare(y.node) || x.link.localeCompare(y.link));
+}
+
 export function computeSrv6(topo, igp) {
   const locators = (topo.srv6?.locators ?? []).map((l) => ({ ...l, algorithm: algoOf(l) }));
   const routers = igp.routers;
   const algorithms = [{ algorithm: 0, participants: [...routers], definition: null, links: igp.adjacencies.filter((a) => a.state === 'Up').map((a) => a.link), notes: [] }];
-  const spfs = { 0: igp.spf };
+  const spfs = { 0: igpSpf(topo, igp) };
   for (const fa of topo.flexAlgos ?? []) {
     const defs = fa.definitions.filter((d) => routers.includes(d.node));
     const definition = winningDefinition(topo, defs);

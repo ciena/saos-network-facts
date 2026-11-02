@@ -17,6 +17,26 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-02
+
+### Fixed
+
+- **Viewer: SRv6 over OSPF no longer crashes the page, frames and snapshot** — OSPF keeps its SPF per
+  router and per area (RFC 2328 §16.1), IS-IS per router only, and `computeSrv6` read algorithm 0's SPF
+  as IS-IS's, so any lab with SRv6 locators over OSPF threw `TypeError: Cannot read properties of
+  undefined (reading '<router>')` in `buildNetwork`. Algorithm 0 now merges OSPF's areas: the shortest
+  intra-area path over the router's areas (equal-cost next hops merged), and a router in another area
+  over the inter-area route to its loopback through an area border router (§16.2). IS-IS labs are
+  unchanged. Synthetic fixture `viewer/test/fixtures/srv6-ospf.facts.json` (a two-area OSPF ring, one
+  locator per router) with golden frames and snapshot.
+- **SAOS 6/8: a configuration with nothing recognised is `error`, not `ok`** — a device typed SAOS 6/8
+  whose files hold no command line the parser reads (`recognised: 0`, no host name) came out `ok` with
+  all-empty facts, which reads like a device that configures nothing. It is now `status: error` with
+  `facts: null` and a `reason` (`no SAOS 6/8 command recognised in N command lines: not a SAOS 6/8
+  configuration?`), as the schema already describes `error` ("nothing could be read"); readers already
+  skip `error` records and the viewer shows them as plain boxes. Schema description updated, shape
+  unchanged (still 1.8.0). Synthetic fixture lab `saos6-unrecognised`.
+
 ## [0.17.0] - 2026-11-02
 
 ### Added
