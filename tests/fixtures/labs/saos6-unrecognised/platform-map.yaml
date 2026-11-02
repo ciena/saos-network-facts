@@ -1,0 +1,4 @@
+# Device types for the synthetic unrecognised-SAOS 6 lab: AGG1 reads, AGG2 holds nothing the extractor knows.
+devices:
+  AGG1: 3930-6x
+  AGG2: 3930-6x

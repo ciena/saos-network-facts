@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="netfacts-snapshot" data-variant="exploded" data-gap="196" data-full-h="1100" viewBox="0 0 897 1100" width="897" height="1100" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<title>srv6-ospf</title>
+<rect class="bg" x="0" y="-4000" width="897" height="9100" fill="#ffffff"/>
+<g class="pillars">
+<line class="pillar" data-layers="physical igp mpls srv6 pw" x1="270.5" y1="919.3" x2="270.5" y2="919.3" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical igp mpls srv6" x1="605.9" y1="990.7" x2="605.9" y2="990.7" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical igp mpls srv6 pw" x1="500.5" y1="919.3" x2="500.5" y2="919.3" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical igp mpls srv6 pw" x1="375.9" y1="990.7" x2="375.9" y2="990.7" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+</g>
+<g class="layer" data-layer="pw" transform="translate(0,-784)"><polygon points="40,880 615,880 836.3,1029.9 261.3,1029.9" fill="#d63384" fill-opacity="0.07" stroke="#d63384" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1021.9000000000001" font-size="12" font-weight="700" fill="#d63384">Pseudowires</text><polyline points="500.5,919.3 270.5,919.3 375.9,990.7" fill="none" stroke="#d63384" stroke-width="1.6" stroke-dasharray="6 4" stroke-opacity="0.7"/><g><title>VPWS-200 PE1-PE2
+MPLS-TP TP-1
+PW labels 2001/2001
+path PE1 → P1 → PE2</title><path d="M500.5,919.3 Q438.2,867.8 375.9,990.7" fill="none" stroke="#d63384" stroke-width="2.4"/><rect x="386" y="876.4" width="104.4" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="391" y="887.4" font-size="12" font-weight="700" fill="#d63384">VPWS VPWS-200</text><text x="391" y="900.4" font-size="10.5" fill="#5b6675">MPLS-TP TP-1</text><text x="391" y="913.4" font-size="10.5" fill="#5b6675">labels 2001/2001</text></g><ellipse cx="500.5" cy="919.3" rx="9" ry="5" fill="#d63384" stroke="#fff"/><rect x="457.5" y="931.1" width="31" height="18" rx="4" fill="#fff" fill-opacity="0.88"/><text x="462.5" y="942.1" font-size="12" font-weight="700" fill="#d63384">PE1</text><ellipse cx="375.9" cy="990.7" rx="9" ry="5" fill="#d63384" stroke="#fff"/><rect x="332.9" y="991.7" width="31" height="18" rx="4" fill="#fff" fill-opacity="0.88"/><text x="337.9" y="1002.7" font-size="12" font-weight="700" fill="#d63384">PE2</text></g>
+<g class="layer" data-layer="srv6" transform="translate(0,-588)"><polygon points="40,880 615,880 836.3,1029.9 261.3,1029.9" fill="#e8590c" fill-opacity="0.07" stroke="#e8590c" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1021.9000000000001" font-size="12" font-weight="700" fill="#e8590c">SRv6</text><g><title>P1
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.12
+SRv6 locator 2001:db8:f0:3::/64</title><ellipse cx="270.5" cy="919.3" rx="10" ry="6" fill="#e8590c" stroke="#fff"/><rect x="284.5" y="885.3" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="289.5" y="896.3" font-size="12" font-weight="700" fill="#e8590c">P1</text><text x="289.5" y="909.3" font-size="10.5" fill="#5b6675">2001:db8:f0:3::/64</text></g><g><title>P2
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.14
+SRv6 locator 2001:db8:f0:4::/64</title><ellipse cx="605.9" cy="990.7" rx="10" ry="6" fill="#e8590c" stroke="#fff"/><rect x="619.9" y="956.7" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="624.9" y="967.7" font-size="12" font-weight="700" fill="#e8590c">P2</text><text x="624.9" y="980.7" font-size="10.5" fill="#5b6675">2001:db8:f0:4::/64</text></g><g><title>PE1
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.11
+SRv6 locator 2001:db8:f0:1::/64</title><ellipse cx="500.5" cy="919.3" rx="10" ry="6" fill="#e8590c" stroke="#fff"/><rect x="514.5" y="885.3" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="519.5" y="896.3" font-size="12" font-weight="700" fill="#e8590c">PE1</text><text x="519.5" y="909.3" font-size="10.5" fill="#5b6675">2001:db8:f0:1::/64</text></g><g><title>PE2
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.13
+SRv6 locator 2001:db8:f0:2::/64</title><ellipse cx="375.9" cy="990.7" rx="10" ry="6" fill="#e8590c" stroke="#fff"/><rect x="389.9" y="956.7" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="394.9" y="967.7" font-size="12" font-weight="700" fill="#e8590c">PE2</text><text x="394.9" y="980.7" font-size="10.5" fill="#5b6675">2001:db8:f0:2::/64</text></g></g>
+<g class="layer" data-layer="mpls" transform="translate(0,-392)"><polygon points="40,880 615,880 836.3,1029.9 261.3,1029.9" fill="#b7791f" fill-opacity="0.07" stroke="#b7791f" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1021.9000000000001" font-size="12" font-weight="700" fill="#b7791f">MPLS (SR policies / TP)</text><polyline points="500.5,919.3 270.5,919.3 375.9,990.7" fill="none" stroke="#b7791f" stroke-width="1.6" stroke-dasharray="6 4" stroke-opacity="0.75"/><g><title>TP-1
+MPLS-TP co-routed tunnel
+path PE1 → P1 → PE2</title><path d="M500.5,919.3 Q438.2,880.6 375.9,990.7" fill="none" stroke="#b7791f" stroke-width="2.4"/><rect x="412.6" y="895.8" width="51.3" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="417.6" y="906.8" font-size="12" font-weight="700" fill="#b7791f">TP-1</text><text x="417.6" y="919.8" font-size="10.5" fill="#5b6675">MPLS-TP</text></g><polyline points="500.5,919.3 605.9,990.7 375.9,990.7" fill="none" stroke="#b7791f" stroke-width="1.6" stroke-dasharray="6 4" stroke-opacity="0.75"/><g><title>TP-1-B
+MPLS-TP co-routed tunnel
+path PE1 → P2 → PE2</title><path d="M500.5,919.3 Q438.2,852.6 375.9,990.7" fill="none" stroke="#b7791f" stroke-width="2.4"/><rect x="412.2" y="844.6" width="52" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="417.2" y="855.6" font-size="12" font-weight="700" fill="#b7791f">TP-1-B</text><text x="417.2" y="868.6" font-size="10.5" fill="#5b6675">MPLS-TP</text></g></g>
+<g class="layer" data-layer="igp" transform="translate(0,-196)"><polygon points="40,880 615,880 836.3,1029.9 261.3,1029.9" fill="#2e9e5b" fill-opacity="0.07" stroke="#2e9e5b" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1021.9000000000001" font-size="12" font-weight="700" fill="#2e9e5b">IGP</text><text x="269.3" y="1043.9" font-size="10.5" fill="#5b6675">OSPF</text><g><title>P1 — PE1: adjacency Up, metric 10
+198.51.100.0/30</title><line x1="270.5" y1="919.3" x2="500.5" y2="919.3" stroke="#2e9e5b" stroke-width="2.6"/><rect x="375.7" y="912.3" width="19.6" height="14" rx="7" fill="#fff" stroke="#2e9e5b"/><text x="385.5" y="922.8" font-size="9.5" text-anchor="middle" fill="#1d2430">10</text></g><g><title>P1 — PE2: adjacency Up, metric 10
+198.51.100.4/30</title><line x1="270.5" y1="919.3" x2="375.9" y2="990.7" stroke="#2e9e5b" stroke-width="2.6"/><rect x="313.4" y="948" width="19.6" height="14" rx="7" fill="#fff" stroke="#2e9e5b"/><text x="323.2" y="958.5" font-size="9.5" text-anchor="middle" fill="#1d2430">10</text></g><g><title>P2 — PE1: adjacency Up, metric 20
+198.51.100.8/30</title><line x1="605.9" y1="990.7" x2="500.5" y2="919.3" stroke="#2e9e5b" stroke-width="2.6"/><rect x="543.4" y="948" width="19.6" height="14" rx="7" fill="#fff" stroke="#2e9e5b"/><text x="553.2" y="958.5" font-size="9.5" text-anchor="middle" fill="#1d2430">20</text></g><g><title>P2 — PE2: adjacency Up, metric 20
+198.51.100.12/30</title><line x1="605.9" y1="990.7" x2="375.9" y2="990.7" stroke="#2e9e5b" stroke-width="2.6"/><rect x="481.1" y="983.7" width="19.6" height="14" rx="7" fill="#fff" stroke="#2e9e5b"/><text x="490.9" y="994.2" font-size="9.5" text-anchor="middle" fill="#1d2430">20</text></g><g><title>P1
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.12
+SRv6 locator 2001:db8:f0:3::/64</title><ellipse cx="270.5" cy="919.3" rx="12" ry="7" fill="#2e9e5b" stroke="#fff"/><rect x="185.5" y="883.3" width="69" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="190.5" y="894.3" font-size="12" font-weight="700" fill="#2e9e5b">P1</text><text x="190.5" y="907.3" font-size="10.5" fill="#5b6675">192.0.2.12</text></g><g><title>P2
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.14
+SRv6 locator 2001:db8:f0:4::/64</title><ellipse cx="605.9" cy="990.7" rx="12" ry="7" fill="#2e9e5b" stroke="#fff"/><rect x="520.9" y="954.7" width="69" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="525.9" y="965.7" font-size="12" font-weight="700" fill="#2e9e5b">P2</text><text x="525.9" y="978.7" font-size="10.5" fill="#5b6675">192.0.2.14</text></g><g><title>PE1
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.11
+SRv6 locator 2001:db8:f0:1::/64</title><ellipse cx="500.5" cy="919.3" rx="12" ry="7" fill="#2e9e5b" stroke="#fff"/><rect x="415.5" y="883.3" width="69" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="420.5" y="894.3" font-size="12" font-weight="700" fill="#2e9e5b">PE1</text><text x="420.5" y="907.3" font-size="10.5" fill="#5b6675">192.0.2.11</text></g><g><title>PE2
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.13
+SRv6 locator 2001:db8:f0:2::/64</title><ellipse cx="375.9" cy="990.7" rx="12" ry="7" fill="#2e9e5b" stroke="#fff"/><rect x="290.9" y="954.7" width="69" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="295.9" y="965.7" font-size="12" font-weight="700" fill="#2e9e5b">PE2</text><text x="295.9" y="978.7" font-size="10.5" fill="#5b6675">192.0.2.13</text></g></g>
+<g class="layer" data-layer="physical" transform="translate(0,0)"><polygon points="40,880 615,880 836.3,1029.9 261.3,1029.9" fill="#8b98a8" fill-opacity="0.07" stroke="#8b98a8" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1021.9000000000001" font-size="12" font-weight="700" fill="#8b98a8">Physical</text><g><title>P1 1 — PE1 1
+198.51.100.0/30</title><line x1="270.5" y1="919.3" x2="500.5" y2="919.3" stroke="#69768a" stroke-width="2"/><rect x="309.6" y="912.3" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="316.5" y="922.8" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="447.6" y="912.3" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="454.5" y="922.8" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text></g><g><title>P1 2 — PE2 1
+198.51.100.4/30</title><line x1="270.5" y1="919.3" x2="375.9" y2="990.7" stroke="#69768a" stroke-width="2"/><rect x="284.7" y="926.6" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="291.6" y="937.1" font-size="9.5" text-anchor="middle" fill="#1d2430">2</text><rect x="347.9" y="969.4" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="354.8" y="979.9" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text></g><g><title>P2 1 — PE1 2
+198.51.100.8/30</title><line x1="605.9" y1="990.7" x2="500.5" y2="919.3" stroke="#69768a" stroke-width="2"/><rect x="577.9" y="969.4" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="584.8" y="979.9" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="514.7" y="926.6" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="521.6" y="937.1" font-size="9.5" text-anchor="middle" fill="#1d2430">2</text></g><g><title>P2 2 — PE2 2
+198.51.100.12/30</title><line x1="605.9" y1="990.7" x2="375.9" y2="990.7" stroke="#69768a" stroke-width="2"/><rect x="553" y="983.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="559.9" y="994.2" font-size="9.5" text-anchor="middle" fill="#1d2430">2</text><rect x="415" y="983.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="421.9" y="994.2" font-size="9.5" text-anchor="middle" fill="#1d2430">2</text></g><g class="device"><title>P1
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.12
+SRv6 locator 2001:db8:f0:3::/64</title><polygon points="290.9,892.1 318.1,910.5 318.1,928.5 290.9,910.1" fill="#1f5fa8" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="250.1,910.5 318.1,910.5 318.1,928.5 250.1,928.5" fill="#1f5fa8" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="222.9,892.1 290.9,892.1 318.1,910.5 250.1,910.5" fill="#1f5fa8" stroke="#fff" stroke-width="0.8"/><rect x="222.9" y="862.1" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="227.9" y="873.1" font-size="12" font-weight="700" fill="#1f5fa8">P1  P</text><text x="227.9" y="886.1" font-size="10.5" fill="#5b6675">5164-10x · SAOS 10</text></g><g class="device"><title>P2
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.14
+SRv6 locator 2001:db8:f0:4::/64</title><polygon points="626.3,963.5 653.5,981.9 653.5,999.9 626.3,981.5" fill="#1f5fa8" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="585.5,981.9 653.5,981.9 653.5,999.9 585.5,999.9" fill="#1f5fa8" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="558.3,963.5 626.3,963.5 653.5,981.9 585.5,981.9" fill="#1f5fa8" stroke="#fff" stroke-width="0.8"/><rect x="558.3" y="933.5" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="563.3" y="944.5" font-size="12" font-weight="700" fill="#1f5fa8">P2  P</text><text x="563.3" y="957.5" font-size="10.5" fill="#5b6675">5164-10x · SAOS 10</text></g><g class="device"><title>PE1
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.11
+SRv6 locator 2001:db8:f0:1::/64</title><polygon points="520.9,892.1 548.1,910.5 548.1,928.5 520.9,910.1" fill="#c8202f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="480.1,910.5 548.1,910.5 548.1,928.5 480.1,928.5" fill="#c8202f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="452.9,892.1 520.9,892.1 548.1,910.5 480.1,910.5" fill="#c8202f" stroke="#fff" stroke-width="0.8"/><rect x="452.9" y="862.1" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="457.9" y="873.1" font-size="12" font-weight="700" fill="#c8202f">PE1  PE</text><text x="457.9" y="886.1" font-size="10.5" fill="#5b6675">5164-10x · SAOS 10</text></g><g class="device"><title>PE2
+5164-10x · cn5164 · SAOS 10
+loopback 192.0.2.13
+SRv6 locator 2001:db8:f0:2::/64</title><polygon points="396.3,963.5 423.5,981.9 423.5,999.9 396.3,981.5" fill="#c8202f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="355.5,981.9 423.5,981.9 423.5,999.9 355.5,999.9" fill="#c8202f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="328.3,963.5 396.3,963.5 423.5,981.9 355.5,981.9" fill="#c8202f" stroke="#fff" stroke-width="0.8"/><rect x="328.3" y="933.5" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="333.3" y="944.5" font-size="12" font-weight="700" fill="#c8202f">PE2  PE</text><text x="333.3" y="957.5" font-size="10.5" fill="#5b6675">5164-10x · SAOS 10</text></g></g>
+<g class="hud">
+<text x="40" y="30" font-size="17" font-weight="700" fill="#1d2430">srv6-ospf</text>
+<text x="40" y="48" font-size="11" fill="#5b6675">4 devices · 4 links · 1 PW · layout: ladder</text>
+<g class="chip" data-layer="physical" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Physical (always shown)</title><rect x="40" y="58" width="82.8" height="22" rx="11" fill="#8b98a8" fill-opacity="0.14" stroke="#8b98a8"/><circle class="dot" cx="52" cy="69" r="4.5" fill="#8b98a8"/><text x="62" y="73" font-size="11" fill="#1d2430">Physical</text></g>
+<g class="chip" data-layer="igp" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide IGP</title><rect x="130.8" y="58" width="49.8" height="22" rx="11" fill="#2e9e5b" fill-opacity="0.14" stroke="#2e9e5b"/><circle class="dot" cx="142.8" cy="69" r="4.5" fill="#2e9e5b"/><text x="152.8" y="73" font-size="11" fill="#1d2430">IGP</text></g>
+<g class="chip" data-layer="mpls" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide MPLS (SR policies / TP)</title><rect x="188.60000000000002" y="58" width="181.79999999999998" height="22" rx="11" fill="#b7791f" fill-opacity="0.14" stroke="#b7791f"/><circle class="dot" cx="200.60000000000002" cy="69" r="4.5" fill="#b7791f"/><text x="210.60000000000002" y="73" font-size="11" fill="#1d2430">MPLS (SR policies / TP)</text></g>
+<g class="chip" data-layer="srv6" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide SRv6</title><rect x="378.4" y="58" width="56.4" height="22" rx="11" fill="#e8590c" fill-opacity="0.14" stroke="#e8590c"/><circle class="dot" cx="390.4" cy="69" r="4.5" fill="#e8590c"/><text x="400.4" y="73" font-size="11" fill="#1d2430">SRv6</text></g>
+<g class="chip" data-layer="pw" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide Pseudowires</title><rect x="442.79999999999995" y="58" width="102.6" height="22" rx="11" fill="#d63384" fill-opacity="0.14" stroke="#d63384"/><circle class="dot" cx="454.79999999999995" cy="69" r="4.5" fill="#d63384"/><text x="464.79999999999995" y="73" font-size="11" fill="#1d2430">Pseudowires</text></g>
+</g>
+<script><![CDATA[
+(function () {
+  var svgs = document.querySelectorAll('svg.netfacts-snapshot:not([data-wired])');
+  Array.prototype.forEach.call(svgs, function (svg) {
+    svg.setAttribute('data-wired', '1');
+    var gap = +svg.getAttribute('data-gap'), fullH = +svg.getAttribute('data-full-h');
+    var vb = svg.getAttribute('viewBox').split(' ').map(Number);
+    var layers = [].slice.call(svg.querySelectorAll('g.layer'));
+    var order = layers.map(function (g) { return g.getAttribute('data-layer'); }).reverse();
+    var off = {};
+    function apply() {
+      var shown = order.filter(function (id) { return !off[id]; });
+      layers.forEach(function (g) {
+        var id = g.getAttribute('data-layer'), k = shown.indexOf(id);
+        g.style.display = k < 0 ? 'none' : '';
+        if (k >= 0) g.setAttribute('transform', 'translate(0,' + (-k * gap) + ')');
+      });
+      [].forEach.call(svg.querySelectorAll('line.pillar'), function (p) {
+        var ls = (p.getAttribute('data-layers') || '').split(' ');
+        var top = 0;
+        ls.forEach(function (id) { var k = shown.indexOf(id); if (k > top) top = k; });
+        p.setAttribute('y2', +p.getAttribute('y1') - top * gap);
+      });
+      [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
+        var id = c.getAttribute('data-layer');
+        c.style.opacity = off[id] ? 0.45 : 1;
+        c.querySelector('.dot').setAttribute('fill-opacity', off[id] ? 0 : 1);
+        c.setAttribute('aria-pressed', off[id] ? 'false' : 'true');
+      });
+      var drop = (order.length - shown.length) * gap;
+      svg.setAttribute('viewBox', [vb[0], drop, vb[2], fullH - drop].join(' '));
+      svg.setAttribute('height', fullH - drop);
+      svg.querySelector('g.hud').setAttribute('transform', 'translate(0,' + drop + ')');
+    }
+    [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
+      var id = c.getAttribute('data-layer');
+      if (id === 'physical') { c.style.cursor = 'default'; return; }
+      function toggle() { off[id] = !off[id]; apply(); }
+      c.addEventListener('click', toggle);
+      c.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    });
+    apply();
+  });
+})();]]></script>
+</svg>

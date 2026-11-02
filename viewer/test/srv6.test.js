@@ -213,3 +213,37 @@ describe('EVPN instances over SRv6 (C7)', () => {
     expect(presentLayers(buildNetwork(ex.topology, { labelMode: ex.labelMode })).map((l) => l.id)).toEqual(['physical', 'ring', 'isis', 'mpls', 'bgp', 'pw', 'cfm']);
   });
 });
+
+// SRv6 over OSPF: OSPF keeps its SPF per router and area, IS-IS per router only. Synthetic fixture
+// test/fixtures/srv6-ospf.facts.json: the ospf-tp ring (PE1 - P1 - PE2 - P2 - PE1, costs 10 / 20)
+// with PE2 and its links in area 0.0.0.1, so P1 and P2 are area border routers, and one
+// algorithm-0 locator per router.
+describe('SRv6 over a two-area OSPF core', () => {
+  const ospfText = readFileSync(new URL('./fixtures/srv6-ospf.facts.json', import.meta.url), 'utf8');
+  const { imp, net } = load(ospfText);
+  const route = (r, owner) => net.srv6.rib[r][net.srv6.locators.find((l) => l.node === owner).prefix];
+
+  test('the network builds, every router in algorithm 0, one locator each', () => {
+    expect(imp.topology.igp).toBe('ospf');
+    expect(net.ospf.abrs).toEqual(['P1', 'P2']);
+    expect(net.srv6.locators.map((l) => [l.node, l.prefix])).toEqual([['P1', '2001:db8:f0:3::/64'], ['P2', '2001:db8:f0:4::/64'], ['PE1', '2001:db8:f0:1::/64'], ['PE2', '2001:db8:f0:2::/64']]);
+    expect(net.srv6.algorithms[0].participants).toEqual(net.ospf.routers);
+  });
+
+  test('intra-area routes to a locator, equal-cost next hops merged across areas', () => {
+    expect(route('P1', 'PE2')).toMatchObject({ metric: 10, nextHops: [{ node: 'PE2', link: 'P1-PE2' }] });
+    expect(route('P1', 'P2')).toMatchObject({ metric: 30, nextHops: [{ node: 'PE1', link: 'P1-PE1' }, { node: 'PE2', link: 'P1-PE2' }] });
+    expect(route('PE1', 'PE1')).toMatchObject({ metric: 0, local: true });
+  });
+
+  test('a locator in another area is reached through the area border router (inter-area)', () => {
+    expect(route('PE1', 'PE2')).toMatchObject({ metric: 20, nextHops: [{ node: 'P1', link: 'P1-PE1' }] });
+    expect(route('PE2', 'PE1')).toMatchObject({ metric: 20, nextHops: [{ node: 'P1', link: 'P1-PE2' }] });
+    expect(srv6PingWalk(net, 'PE1', 'PE2|LOC').delivered).toBe(true);
+  });
+
+  test('an IS-IS lab keeps its SPF as it was', () => {
+    const { net: isisNet } = load(text);
+    expect(isisNet.srv6.rib.PE1['2001:db8:f0:2::/64']).toMatchObject({ metric: expect.any(Number), nextHops: [{ node: 'P1' }] });
+  });
+});

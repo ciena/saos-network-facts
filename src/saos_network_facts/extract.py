@@ -4,7 +4,8 @@ them, and the device records of the facts file.
 
 Each device has an extractor:
 
-* ``saos6`` (SAOS 6 and SAOS 8): ``saos6`` parses the flat CLI directly.
+* ``saos6`` (SAOS 6 and SAOS 8): ``saos6`` parses the flat CLI directly. A device in whose files it
+  recognises no command line is ``status: error``, not ``ok`` with empty facts.
 * ``saos10``: the translator turns each configuration file into pivot JSON and ``saos10`` walks it.
   A file the translator cannot parse is reported on the record (``status: partial``) and the others
   still count. The translator needs the device's platform (``cn5164``), from the platform map's
@@ -525,7 +526,11 @@ def device_facts(device, translator=None, jobs=1, recipe=None):
         record.update(status="skipped", reason="no configuration")
         return record
     if record["extractor"] == "saos6":
-        record["facts"] = saos6.merge(t for _, t in texts)
+        facts = saos6.merge(t for _, t in texts)
+        if facts["recognised"]:
+            record["facts"] = facts
+        else:
+            record.update(status="error", reason=unrecognised_reason(facts))
         return record
     platform = device.platform or translator_platform(device.type)
     if platform:
@@ -538,6 +543,15 @@ def device_facts(device, translator=None, jobs=1, recipe=None):
         return record
     saos10_device_facts(record, texts, platform, translator, jobs)
     return record
+
+
+def unrecognised_reason(facts):
+    """Why a SAOS 6 / 8 device has no facts: not one of its command lines meant anything to the parser
+    (no host name, interface, port, VLAN, ring or service), so the files are not a SAOS 6 / 8
+    configuration it can read, or the device is not SAOS 6 / 8 at all. Its facts would be all empty,
+    which reads like a device that configures nothing; ``error`` says nothing could be read."""
+    return (f"no SAOS 6/8 command recognised in {facts['lines']} command lines: not a SAOS 6/8 "
+            f"configuration? (check the device type or --platform-map)")
 
 
 def no_platform_reason(device):

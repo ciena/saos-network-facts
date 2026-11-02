@@ -76,7 +76,7 @@ export interface DeviceRecord {
    */
   templates: string[];
   /**
-   * `ok`: every file was read. `partial`: some SAOS 10 files failed (see `failed_templates`); `facts` holds the rest. `error`: nothing could be read. `skipped`: no extractor, no configuration, or no translator (`--no-saos10`); see `reason`.
+   * `ok`: every file was read. `partial`: some SAOS 10 files failed (see `failed_templates`); `facts` holds the rest. `error`: nothing could be read (also a SAOS 6/8 device none of whose command lines was recognised). `skipped`: no extractor, no configuration, or no translator (`--no-saos10`); see `reason`.
    */
   status: "ok" | "partial" | "error" | "skipped";
   /**

@@ -27,7 +27,10 @@ def test_case_matches_expected_facts(name):
     assert text == path.read_text(), f"{path.name} differs; rerun with UPDATE_GOLDEN=1 and review the diff"
 
 
-@pytest.mark.parametrize("path", sorted(EXPECTED.glob("*.json")), ids=lambda p: p.name)
+VIEWER_FIXTURES = sorted((FIXTURES.parent.parent / "viewer" / "test" / "fixtures").glob("*.facts.json"))
+
+
+@pytest.mark.parametrize("path", sorted(EXPECTED.glob("*.json")) + VIEWER_FIXTURES, ids=lambda p: p.name)
 def test_expected_facts_validate(path):
     assert schema.errors(json.loads(path.read_text())) == []
 
@@ -76,6 +79,16 @@ def test_statuses():
     clab = {r["device"]: r for r in run_case("sr-l2")["devices"]}
     assert clab["CE1"]["status"] == "skipped" and clab["CE1"]["facts"] is None
     assert clab["PE2"]["templates"] == ["configs/PE2.xml"]
+
+
+def test_saos6_device_with_nothing_recognised_is_an_error():
+    """A file typed SAOS 6 in which the parser recognises no line has no facts, not empty ones."""
+    by = {r["device"]: r for r in run_case("saos6-unrecognised")["devices"]}
+    assert by["AGG1"]["status"] == "ok" and by["AGG1"]["facts"]["hostname"] == "AGG1"
+    agg2 = by["AGG2"]
+    assert (agg2["status"], agg2["extractor"], agg2["facts"]) == ("error", "saos6", None)
+    assert agg2["reason"].startswith("no SAOS 6/8 command recognised in 3 command lines")
+    assert extract.summary_line(agg2).startswith("ERROR   AGG2 (3930-6x) no SAOS 6/8 command recognised")
 
 
 def test_merge_order_and_removals():
