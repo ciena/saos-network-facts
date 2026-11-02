@@ -200,6 +200,46 @@ function linkEnds(ctx) {
   return ends;
 }
 
+// The options a port badge tries, in order, all badges at each step before the next: on the link at
+// full size, then 0.8 and 0.65 of it, then beside the link (one, two, three badge heights either side)
+// at each size. A badge stays on its link and full size wherever there is room, and no early small badge
+// takes the room a later one needed.
+export const BADGE_STEPS = [0, 1, -1, 2, -2, 3, -3].flatMap((side) => [1, 0.8, 0.65].map((k) => ({ side, k })));
+
+// Whether the segment p-q crosses the rectangle r (Liang-Barsky clipping).
+export function segmentHitsRect(p, q, r) {
+  let t0 = 0, t1 = 1;
+  const dx = q.x - p.x, dy = q.y - p.y;
+  for (const [pp, qq] of [[-dx, p.x - r.x], [dx, r.x + r.w - p.x], [-dy, p.y - r.y], [dy, r.y + r.h - p.y]]) {
+    if (pp === 0) { if (qq < 0) return false; continue; }
+    const t = qq / pp;
+    if (pp < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return t0 <= t1;
+}
+
+// Where a port badge goes at one step: on (or beside) the link from its device (`from`) toward the
+// other end (`to`), from the first spot clear of its own device box up to the middle of the link, clear
+// of everything in `taken` (device boxes, captions, labels, badges placed) and, beside the line, of the
+// other links (`others`: [from, to] segments). { x, y, k, rect } or null.
+export function placeBadge(from, to, len, w, f, box, taken, { side = 0, k = 1 } = {}, others = []) {
+  const d = len || 1;
+  const ux = (to.x - from.x) / d, uy = (to.y - from.y) / d;
+  const pad = f * 0.15;
+  const hits = (r) => taken.some((q) => r.x < q.x + q.w + pad && q.x < r.x + r.w + pad && r.y < q.y + q.h + pad && q.y < r.y + r.h + pad);
+  const bw = w * k, bh = f * 1.1 * k;
+  // the first distance from the device centre at which the badge clears its own box
+  const tx = Math.abs(ux) > 1e-6 ? (box.w / 2 + bw / 2 + pad) / Math.abs(ux) : Infinity;
+  const ty = Math.abs(uy) > 1e-6 ? (box.h / 2 + bh / 2 + pad) / Math.abs(uy) : Infinity;
+  for (let t = Math.min(tx, ty); t <= d / 2 + 1e-6; t += f * (side ? 0.7 : 0.35)) {
+    const c = { x: from.x + ux * t - uy * side * (bh + pad), y: from.y + uy * t + ux * side * (bh + pad) };
+    const r = { x: r1(c.x - bw / 2), y: r1(c.y - bh / 2), w: r1(bw), h: r1(bh) };
+    // beside its line, a badge must not sit on another link (it would read as that link's port)
+    if (!hits(r) && !(side && others.some(([p, q]) => segmentHitsRect(p, q, r)))) return { x: r1(c.x), y: r1(c.y), k, rect: r };
+  }
+  return null;
+}
+
 // The ghost: the physical topology faint, with names, so every frame keeps its bearings.
 function ghost(ctx, ends, reg, { names = true } = {}) {
   const g = [];
@@ -226,9 +266,10 @@ function draw(id, ctx) {
   const reg = [];
   const g = siteFrames(ctx, reg, id === 'physical' || id === 'optical');
   const dot = (p, color, r = f * 0.55) => `<ellipse cx="${p.x}" cy="${p.y}" rx="${r1(r)}" ry="${r1(r * 0.75)}" fill="${color}" stroke="#fff" stroke-width="${r1(f * 0.1)}"/>`;
-  const pill = (p, text, color) => {
-    const w = String(text).length * f * 0.75 * 0.6 + f * 0.6;
-    return `<rect x="${r1(p.x - w / 2)}" y="${r1(p.y - f * 0.55)}" width="${r1(w)}" height="${r1(f * 1.1)}" rx="${r1(f * 0.55)}" fill="#fff" stroke="${color}" stroke-width="${r1(f * 0.07)}"/><text x="${p.x}" y="${r1(p.y + f * 0.28)}" font-size="${r1(f * 0.75)}" text-anchor="middle" fill="${C.ink}">${esc(text)}</text>`;
+  // A pill at p; k < 1 draws it smaller (a badge on a short link), with the same corner radius.
+  const pill = (p, text, color, k = 1) => {
+    const w = (String(text).length * f * 0.75 * 0.6 + f * 0.6) * k;
+    return `<rect x="${r1(p.x - w / 2)}" y="${r1(p.y - f * 0.55 * k)}" width="${r1(w)}" height="${r1(f * 1.1 * k)}" rx="${r1(f * 0.55)}" fill="#fff" stroke="${color}" stroke-width="${r1(f * 0.07)}"/><text x="${p.x}" y="${r1(p.y + f * 0.28 * k)}" font-size="${r1(f * 0.75 * k)}" text-anchor="middle" fill="${C.ink}">${esc(text)}</text>`;
   };
   const arc = (a, b, k, color, dash) => {
     const d = Math.hypot(b.x - a.x, b.y - a.y);
@@ -250,6 +291,11 @@ function draw(id, ctx) {
     const pair = (l) => [l.a.node, l.b.node].sort().join('|');
     const pairs = new Map();
     for (const l of model.links) pairs.set(pair(l), [...(pairs.get(pair(l)) ?? []), l.id]);
+    // Every device box first, then the link captions: the port badges are placed clear of them all
+    // (placeBadges), and of each other.
+    const boxes = new Map(model.nodes.map((n) => { const p = at(n.id), s = f * (n.rr ? 1.6 : 1.3); return [n.id, { x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s }]; }));
+    const taken = [...boxes.values()];
+    const linkDraw = [];
     for (const l of model.links) {
       const [a, b] = ends.get(l.id);
       // A routed link over the line system says so (`over ch 25`) where it has no label of its own.
@@ -265,13 +311,12 @@ function draw(id, ctx) {
       const t = 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3;
       const len = Math.hypot(b.x - a.x, b.y - a.y);
       const cw = caption ? pillW(caption) : 0;
-      const fits = (port, tp) => !caption || (Math.min(tp, 1 - tp) * len - pillW(port) / 2 > f * 1.4 && Math.abs(t - tp) * len > (cw + pillW(port)) / 2 + 2);
-      const pa = l.a.port ?? '?', pb = l.b.port ?? '?';
-      const ports = fits(pa, 0.24) && fits(pb, 0.76) ? `${pill(lerp(a, b, 0.24), pa, '#9aa4b1')}${pill(lerp(a, b, 0.76), pb, '#9aa4b1')}` : '';
       const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || !l.caption ? C.optical : '#9aa4b1') : '';
-      g.push(`<g${l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}${ports}${cap}</g>`);
-      if (caption) { const c = lerp(a, b, t); reg.push({ x: c.x - cw / 2, y: c.y - f * 0.55, w: cw, h: f * 1.1 }); }
+      if (caption) { const c = lerp(a, b, t); const r = { x: c.x - cw / 2, y: c.y - f * 0.55, w: cw, h: f * 1.1 }; reg.push(r); taken.push(r); }
+      linkDraw.push({ l, a, b, len, head: `<g${l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}`, cap });
     }
+    const devices = [];
+    const labels = [];
     for (const n of model.nodes) {
       const p = at(n.id);
       // A line-system member (a box without facts that has an equipment role) is meant to have no
@@ -280,14 +325,32 @@ function draw(id, ctx) {
       const col = eq ? C.optical : C[n.role] ?? C.plain;
       const s = f * (n.rr ? 1.6 : 1.3);
       const tag = eq ?? (ROLE_TAG[n.role] ?? '') + (n.rr ? '·RR' : '');
-      g.push(`<g>${title(deviceDetail(n, model))}<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${col}"${n.plain && !eq ? ' fill-opacity="0.35" stroke-dasharray="4 3"' : ''} stroke="${n.plain && !eq ? C.plain : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.35)}" font-size="${r1(f * (eq && tag.length > 3 ? 0.62 : 0.8))}" font-weight="700" text-anchor="middle" fill="#fff">${esc(tag)}</text></g>`);
+      devices.push(`<g>${title(deviceDetail(n, model))}<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${col}"${n.plain && !eq ? ' fill-opacity="0.35" stroke-dasharray="4 3"' : ''} stroke="${n.plain && !eq ? C.plain : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.35)}" font-size="${r1(f * (eq && tag.length > 3 ? 0.62 : 0.8))}" font-weight="700" text-anchor="middle" fill="#fff">${esc(tag)}</text></g>`);
       reg.push({ x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s });
     }
+    // The device labels next, at their usual place beside the device; the badges then keep clear of
+    // them too (a label pushed away by a badge would leave its device).
     for (const n of model.nodes) {
       const p = at(n.id);
       const sub = n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type, 'no facts']) : [n.type, mixed ? n.os : null];
-      g.push(outward(ctx, reg, p, f * 1.0, [n.id, sub.filter(Boolean).join(' · ')], { color: n.plain && n.equipment ? C.optical : C[n.role] ?? C.plain }));
+      labels.push(outward(ctx, reg, p, f * 1.0, [n.id, sub.filter(Boolean).join(' · ')], { color: n.plain && n.equipment ? C.optical : C[n.role] ?? C.plain }));
     }
+    // The port badges, link by link and end by end (a fixed order: the same facts, the same picture),
+    // clear of the boxes, captions, labels and each other. Drawn with their link, under the boxes.
+    taken.push(...reg.filter((r) => !taken.includes(r)));
+    const want = linkDraw.flatMap((d, i) => [[d.a, d.b, d.l.a], [d.b, d.a, d.l.b]].map(([from, to, end], e) => ({ i, e, from, to, len: d.len, text: end.port ?? '?', box: boxes.get(end.node), spot: null })));
+    for (const step of BADGE_STEPS) {
+      for (const b of want) {
+        if (b.spot) continue;
+        b.spot = placeBadge(b.from, b.to, b.len, pillW(b.text), f, b.box, taken, step, linkDraw.filter((_, j) => j !== b.i).map((d) => [d.a, d.b]));
+        if (b.spot) taken.push(b.spot.rect);
+      }
+    }
+    for (const [i, d] of linkDraw.entries()) {
+      const ports = want.filter((b) => b.i === i && b.spot).map((b) => pill(b.spot, b.text, '#9aa4b1', b.spot.k));
+      g.push(`${d.head}${ports.join('')}${d.cap}</g>`);
+    }
+    g.push(...devices, ...labels);
   }
 
   if (id === 'ring') {
@@ -317,10 +380,19 @@ function draw(id, ctx) {
 
   if (id === 'igp') {
     g.push(...ghost(ctx, ends, reg, { names: false }));
+    // A metric pill at the middle of its link, else the nearest spot along it (toward either end, up to
+    // a fifth of the length from it) clear of the device boxes and the pills already placed: parallel
+    // and crossing links do not stack their metrics.
+    const pillsTaken = model.nodes.map((n) => { const p = at(n.id), s = f * 0.9; return { x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s }; });
+    const clearOf = (r) => !pillsTaken.some((q) => r.x < q.x + q.w && q.x < r.x + r.w && r.y < q.y + q.h && q.y < r.y + r.h);
     for (const l of model.links) {
       if (!l.adj) continue;
       const [a, b] = ends.get(l.id);
-      g.push(`<g>${title(`${l.a.node} — ${l.b.node}: ${l.adj}, metric ${l.metric}\n${l.subnet ?? ''}`)}${line(a, b, l.adj === 'Up' ? C.igp : C.rpl, f * 0.22)}${pill(lerp(a, b, 0.5), l.metric ?? '?', C.igp)}</g>`);
+      const mw = String(l.metric ?? '?').length * f * 0.75 * 0.6 + f * 0.6;
+      const at_ = (tt) => { const c = lerp(a, b, tt); return { x: c.x - mw / 2, y: c.y - f * 0.55, w: mw, h: f * 1.1 }; };
+      const t = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74].find((tt) => clearOf(at_(tt))) ?? 0.5;
+      pillsTaken.push(at_(t));
+      g.push(`<g>${title(`${l.a.node} — ${l.b.node}: ${l.adj}, metric ${l.metric}\n${l.subnet ?? ''}`)}${line(a, b, l.adj === 'Up' ? C.igp : C.rpl, f * 0.22)}${pill(lerp(a, b, t), l.metric ?? '?', C.igp)}</g>`);
     }
     for (const n of model.nodes) {
       if (!model.links.some((l) => l.adj && (l.a.node === n.id || l.b.node === n.id))) continue;

@@ -17,6 +17,23 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-02
+
+### Fixed
+
+- **Frames: port badges never overlap a device box or each other; IGP metrics never stack** — the port
+  badges in the physical and optical frames sat at a fixed point along each link, so on a short link they
+  went under the device boxes, and the badges of parallel links (a bond's member cables) stacked. Each badge
+  now starts outside its device's box (measured from the box edge), slides along its link up to the middle
+  until it clears every device box, caption, device label and badge already placed, then tries 0.8 and 0.65
+  of its size, then beside the line (never on another link); all badges try each step before the next, in
+  a fixed order, so the output stays byte-stable. A badge with no room (a short link in a crowded corner)
+  leaves its port to the link's hover title. Device labels are placed before the badges, so they stay
+  beside their device. IGP metric pills take the middle of their link, else the nearest clear spot along
+  it (parallel and crossing links). New golden lab `vpws-bonds` (short host links, a bond's two cables to
+  one PE) and a test that counts overlaps on every golden lab; on 199 generated lab frames: 0 overlaps
+  (was 114 frames, 257 badge-on-badge, 467 badge-on-device), 99% of badges drawn.
+
 ## [0.19.0] - 2026-11-02
 
 ### Added
