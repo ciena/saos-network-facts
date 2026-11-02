@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="netfacts-snapshot" data-variant="exploded" data-gap="125" data-full-h="370" viewBox="0 0 1205 370" width="1205" height="370" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<title>vpws-bonds</title>
+<rect class="bg" x="0" y="-4000" width="1205" height="8370" fill="#ffffff"/>
+<g class="pillars">
+<line class="pillar" data-layers="physical pw" x1="477.5" y1="260.3" x2="477.5" y2="260.3" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical pw" x1="707.5" y1="260.3" x2="707.5" y2="260.3" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical" x1="270.5" y1="260.3" x2="270.5" y2="260.3" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical" x1="914.5" y1="260.3" x2="914.5" y2="260.3" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+</g>
+<g class="layer" data-layer="pw" transform="translate(0,-125)"><polygon points="40,221 1029,221 1144.9,299.5 155.9,299.5" fill="#d63384" fill-opacity="0.07" stroke="#d63384" stroke-opacity="0.55" stroke-width="1.2"/><text x="163.9" y="291.5" font-size="12" font-weight="700" fill="#d63384">Pseudowires</text><g><title>VS300 PE1-PE2
+LDP LSP
+PW labels 201000/202000</title><path d="M477.5,260.3 Q592.5,162.7 707.5,260.3" fill="none" stroke="#d63384" stroke-width="2.4"/><rect x="528.5" y="176.5" width="128" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="533.5" y="187.5" font-size="12" font-weight="700" fill="#d63384">VPWS VS300</text><text x="533.5" y="200.5" font-size="10.5" fill="#5b6675">LDP LSP</text><text x="533.5" y="213.5" font-size="10.5" fill="#5b6675">labels 201000/202000</text></g><ellipse cx="477.5" cy="260.3" rx="9" ry="5" fill="#d63384" stroke="#fff"/><rect x="434.5" y="261.3" width="31" height="18" rx="4" fill="#fff" fill-opacity="0.88"/><text x="439.5" y="272.3" font-size="12" font-weight="700" fill="#d63384">PE1</text><ellipse cx="707.5" cy="260.3" rx="9" ry="5" fill="#d63384" stroke="#fff"/><rect x="664.5" y="261.3" width="31" height="18" rx="4" fill="#fff" fill-opacity="0.88"/><text x="669.5" y="272.3" font-size="12" font-weight="700" fill="#d63384">PE2</text></g>
+<g class="layer" data-layer="physical" transform="translate(0,0)"><polygon points="40,221 1029,221 1144.9,299.5 155.9,299.5" fill="#8b98a8" fill-opacity="0.07" stroke="#8b98a8" stroke-opacity="0.55" stroke-width="1.2"/><text x="163.9" y="291.5" font-size="12" font-weight="700" fill="#8b98a8">Physical</text><g><title>PE1 1 — PE2 1
+198.51.100.0/31</title><line x1="477.5" y1="260.3" x2="707.5" y2="260.3" stroke="#69768a" stroke-width="2"/><rect x="516.6" y="253.3" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="523.5" y="263.8" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="654.6" y="253.3" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="661.5" y="263.8" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text></g><g><title>PE1 3 — c1 eth2</title><line x1="477.5" y1="260.3" x2="270.5" y2="260.3" stroke="#69768a" stroke-width="2"/><rect x="429.2" y="253.3" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="436.1" y="263.8" font-size="9.5" text-anchor="middle" fill="#1d2430">3</text><rect x="296.3" y="253.3" width="31.2" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="311.9" y="263.8" font-size="9.5" text-anchor="middle" fill="#1d2430">eth2</text></g><g><title>PE2 3 — c2 eth3</title><line x1="707.5" y1="254.3" x2="914.5" y2="254.3" stroke="#69768a" stroke-width="2"/><rect x="742" y="247.3" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="748.9" y="257.8" font-size="9.5" text-anchor="middle" fill="#1d2430">3</text><rect x="857.5" y="247.3" width="31.2" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="873.1" y="257.8" font-size="9.5" text-anchor="middle" fill="#1d2430">eth3</text></g><g><title>PE2 4 — c2 eth4</title><line x1="707.5" y1="266.3" x2="914.5" y2="266.3" stroke="#69768a" stroke-width="2"/><rect x="742" y="259.3" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="748.9" y="269.8" font-size="9.5" text-anchor="middle" fill="#1d2430">4</text><rect x="857.5" y="259.3" width="31.2" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="873.1" y="269.8" font-size="9.5" text-anchor="middle" fill="#1d2430">eth4</text></g><g class="device"><title>PE1
+3930-6x · SAOS 6/8
+loopback 192.0.2.1
+IS-IS 49.0001 L2 · 1920.0000.2001</title><polygon points="497.9,233.1 525.1,251.5 525.1,269.5 497.9,251.1" fill="#c8202f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="457.1,251.5 525.1,251.5 525.1,269.5 457.1,269.5" fill="#c8202f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="429.9,233.1 497.9,233.1 525.1,251.5 457.1,251.5" fill="#c8202f" stroke="#fff" stroke-width="0.8"/><rect x="429.9" y="203.1" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="434.9" y="214.1" font-size="12" font-weight="700" fill="#c8202f">PE1  PE</text><text x="434.9" y="227.1" font-size="10.5" fill="#5b6675">3930-6x · SAOS 6/8</text></g><g class="device"><title>PE2
+3930-6x · SAOS 6/8
+loopback 192.0.2.2
+IS-IS 49.0001 L2 · 1920.0000.2002</title><polygon points="727.9,233.1 755.1,251.5 755.1,269.5 727.9,251.1" fill="#c8202f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="687.1,251.5 755.1,251.5 755.1,269.5 687.1,269.5" fill="#c8202f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="659.9,233.1 727.9,233.1 755.1,251.5 687.1,251.5" fill="#c8202f" stroke="#fff" stroke-width="0.8"/><rect x="659.9" y="203.1" width="116.2" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="664.9" y="214.1" font-size="12" font-weight="700" fill="#c8202f">PE2  PE</text><text x="664.9" y="227.1" font-size="10.5" fill="#5b6675">3930-6x · SAOS 6/8</text></g><g class="device"><title>c1
+linux
+address 192.168.60.1</title><polygon points="290.9,233.1 318.1,251.5 318.1,269.5 290.9,251.1" fill="#3d7f8f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="250.1,251.5 318.1,251.5 318.1,269.5 250.1,269.5" fill="#3d7f8f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="222.9,233.1 290.9,233.1 318.1,251.5 250.1,251.5" fill="#3d7f8f" stroke="#fff" stroke-width="0.8"/><rect x="222.9" y="203.1" width="66" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="227.9" y="214.1" font-size="12" font-weight="700" fill="#3d7f8f">c1  host</text><text x="227.9" y="227.1" font-size="10.5" fill="#5b6675">linux</text></g><g class="device"><title>c2
+linux
+address 192.168.60.2</title><polygon points="934.9,233.1 962.1,251.5 962.1,269.5 934.9,251.1" fill="#3d7f8f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="894.1,251.5 962.1,251.5 962.1,269.5 894.1,269.5" fill="#3d7f8f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="866.9,233.1 934.9,233.1 962.1,251.5 894.1,251.5" fill="#3d7f8f" stroke="#fff" stroke-width="0.8"/><rect x="866.9" y="203.1" width="66" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="871.9" y="214.1" font-size="12" font-weight="700" fill="#3d7f8f">c2  host</text><text x="871.9" y="227.1" font-size="10.5" fill="#5b6675">linux</text></g></g>
+<g class="hud">
+<text x="40" y="30" font-size="17" font-weight="700" fill="#1d2430">vpws-bonds</text>
+<text x="40" y="48" font-size="11" fill="#5b6675">4 devices · 4 links · 1 PW · layout: columns</text>
+<g class="chip" data-layer="physical" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Physical (always shown)</title><rect x="40" y="58" width="82.8" height="22" rx="11" fill="#8b98a8" fill-opacity="0.14" stroke="#8b98a8"/><circle class="dot" cx="52" cy="69" r="4.5" fill="#8b98a8"/><text x="62" y="73" font-size="11" fill="#1d2430">Physical</text></g>
+<g class="chip" data-layer="pw" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide Pseudowires</title><rect x="130.8" y="58" width="102.6" height="22" rx="11" fill="#d63384" fill-opacity="0.14" stroke="#d63384"/><circle class="dot" cx="142.8" cy="69" r="4.5" fill="#d63384"/><text x="152.8" y="73" font-size="11" fill="#1d2430">Pseudowires</text></g>
+</g>
+<script><![CDATA[
+(function () {
+  var svgs = document.querySelectorAll('svg.netfacts-snapshot:not([data-wired])');
+  Array.prototype.forEach.call(svgs, function (svg) {
+    svg.setAttribute('data-wired', '1');
+    var gap = +svg.getAttribute('data-gap'), fullH = +svg.getAttribute('data-full-h');
+    var vb = svg.getAttribute('viewBox').split(' ').map(Number);
+    var layers = [].slice.call(svg.querySelectorAll('g.layer'));
+    var order = layers.map(function (g) { return g.getAttribute('data-layer'); }).reverse();
+    var off = {};
+    function apply() {
+      var shown = order.filter(function (id) { return !off[id]; });
+      layers.forEach(function (g) {
+        var id = g.getAttribute('data-layer'), k = shown.indexOf(id);
+        g.style.display = k < 0 ? 'none' : '';
+        if (k >= 0) g.setAttribute('transform', 'translate(0,' + (-k * gap) + ')');
+      });
+      [].forEach.call(svg.querySelectorAll('line.pillar'), function (p) {
+        var ls = (p.getAttribute('data-layers') || '').split(' ');
+        if (p._y0 === undefined) p._y0 = +p.getAttribute('y1');
+        var y0 = p._y0, top = 0, bottom = Infinity;
+        ls.forEach(function (id) { var k = shown.indexOf(id); if (k > top) top = k; if (k >= 0 && k < bottom) bottom = k; });
+        if (bottom === Infinity) bottom = 0;
+        p.setAttribute('y1', y0 - bottom * gap);
+        p.setAttribute('y2', y0 - top * gap);
+      });
+      [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
+        var id = c.getAttribute('data-layer');
+        c.style.opacity = off[id] ? 0.45 : 1;
+        c.querySelector('.dot').setAttribute('fill-opacity', off[id] ? 0 : 1);
+        c.setAttribute('aria-pressed', off[id] ? 'false' : 'true');
+      });
+      var drop = (order.length - shown.length) * gap;
+      svg.setAttribute('viewBox', [vb[0], drop, vb[2], fullH - drop].join(' '));
+      svg.setAttribute('height', fullH - drop);
+      svg.querySelector('g.hud').setAttribute('transform', 'translate(0,' + drop + ')');
+    }
+    [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
+      var id = c.getAttribute('data-layer');
+      if (id === 'physical') { c.style.cursor = 'default'; return; }
+      function toggle() { off[id] = !off[id]; apply(); }
+      c.addEventListener('click', toggle);
+      c.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    });
+    apply();
+  });
+})();]]></script>
+</svg>

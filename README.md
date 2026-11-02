@@ -562,7 +562,7 @@ with the same layout as the 3D page:
   IGP; EVPN instances; CFM MEGs. The view picks them (`layers`, `frames.rule` / `frames.list`) and the
   frame to start on (`frames.start`, by default the lab's signature layer: its services, else its
   transport). Devices stay put from frame to frame; each object carries two or three short labels, each
-  frame a title, devices without facts are dashed plain boxes (line-system members solid, with their
+  frame a title (port badges and IGP metrics are placed clear of the device boxes and of each other; a port with no room is in its link's hover title), devices without facts are dashed plain boxes (line-system members solid, with their
   role), optical spans a double line with their label, sites a dashed frame, notes yellow (schema 1.9). Each frame is a group `<g id="f-<layer>">`
   shown by CSS `:target`, so `<img src="frames.svg#f-igp">` shows that frame and stays on it, without any
   script. **The bare file rotates by itself**: CSS inside the SVG (`@keyframes`, no script) shows the start

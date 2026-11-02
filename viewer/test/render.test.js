@@ -23,6 +23,8 @@ const LABS = {
   'ospf-tp': 'tests/fixtures/expected/ospf-tp.facts.json',
   'srv6-ospf': 'viewer/test/fixtures/srv6-ospf.facts.json',
   'line-system': 'tests/fixtures/expected/line-system.facts.json',
+  // short host links and a bond's two member cables to one PE: port badges that stacked before
+  'vpws-bonds': 'tests/fixtures/expected/vpws-bonds.facts.json',
 };
 const GOLDEN = resolve(here, 'golden/render');
 const frameIds = (svg) => [...svg.matchAll(/<g class="frame[ a-z0-9]*" id="f-([a-z0-9]+)"/g)].map((m) => m[1]);
@@ -241,5 +243,55 @@ describe('PNG export', () => {
     expect(Object.keys(files).sort()).toEqual(['out/g8032-two-ring.physical.png', 'out/g8032-two-ring.physical@2x.png', 'out/g8032-two-ring.ring.png', 'out/g8032-two-ring.ring@2x.png']);
     expect(labName('examples/adaptive-sr-cfm/facts.json')).toBe('adaptive-sr-cfm');
     expect(() => parseArgs(['a.json', '--scale', '0'])).toThrow(/--scale/);
+  });
+});
+
+describe('port badges and metric pills never overlap', () => {
+  const rects = (svg, re) => [...svg.matchAll(re)].map((m) => m.slice(1, 5).map(Number));
+  const overlap = (a, b, pad = 0.5) => a[0] < b[0] + b[2] - pad && b[0] < a[0] + a[2] - pad && a[1] < b[1] + b[3] - pad && b[1] < a[1] + a[3] - pad;
+  const frameOf = (svg, id) => svg.match(new RegExp(`<g class="frame[ a-z0-9]*" id="f-${id}"[\\s\\S]*?(?=\\n<g class="frame|\\n</svg>)`))?.[0] ?? '';
+  const BADGE = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#fff" stroke="#9aa4b1"/g;
+  const DEVICE = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#(?!fff)[0-9a-f]{6}"[^>]*stroke="#(?:fff|8a94a3)"/g;
+  const METRIC = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#fff" stroke="#2e9e5b"/g;
+  const GHOST = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#eef1f4"/g;
+  const pairs = (xs, ys = null) => (ys ? xs.flatMap((a) => ys.filter((b) => overlap(a, b))) : xs.flatMap((a, i) => xs.slice(i + 1).filter((b) => overlap(a, b))));
+
+  for (const [lab, path] of Object.entries(LABS)) {
+    test(lab, () => {
+      const svg = frames(read(path), { preset: 'card-frames' }).svg;
+      for (const id of ['physical', 'optical']) {
+        const fr = frameOf(svg, id);
+        if (!fr) continue;
+        const badges = rects(fr, BADGE), devices = rects(fr, DEVICE);
+        expect(devices.length, `${id}: device boxes found`).toBeGreaterThan(0);
+        expect(pairs(badges), `${id}: badge on badge`).toEqual([]);
+        expect(pairs(badges, devices), `${id}: badge on device`).toEqual([]);
+      }
+      const igp = frameOf(svg, 'igp');
+      if (igp) {
+        const metrics = rects(igp, METRIC);
+        expect(pairs(metrics), 'metric on metric').toEqual([]);
+        expect(pairs(metrics, rects(igp, GHOST)), 'metric on device').toEqual([]);
+      }
+    });
+  }
+
+  test('the bond cables of vpws-bonds keep both ends\' ports, apart', () => {
+    const fr = frameOf(frames(read(LABS['vpws-bonds']), { preset: 'card-frames' }).svg, 'physical');
+    const n = rects(fr, BADGE).length;
+    const links = (fr.match(/<title>[^<]* — [^<]*/g) ?? []).length;
+    expect(n).toBe(links * 2); // every port drawn, none dropped to the hover title
+  });
+
+  test('placeBadge: clear of its own box, then along the link, then beside it, else null', async () => {
+    const { placeBadge } = await import('../src/render/frames.js');
+    const box = { x: 0, y: 0, w: 40, h: 24 };
+    const from = { x: 20, y: 12 }, to = { x: 220, y: 12 };
+    const s1 = placeBadge(from, to, 200, 20, 13, box, [box]);
+    expect(s1.rect.x).toBeGreaterThanOrEqual(40); // outside the box, measured from its edge
+    const s2 = placeBadge(from, to, 200, 20, 13, box, [box, s1.rect]);
+    expect(s2.rect.x).toBeGreaterThan(s1.rect.x + s1.rect.w); // slid along past the first badge
+    const crowded = placeBadge({ x: 20, y: 12 }, { x: 70, y: 12 }, 50, 20, 13, box, [box, { x: 40, y: -40, w: 40, h: 104 }]);
+    expect(crowded).toBeNull(); // no room on a short, crowded link: the port stays in the hover title
   });
 });
