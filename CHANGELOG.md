@@ -17,7 +17,7 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
-## [0.15.0] - 2026-11-02
+## [0.17.0] - 2026-11-02
 
 ### Added
 
@@ -32,8 +32,49 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   Both on `layoutFacts` (the 3D page's positions) with plain boxes, self-contained and byte-stable. CLI
   `saos-network-facts-render facts.json --view v.json --frames f.svg --snapshot s.svg`; `npm run build:render`
   bundles it and `render.js` (ES module, importer and engine included, no three.js or yaml), which the
-  viewer release tgz carries as `render/` (the Pages site does not). Golden SVGs for six fixture labs; checked
+  viewer release tgz carries as `render/` (the Pages site does not). On the landscape card layout (0.16.0). Golden SVGs for six fixture labs; checked
   headless in Chromium and Firefox (fragment frames, chips, no console errors).
+
+## [0.16.0] - 2026-11-02
+
+### Changed
+
+- **Layout: landscape cards** — the card aspect (`aspect: "card"`, the `card-frames` preset) is for a landscape
+  card image, but half the cards came out taller than wide: a 10-device lab was two columns by six rows, small
+  labs two columns by four (CEs hung in bands above and below the core). A card is now wider than tall where
+  it can be, still within `max_columns` (about 4 columns by 3 rows for a 10-device lab): a cycle too long for
+  a two-row ladder runs round a rectangle whose rows use the full width (it was as narrow as two columns);
+  outer devices hang sideways off the row ends while everything stays within `max_columns` (the layout may
+  grow to either side), else above or below; a triangle that is the whole core is drawn as a V; islands go
+  beside the layout when they fit; and the last untangling pass counts each row of height (and link length)
+  a little, so a device moves into a nearby spare spot when that adds no crossing.
+- **Layout: hung devices avoid the rungs on a card** — devices hung off the core on a card no longer cross
+  the rungs where the wide layout is clean: a core device with a single core neighbour (a stub off an inner
+  router) hangs outward with the CEs instead of between the rows; spots round a device's neighbours are
+  tried when the band above or below leaves none whose links cross nothing; and the last untangling pass may
+  use the card's whole width and never adds a link through a device. Wide layouts are unchanged.
+
+## [0.15.0] - 2026-11-02
+
+### Added
+
+- **Viewer: the view's layers, camera and label density on the 3D page** — the resolved view (`resolveView`:
+  a lab's view file, `?view=`, URL parameters) now drives more than the layer toggles. `layers`: the page
+  draws and lists only the planes that are both in the view and in the facts (`viewprops.js` `viewLayers`,
+  on top of the planes the facts have); a layer the view leaves out is no longer drawn unchecked, and when
+  the view names none of the facts' layers every plane is shown with a warning. `camera`: the camera starts
+  at `fit` (front and above, the page's camera as it was; aimed at the middle of the planes left when the
+  view removes some), `top` (straight down on the top plane, the outline filling the stage between the side
+  panels) or `iso` (from the front right corner, the whole stack in view) (`cameraPose`); a Camera menu in
+  the Layers section switches it, and `window.netfactsView.camera` gives the pose it started from.
+  `density`: the Labels panel starts from it for this page without storing it. So
+  `?preset=protocol-stack&layers=igp,mpls&camera=top` opens on the IGP and MPLS planes from above, the same
+  every time, and `?preset=lab-snapshot` opens from the corner with compact labels. No view: the same
+  planes, camera and labels as before.
+- **View schema 1.1: `density`** — `full`, `compact`, `minimal` or `null` (the default: the page's own
+  choice), as the view property and the URL parameter `density`; the preset `lab-snapshot` sets `compact`.
+  An optional property, so a 1.0 view is still valid and a 1.0 reader reports it and ignores it. The facts
+  schema is unchanged (1.8.0).
 
 ## [0.14.0] - 2026-11-02
 

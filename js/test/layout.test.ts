@@ -316,6 +316,80 @@ test("hints: a hint for NAME places devices NAME-*, and plain boxes without a hi
   assert.notEqual(own.method, "hints");
 });
 
+test("aspect card: a long cycle's rectangle uses max_columns, not two columns and many rows", () => {
+  // Two rails of six with a rung between each pair: a 12-device cycle whose rungs a tall, two-wide
+  // rectangle would keep short.
+  const links: LayoutModel["links"] = [];
+  for (let i = 1; i <= 6; i++) {
+    links.push({ a: `T${i}`, b: `B${i}` });
+    if (i < 6) links.push({ a: `T${i}`, b: `T${i + 1}` }, { a: `B${i}`, b: `B${i + 1}` });
+  }
+  const rails: LayoutModel = { nodes: Array.from({ length: 6 }, (_, i) => [{ id: `T${i + 1}`, role: "pe" }, { id: `B${i + 1}`, role: "p" }]).flat(), links };
+  // A core triangle and an access ring (no IGP) that reaches it through two gateways.
+  const access: LayoutModel = {
+    nodes: [...["K1", "K2", "K3"].map((id) => ({ id, role: "pe" })), ...["A1", "A2", "A3", "A4", "G1", "G2"].map((id) => ({ id, role: "ce" }))],
+    links: [["A4", "A1"], ["A2", "A3"], ["K1", "K2"], ["K1", "K3"], ["K2", "K3"], ["G1", "K1"], ["G2", "K3"], ["A1", "A2"], ["A3", "A4"], ["A1", "G1"], ["A4", "G2"], ["G1", "G2"]].map(([a, b]) => ({ a: a!, b: b! })),
+  };
+  for (const lab of [rails, access]) {
+    for (const max of [4, 3]) {
+      const out = layoutFacts(lab, { aspect: "card", max_columns: max });
+      assert.equal(out.method, "rectangle");
+      assert.equal(spanX(out.positions), max - 1, `uses all ${max} columns`);
+      assert.equal(crossings(lab, out.positions), 0);
+      assert.deepEqual(through(lab, out.positions), []);
+      assert.ok(minDistance(out.positions) >= 0.5);
+    }
+  }
+  const ys = Object.values(layoutFacts(rails, CARD).positions).map((p) => p.y);
+  assert.ok(Math.max(...ys) - Math.min(...ys) <= 3, "four rows, not six");
+});
+
+test("aspect card: hung devices avoid crossing the rungs (stubs off an inner device hang outward)", () => {
+  // A hub on a triangle with two stubs, a CE dual-homed to the triangle and linked to the CEs behind the
+  // stubs: clean wide; on a card the stubs used to sit between the rows, boxing their CEs in (two
+  // crossings on a 4-column card; on 3 columns, where the stubs leave little room, no worse than that).
+  const lab: LayoutModel = {
+    nodes: [...["H", "R1", "R2", "S3", "S4"].map((id) => ({ id, role: "p" })), ...["C1", "C2", "C3"].map((id) => ({ id, role: "ce" }))],
+    links: [["R1", "R2"], ["R1", "H"], ["R2", "H"], ["H", "S3"], ["H", "S4"], ["C1", "R1"], ["C1", "R2"], ["S4", "C2"], ["S3", "C3"], ["C1", "C2"], ["C1", "C3"]].map(([a, b]) => ({ a: a!, b: b! })),
+  };
+  assert.equal(crossings(lab, layoutFacts(lab).positions), 0);
+  for (const max of [4, 3]) {
+    const p = layoutFacts(lab, { aspect: "card", max_columns: max }).positions;
+    assert.ok(crossings(lab, p) <= (max === 4 ? 1 : 2), `card ${max}: ${crossings(lab, p)} crossings`);
+    assert.deepEqual(through(lab, p), []);
+    assert.ok(spanX(p) <= max - 1 + 1e-9);
+    assert.ok(minDistance(p) >= 0.5);
+  }
+});
+
+test("aspect card: landscape, wider than tall, for small and mid-size labs", () => {
+  const shape = (positions: Record<string, Point>) => {
+    const xs = Object.values(positions).map((p) => p.x), ys = Object.values(positions).map((p) => p.y);
+    return { w: Math.max(...xs) - Math.min(...xs) + 1, h: Math.max(...ys) - Math.min(...ys) + 1 };
+  };
+  // A triangle of routers with a CE on each (drawn as a V), a square and a 6-ring with CEs (hung
+  // sideways off the row ends while the card has room), and a 9-ring with one CE.
+  const labs: Array<[string, LayoutModel]> = [
+    ["triangle", ringLab(3, { roles: "pe", ces: [1, 2, 3] })],
+    ["square", ringLab(4, { roles: "pe", ces: [1, 3] })],
+    ["6-ring", ringLab(6, { roles: "pe", ces: [1, 4] })],
+    ["9-ring", ringLab(9, { roles: "pe", ces: [1] })],
+  ];
+  for (const [name, lab] of labs) {
+    const out = layoutFacts(lab, CARD);
+    const { w, h } = shape(out.positions);
+    assert.ok(w > h, `${name}: ${w} wide, ${h} tall`);
+    assert.ok(w <= 4 + 1e-9, `${name}: within 4 columns`);
+    assert.ok(minDistance(out.positions) >= 0.5);
+    assert.deepEqual(through(lab, out.positions), []);
+    assert.equal(crossings(lab, out.positions), 0, name);
+  }
+  // A device linked to nothing goes beside the layout when the card has room.
+  const island = { nodes: [{ id: "PE1", role: "pe" }, { id: "PE2", role: "pe" }, { id: "BOX", plain: true }], links: [{ a: "PE1", b: "PE2" }] };
+  const { w, h } = shape(layoutFacts(island, CARD).positions);
+  assert.ok(w > h);
+});
+
 test("longestCycle: the longest simple cycle from its smallest name", () => {
   const adj = new Map<string, Set<string>>([
     ["A", new Set(["B", "C"])], ["B", new Set(["A", "C", "D"])], ["C", new Set(["A", "B", "D"])], ["D", new Set(["B", "C"])],

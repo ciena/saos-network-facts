@@ -415,27 +415,28 @@ page fetches the facts from the same site, so they stay as private as the site t
 
 A view file says what to show of a facts file, so a site or a lab card never computes a layout or
 draws a diagram itself: which layers, the 2D frames a card rotates through (one per layer), the 3D
-snapshot, the layout and the camera. Its schema is
-[`view-v1.schema.json`](src/saos_network_facts/schema/view-v1.schema.json) (`view_version` 1.0),
+snapshot, the layout, the camera and the label density. Its schema is
+[`view-v1.schema.json`](src/saos_network_facts/schema/view-v1.schema.json) (`view_version` 1.1),
 the defaults and presets are in [`view-presets-v1.json`](src/saos_network_facts/schema/view-presets-v1.json).
 Every property is optional:
 
 ```json
 {
-  "view_version": "1.0",
+  "view_version": "1.1",
   "preset": "card-frames",
   "layers": ["physical", "ring", "igp", "mpls", "pw", "cfm"],
   "frames": {"rule": "list", "list": ["igp", "ring", "pw", "cfm"], "start": "signature", "period_s": 5},
   "snapshot": {"variant": "exploded"},
   "layout": {"algorithm": "auto", "aspect": "card", "max_columns": 4},
   "plain": true,
-  "camera": "fit"
+  "camera": "fit",
+  "density": null
 }
 ```
 
 | Property | Values (default first) |
 |---|---|
-| `preset` | `card-frames` (rotating 2D frames for a lab card), `lab-snapshot` (the exploded 3D snapshot, full screen, iso camera), `protocol-stack` (every layer as a stacked plane) |
+| `preset` | `card-frames` (rotating 2D frames for a lab card), `lab-snapshot` (the exploded 3D snapshot, full screen, iso camera, compact labels), `protocol-stack` (every layer as a stacked plane) |
 | `layers` | the layers that may be shown: `physical`, `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
 | `frames.rule` | `auto` (one frame per shown layer with content, in the order above), `list` (the layers of `frames.list`, in that order) |
 | `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport), `first`, or a layer |
@@ -445,7 +446,8 @@ Every property is optional:
 | `layout.hints` | `{}`: device name to `[x, y]`, y down, as a positions file; used when they place every device (with `auto` or `hints`): a hint for `LS` places `LS-O-1`, `LS-T-1`… when there is no device `LS`, and plain boxes without a hint go beside their neighbours |
 | `layout.aspect` | `free`, `card` (at most `layout.max_columns` columns, default 6, so text stays readable on a card), `wide` (as `free`) |
 | `plain` | `true`: devices without facts drawn as plain boxes with their name |
-| `camera` | `fit`, `top`, `iso` |
+| `camera` | `fit` (front and above), `top` (straight down on the top plane), `iso` (from a corner, the whole stack in view) |
+| `density` | `null` (the page's own choice), `full` (names and loopbacks, every iBGP session, LAG labels), `compact` (names, iBGP sessions that are down, LAG labels), `minimal` (names only) |
 | `title` | `null` (named after the lab) |
 
 A view is resolved by merging, lowest first: the defaults, the preset, the view file, then URL
@@ -455,12 +457,16 @@ unknown property or a bad value is reported and ignored (the lower value stays),
 The viewer reads the view of a lab from the lab index (`"view": "core/view.json"`, relative to the
 index), or from `?view=<url>` (which replaces it), then these URL parameters: `preset`, `title`,
 `layers` and `frames` (comma-separated; `frames` sets the rule to `list`), `start`, `period`, `variant`,
-`layout`, `aspect`, `columns`, `plain` (`1` / `0`), `camera`; for example
-`index.html?lab=core&preset=card-frames&frames=igp,ring`. Today the 3D page applies `layers` (the
-layer toggles start from it), `plain` (`?plain=0` leaves devices without facts out) and `layout`
-(where the devices go, unless a positions file places every one), and exposes the whole resolved view,
-with its warnings and the layout it used, as `window.netfactsView`; the frames, snapshot and camera
-properties are for the renderers that read them (the frames and the snapshot: [Frames and snapshot](#frames-and-snapshot-the-lab-as-static-svg)).
+`layout`, `aspect`, `columns`, `plain` (`1` / `0`), `camera`, `density`; for example
+`index.html?lab=core&preset=card-frames&frames=igp,ring`. The 3D page applies `layers` (it draws and
+lists only the planes both in the view and in the facts; when that leaves none, every plane the facts
+have, with a warning), `plain` (`?plain=0` leaves devices without facts out), `layout` (where the
+devices go, unless a positions file places every one), `camera` (where the camera starts; the sidebar's
+Camera menu switches it) and `density` (the Labels panel starts from it; the visitor's own choice stays
+stored for pages without one), and exposes the whole resolved view, with its warnings, the layout it
+used and the camera it started from (`camera: { name, target, position }`), as `window.netfactsView`.
+For example `index.html?preset=protocol-stack&layers=igp,mpls&camera=top` opens on the IGP and MPLS
+planes, seen from above. The frames and snapshot properties are for the renderers that read them ([Frames and snapshot](#frames-and-snapshot-the-lab-as-static-svg)).
 
 The layout (`algorithm` `auto`) is computed from the facts, deterministically (the same facts give the
 same positions), and shared by every renderer:
@@ -479,8 +485,8 @@ same positions), and shared by every renderer:
 4. **No device on a link**: a spot on a link, or whose own links would run through a device, is never
    taken; a last pass swaps or moves devices while that removes crossings.
 
-With `aspect` `card`, nothing is wider than `max_columns` columns: a ring too long for the ladder runs
-round a rectangle that wide (its rows, sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
+With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns: outer devices hang sideways while there is room, a ring too long for the ladder runs
+round a rectangle that wide (its rows using the full width, its sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
 10-device lab stays readable on a ~330 px card (the `card-frames` preset: 4 columns). From JavaScript:
 
 ```ts

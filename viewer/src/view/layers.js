@@ -27,7 +27,7 @@ export const LAYERS = [
   { id: 'evpn', name: 'EVPN instances', color: 0xd2a8ff, has: (net) => (net.evpn?.instances.length ?? 0) > 0 },
   { id: 'cfm', name: 'CFM MEG', color: 0x39c5cf, has: (net) => net.cfm.megs.length > 0 },
 ];
-const LAYER_GAP = 6;
+export const LAYER_GAP = 6;
 // Flex-Algo topologies in the SRv6 plane, one colour per algorithm after algorithm 0's.
 const ALGO_COLORS = [0xff7b72, 0x79c0ff, 0x56d364, 0xe3b341];
 // VRFs in the L3VPN plane, one colour each (the panels use the same: vrfColor).
@@ -91,6 +91,14 @@ export function transportLsps(net) {
     }
   }
   return out;
+}
+
+// The outline every plane shares: the drawn devices (plain boxes too) with a 6-unit margin, in xz.
+export function planeBox(topo) {
+  const drawn = [...topo.nodes, ...(topo.plain?.nodes ?? [])];
+  const xs = drawn.map((n) => n.pos.x);
+  const zs = drawn.map((n) => n.pos.z);
+  return { x0: Math.min(...xs) - 6, x1: Math.max(...xs) + 6, z0: Math.min(...zs) - 6, z1: Math.max(...zs) + 6 };
 }
 
 // The toggle state after a build: kept for the layers shown, forgotten (visible again) for the others,
@@ -221,10 +229,7 @@ export class LayerView {
     this.groups = {};
     this.pickables = [];
     this.linkMeshes = {};
-    const drawn = [...net.topo.nodes, ...(net.topo.plain?.nodes ?? [])];
-    const xs = drawn.map((n) => n.pos.x);
-    const zs = drawn.map((n) => n.pos.z);
-    const box = { x0: Math.min(...xs) - 6, x1: Math.max(...xs) + 6, z0: Math.min(...zs) - 6, z1: Math.max(...zs) + 6 };
+    const box = planeBox(net.topo);
     this.box = box;
 
     shown = present ? LAYERS.filter((l) => present.includes(l.id)) : presentLayers(net);

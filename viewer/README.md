@@ -34,7 +34,7 @@ Node 22.18 or later.
 | `src/labs.js` | facts by URL: `?facts=`, `?positions=`, `?labs=`, `?lab=`, `?view=` and the lab index |
 | `src/render/` | the static renders: `frames.svg` (a 2D frame per layer, CSS `:target`) and `snapshot.svg` (the exploded planes, layer chips), from the importer, the engine and the library layout; no three.js |
 | `bin/saos-network-facts-render.mjs` | the CLI for them (`npm run render -- facts.json --frames f.svg --snapshot s.svg`); `npm run build:render` bundles it and `render.js` into `dist-render/render/`, which the release tgz carries as `render/` (not the Pages site) |
-| `src/viewprops.js` | view properties: the resolved view (lab view file, `?view=`, URL parameters), the layers it shows |
+| `src/viewprops.js` | view properties: the resolved view (lab view file, `?view=`, URL parameters), the planes it draws, the camera pose, the label density |
 | `labs.config.js` | the labs the build stages as `labs/index.json` (vite plugin; the dev server serves them too) |
 | `src/engine/` | the network model: IS-IS, OSPF, SR-MPLS and SR policies, MPLS-TP, SRv6 / Flex-Algo, BGP and L3VPN (VRFs, hosts), VPWS, EVPN, CFM, G.8032, LAG, walks, failure replay |
 | `src/view/` | the three.js layers, the walk animation and the engine's per-node tables |
@@ -73,7 +73,9 @@ IPv6 addresses too.
 The sidebar lists, and the stack draws, only the layers the loaded facts give something to draw (a
 ring-only lab gets the physical and ring planes and nothing else): each layer checks the network once
 per loaded lab or file (`view/layers.js` `LAYERS[].has`), and a layer's on / off choice is kept only while
-the lab has it.
+the lab has it. A view's `layers` narrow that further (`src/viewprops.js` `viewLayers`): only the layers
+both in the view and in the facts are drawn and listed, and the camera (`cameraPose`: `fit`, `top`,
+`iso`) frames the planes left. No view: every layer the facts have, the camera as before.
 
 SRv6 and EVPN (schema 1.6) get two more planes, shown only when the file has SRv6 locators or EVPN
 instances (`engine/srv6.js`). The SRv6 plane draws each router's locators and the topology of
