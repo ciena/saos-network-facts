@@ -754,7 +754,7 @@ export interface PrefixSid {
    */
   sid: string | null;
   /**
-   * `index` or `absolute`.
+   * How `sid` is read: `index` (into the SRGB; the YANG default, written when the configuration leaves `value-type` out) or `absolute` (an MPLS label).
    */
   value_type: string | null;
   /**

@@ -79,6 +79,17 @@ def test_prefix_sids_and_node_flag():
         ("192.0.2.1/32", "1", True), ("198.51.100.0/31", "9", False)]
 
 
+def test_prefix_sid_value_type_defaults_to_index():
+    """``value-type`` defaults to ``index`` (ietf-sr-cmn ``sid-value-type``): a config that leaves it out
+    still means an SRGB index; ``absolute`` is kept, and a later file without the leaf keeps it."""
+    f = run(IFACES, {"ciena-sr:segment-routing": {"connected-prefix-sid-map": [
+        {"prefix": "192.0.2.1/32", "interface": "lb0", "start-sid": 1001},
+        {"prefix": "192.0.2.9/32", "interface": "lb0", "start-sid": 17009, "value-type": "absolute"}]}},
+        {"ciena-sr:segment-routing": {"connected-prefix-sid-map": [{"prefix": "192.0.2.9/32", "range": 1}]}})
+    assert [(p["prefix"], p["sid"], p["value_type"]) for p in f["segment_routing"]["prefix_sids"]] == [
+        ("192.0.2.1/32", "1001", "index"), ("192.0.2.9/32", "17009", "absolute")]
+
+
 def test_sr_policy_and_segment_lists():
     f = run({"ciena-sr-policy:segment-routing-traffic-engineering": {
         "attributes": {"segment-lists": {"segment-list": [{"name": "L1", "segments": {"segment": [

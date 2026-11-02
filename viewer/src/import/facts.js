@@ -234,7 +234,11 @@ function buildNodes(devices, igp, report) {
     }
     if (router) {
       const sid = (f.segment_routing?.prefix_sids ?? []).find((s) => all.some((ip) => s.prefix === hostPrefix(ip)));
-      if (sid?.value_type === 'index') node.sidIndex = Number(sid.sid);
+      // value_type null (facts from before 0.13.1, a config without value-type) is the YANG default, index.
+      if (sid?.sid != null) {
+        if (sid.value_type === 'absolute') node.sidLabel = Number(sid.sid);
+        else node.sidIndex = Number(sid.sid);
+      }
       if (sid && sid.prefix !== hostPrefix(loIp)) sidElsewhere.push(`${name} (${sid.prefix})`);
       if (igp === 'isis' && isis && !isis.system_id) report.warn(`${name}: IS-IS instance ${isis.name} has no NET; its LSP ID is made up`);
     } else if (runsIgp) {
@@ -494,8 +498,27 @@ function srgbOf(devices, report) {
   if (!blocks.length) return null;
   const [first] = blocks;
   if (blocks.some((b) => b.base !== first.base || b.size !== first.size)) report.warn(`SRGB differs between devices; ${first.base}-${first.base + first.size - 1} (${first.name}) is used for all`);
-  report.add('mpls', 'facts', 'SRGB', `${first.base}-${first.base + first.size - 1}; node SIDs are the loopbacks' prefix SID indexes`);
+  report.add('mpls', 'facts', 'SRGB', `${first.base}-${first.base + first.size - 1}; a node SID label is the SRGB base + the loopback's prefix SID index (value-type index, the default), or the absolute label`);
   return { base: first.base, size: first.size };
+}
+
+// Node SIDs against the SRGB: an absolute SID inside the SRGB becomes its index (label - base); one
+// outside it keeps its label, with a warning (other routers would not map it to the node); a router
+// with no prefix SID gets its ordinal as the index, reported.
+function resolveNodeSids(nodes, srgb, report) {
+  if (!srgb) return;
+  const routers = nodes.filter((n) => n.role !== 'ce');
+  for (const n of routers) {
+    if (n.sidLabel == null) continue;
+    if (n.sidLabel >= srgb.base && n.sidLabel < srgb.base + srgb.size) {
+      n.sidIndex = n.sidLabel - srgb.base;
+      delete n.sidLabel;
+    } else {
+      report.warn(`${n.id}: absolute prefix SID ${n.sidLabel} is outside the SRGB ${srgb.base}-${srgb.base + srgb.size - 1}; shown as its label`);
+    }
+  }
+  const noSid = routers.filter((n) => n.loopback && n.sidIndex == null && n.sidLabel == null).map((n) => n.id);
+  if (noSid.length) report.add('mpls', 'default', 'node SIDs not configured', `${noSid.join(', ')}: no prefix SID on the loopback; the view gives each the SRGB base + its position in the topology`);
 }
 
 // MPLS-TP co-routed tunnels. Each node configures its own segment of a tunnel; a tunnel is
@@ -1187,6 +1210,7 @@ export function importFacts(input, { name, positions, plain: showPlain = true } 
   const owner = ownerIndex(devices);
   const bgp = buildBgp(devices, owner, report);
   const srgb = srgbOf(devices, report);
+  resolveNodeSids(nodes, srgb, report);
   const srPolicies = buildSrPolicies(devices, report);
   const tpTunnels = buildTpTunnels(devices, links, report);
   const pseudowires = buildPseudowires(devices, owner, tpTunnels, report);

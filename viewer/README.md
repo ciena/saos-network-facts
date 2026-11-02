@@ -97,8 +97,12 @@ between the devices, and only the cables are drawn; two hosts that are both cabl
 linked to each other, even when the facts trace an address to no cable.
 
 The MPLS plane draws the transport wherever it exists, whatever the roles: every label-switching router
-(a label table with entries) gets a marker with its node SID label (SR-MPLS: SRGB base + index) or its
-label count (LDP), and, when there are no SR policies, an LSP between every two transport endpoints:
+(a label table with entries) gets a marker with its node SID label (SR-MPLS) or its label count (LDP).
+The node SID label is the SRGB base + the loopback's prefix SID index (`value_type` `index`, which a
+null `value_type` from facts before 0.13.1 also means: it is the YANG default), or the label itself for
+`absolute` (an absolute label outside the SRGB is shown as is, with a warning); only a router with no
+prefix SID gets the SRGB base + its position in the topology, listed in the import report. The device
+panel, the label tables, the SR policy segment checks and the markers all use this one label. And, when there are no SR policies, an LSP between every two transport endpoints:
 the PEs and any router that ends a VRF (a P with a management VRF counts), a pseudowire, an EVPN
 instance or an MPLS-TP tunnel. The plane is listed when there is a tunnel, an SR policy or a
 label-switching router. Being an endpoint does not make a router a PE. VRFs (`vrf_instances`,
