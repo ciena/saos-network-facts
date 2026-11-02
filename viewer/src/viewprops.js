@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // View properties on this page: the view resolved from the lab's view file (or the page's ?view=)
 // and the URL parameters (js/src/view.ts), and what the 3D page applies of it today: which layers
-// start shown. The rest (frames, snapshot, layout, camera) is resolved and exposed for the pages
+// start shown, and whether devices without facts are plain boxes (plain). The rest (frames, snapshot, layout, camera) is resolved and exposed for the pages
 // and embedders that use it. No DOM here, so it is testable.
 import { LAYER_IDS, resolveView } from '../../js/src/index.ts';
 
@@ -18,4 +18,9 @@ export function pageView(viewText, viewError, search) {
 // Page layer id -> shown, for the view's layers (every view layer has a page layer).
 export function layerVisibility(view) {
   return Object.fromEntries(LAYER_IDS.map((id) => [pageLayerId(id), view.layers.includes(id)]));
+}
+
+// The importer's options from the view: plain boxes for devices without facts unless plain is false.
+export function importOptions(view) {
+  return { plain: view.plain !== false };
 }

@@ -5,7 +5,7 @@
 // overview / device / service panels, walks and failure replays. Routes:
 // #device=NAME, #service=ID, #topology (panels hidden); anything else is the overview.
 // View properties (viewprops.js) come from the lab's view file, ?view= and the URL; the page
-// applies their layers and exposes the whole resolved view as window.netfactsView.
+// applies their layers and plain boxes and exposes the whole resolved view as window.netfactsView.
 
 import exampleFacts from '../../examples/adaptive-sr-cfm/facts.json?raw';
 import { buildNetwork, ccmWalk, evpnWalk, hostSources, hostTargets, hostWalk, isisFloodWalk, locatorTargets, ospfFloodAreas, ospfFloodWalk, failureModes, replayFailure, srv6PingWalk, tpTunnelWalk, vpnRouteChoices, vpnUpdateWalk, vpwsWalk } from './engine/index.js';
@@ -17,7 +17,7 @@ import { LAYERS, LayerView, hex, presentLayers } from './view/layers.js';
 import { labelOptions } from './view/labels.js';
 import { markStep, renderImportReport, renderStep, renderStepList } from './view/panel.js';
 import { createScene } from './view/scene.js';
-import { layerVisibility, pageView } from './viewprops.js';
+import { importOptions, layerVisibility, pageView } from './viewprops.js';
 import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
@@ -37,9 +37,8 @@ const state = { imp: null, net: null, present: null, failures: [], walk: null, s
 // The view file the page's ?view= names, for what is not a lab of the index (the example, a visitor's file).
 let urlView = { viewText: null, viewError: null };
 
-// Resolves the view for what is shown, exposes it and applies its layers (each present layer's toggle).
-function applyView({ viewText, viewError }) {
-  const { view, warnings } = pageView(viewText, viewError, location.search);
+// Exposes the view resolved for what is shown (pageView) and applies its layers (each present layer's toggle).
+function applyView({ view, warnings }) {
   state.view = view;
   window.netfactsView = { view, warnings };
   for (const w of warnings) console.warn(`view properties: ${w}`);
@@ -55,9 +54,10 @@ function applyView({ viewText, viewError }) {
 // shown: what the lab menu names ({ lab: id }, { example: true } or { file: name }; see labs.js labChoices).
 // view: { viewText, viewError } of the view file for it (labs.js loadView).
 function load(text, name, positions = null, shown = { file: name }, view = urlView) {
+  const resolved = pageView(view.viewText, view.viewError, location.search);
   let imp;
   try {
-    imp = importFacts(text, { name: name ?? undefined, positions });
+    imp = importFacts(text, { name: name ?? undefined, positions, ...importOptions(resolved.view) });
   } catch (err) {
     showError(`${name ?? 'facts'}: ${err.message}`);
     return false;
@@ -71,7 +71,7 @@ function load(text, name, positions = null, shown = { file: name }, view = urlVi
   state.replay = null;
   setWalk(null);
   rebuild();
-  applyView(view);
+  applyView(resolved);
   fitCamera();
   renderImportReport($('tab-import'), imp.report);
   fillSelects();
@@ -97,7 +97,8 @@ function rebuild(net = null) {
     el.hidden = !layers.present.includes(el.dataset.layer);
     if (el.hidden) el.querySelector('input').checked = true;
   }
-  $('topo-name').textContent = `${imp.topology.name} · ${imp.topology.nodes.length} devices, ${imp.topology.links.length} links`;
+  const boxes = imp.topology.plain?.nodes.length ?? 0;
+  $('topo-name').textContent = `${imp.topology.name} · ${imp.topology.nodes.length} devices, ${imp.topology.links.length} links${boxes ? `, ${boxes} plain` : ''}`;
   $('fail-state').textContent = state.failures.length ? `Down: ${state.failures.join(', ')}` : 'All links up';
   renderOverview($('tab-overview'), imp, state.net);
   if (current.tab === 'device') renderDevice($('tab-device'), imp, state.net, current.id);

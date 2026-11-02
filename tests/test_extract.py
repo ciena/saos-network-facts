@@ -176,6 +176,17 @@ def test_links_from_clab():
     assert "links" not in run_case("mixed")  # no topology given
 
 
+def test_a_node_of_another_kind_is_skipped_with_its_links():
+    # plain-box: a line system (kind generic_vm) between the PEs; the viewer draws it as a plain box
+    case = run_case("plain-box")
+    ols = next(r for r in case["devices"] if r["device"] == "OLS1")
+    assert ols["status"] == "skipped" and ols["facts"] is None and ols["type"] == "line-system"
+    assert ols["reason"] == "no extractor for this device (kind generic_vm)"
+    assert case["links"] == [{"a": {"device": "PE1", "port": "1"}, "b": {"device": "OLS1", "port": "1"}},
+                             {"a": {"device": "OLS1", "port": "2"}, "b": {"device": "PE2", "port": "1"}}]
+    assert [r["status"] for r in case["devices"] if r["device"] != "OLS1"] == ["ok", "ok"]
+
+
 def test_links_from_clab_extended_form_and_odd_links(tmp_path):
     (tmp_path / "topo.clab.yml").write_text(
         "topology:\n  nodes: {A: {kind: linux}, B: {kind: linux}}\n  links:\n"

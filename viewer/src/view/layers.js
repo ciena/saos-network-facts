@@ -11,6 +11,10 @@ import { DEFAULT_LABELS, bgpLabel, lagLabel, nodeLabel } from './labels.js';
 // One plane per layer, LAYER_GAP apart in this order, for the layers the network has something on.
 // Every layer says whether a network gives it anything to draw (`has`, mirroring its build_*): a layer
 // with nothing is neither listed nor drawn, so the sidebar offers only what the loaded facts carry.
+// Plain boxes: devices without facts (fill and outline).
+const PLAIN = 0x3a4351;
+const PLAIN_EDGE = 0x8b98a8;
+
 export const LAYERS = [
   { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8, has: (net) => net.topo.nodes.length > 0 },
   { id: 'ring', name: 'G.8032 rings', color: 0xe3b341, has: (net) => (net.g8032?.rings.length ?? 0) > 0 },
@@ -178,7 +182,7 @@ export class LayerView {
   }
 
   pos(nodeId, layer = 'physical') {
-    const n = this.net.topo.nodes.find((x) => x.id === nodeId);
+    const n = this.net.topo.nodes.find((x) => x.id === nodeId) ?? this.net.topo.plain?.nodes.find((x) => x.id === nodeId);
     return new THREE.Vector3(n.pos.x, layerY(layer), n.pos.z);
   }
 
@@ -217,8 +221,9 @@ export class LayerView {
     this.groups = {};
     this.pickables = [];
     this.linkMeshes = {};
-    const xs = net.topo.nodes.map((n) => n.pos.x);
-    const zs = net.topo.nodes.map((n) => n.pos.z);
+    const drawn = [...net.topo.nodes, ...(net.topo.plain?.nodes ?? [])];
+    const xs = drawn.map((n) => n.pos.x);
+    const zs = drawn.map((n) => n.pos.z);
     const box = { x0: Math.min(...xs) - 6, x1: Math.max(...xs) + 6, z0: Math.min(...zs) - 6, z1: Math.max(...zs) + 6 };
     this.box = box;
 
@@ -295,6 +300,27 @@ export class LayerView {
         if (text) g.add(label(text, 'edge-label', mid.clone().setY(2)));
       }
     }
+    this.buildPlain(g, net);
+  }
+
+  // Plain boxes (import/facts.js plainNodes): a device without facts as a dim box with an outline, its
+  // name and type, and the file's links[] to it as thin dashed lines. Nothing runs on them, so they
+  // have no link state (a failure cannot be set on them) and appear on the physical plane only.
+  buildPlain(g, net) {
+    const plain = net.topo.plain ?? { nodes: [], links: [] };
+    for (const n of plain.nodes) {
+      const geo = new THREE.BoxGeometry(2.4, 1.2, 2.4);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: PLAIN, roughness: 0.8, metalness: 0, transparent: true, opacity: 0.55 }));
+      mesh.position.copy(this.pos(n.id)).setY(0.6);
+      mesh.userData.node = n.id;
+      this.pickables.push(mesh);
+      g.add(mesh);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: PLAIN_EDGE }));
+      edges.position.copy(mesh.position);
+      g.add(edges);
+      g.add(label(nodeLabel(n, this.labels), 'node-label plain', this.pos(n.id).setY(-1.3)));
+    }
+    for (const l of plain.links) g.add(dashed([this.pos(l.a.node).setY(0.6), this.pos(l.b.node).setY(0.6)], PLAIN_EDGE, 0.9));
   }
 
   // One line per ring link at the ring's height (a sub-ring a little above its major ring), a bar

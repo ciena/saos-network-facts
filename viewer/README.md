@@ -54,6 +54,15 @@ positions unless authored. MPLS-TP tunnels are stitched from each node's segment
 the neighbour on the forward next hop with the matching label, to the egress). Signalled PW labels
 and LFIBs are computed by the engine from the RFCs; static PW and tunnel labels are the configured ones.
 
+Devices without facts (a record `skipped` or `error` that is not a Linux host: an optical line system,
+a third-party router, a controller, a device the extractor failed on, still listed with its status) are plain boxes: a dim outlined box with the name and type on the
+physical plane, with the file's `links[]` to it as dashed lines, and the Import tab says "shown as plain
+box". They are `topology.plain` (`{ nodes, links }`, each with `plain: true`), not `topology.nodes`, so the
+engine never sees them and computes exactly what it would without them; `drawnNodes` / `drawnLinks`
+(`src/import/facts.js`) give every device and link a 2D view or layout draws. The view property `plain`
+(a view file's `"plain": false`, or `?plain=0`) leaves them out, as before: the page resolves the view
+(`src/viewprops.js` `importOptions`) and passes `importFacts(text, { plain })`.
+
 IPv6: a link may be an IPv6 subnet (link-local addresses never link), and a router whose IS-IS
 interfaces carry IPv6 only, or whose loopback has no IPv4 address, runs IS-IS, BGP and the label
 tables on its IPv6 loopback (the Import tab lists them); BGP neighbours and pseudowire peers match

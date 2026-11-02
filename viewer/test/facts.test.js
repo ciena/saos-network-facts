@@ -123,7 +123,7 @@ describe('the bundled Adaptive-SR-CFM example', () => {
 });
 
 describe('importing other facts files', () => {
-  test('a third interface in a subnet, a PW without a far end and a failed device are reported, not drawn', () => {
+  test('a third interface in a subnet, a PW without a far end and a failed device are reported; the device is a plain box', () => {
     const imp = importFacts(file([
       device('R1', '192.0.2.1', [['a', '198.51.100.1/29', '1']], { pseudowires: [{ name: 'PW', peer: '192.0.2.2', pw_id: '7', service: 'S' }] }),
       device('R2', '192.0.2.2', [['a', '198.51.100.2/29', '1']]),
@@ -132,8 +132,9 @@ describe('importing other facts files', () => {
     ]));
     expect(imp.topology.links).toEqual([]);
     expect(imp.topology.pseudowires).toEqual([]);
+    expect(imp.topology.plain.nodes.map((n) => n.id)).toEqual(['R4']);
     expect(imp.report.warnings).toEqual([
-      'R4: error (convert failed); not shown',
+      'R4: error (convert failed); shown as plain box',
       '198.51.100.0/29: 3 interfaces (R1 a, R2 a, R3 a) and no two of different devices run IS-IS; only point-to-point links are drawn',
       'R1: PW PW (id 7) to 192.0.2.2: R2 has no PW 7 back; not drawn',
     ]);

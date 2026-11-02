@@ -20,10 +20,10 @@ export function labelOptions(stored = {}) {
   return o;
 }
 
-// A node's label: its name, then its loopback (a host: its LAN) unless names only.
+// A node's label: its name, then its loopback (a host: its LAN; a plain box: its type) unless names only.
 export function nodeLabel(node, opts = DEFAULT_LABELS) {
   if (opts.node === 'name') return node.id;
-  const sub = node.loopback ?? node.lan ?? null;
+  const sub = node.loopback ?? node.lan ?? (node.plain ? node.type : null) ?? null;
   return sub ? `${node.id} ${sub}` : node.id;
 }
 
