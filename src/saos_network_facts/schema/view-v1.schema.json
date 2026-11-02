@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ciena/saos-network-facts/schema/view-v1.schema.json",
+  "title": "ViewFile",
+  "description": "View properties: what a page or a card shows of a facts file, so a consumer never computes a layout or draws a diagram itself. Every property is optional: a view is merged, lowest first, from the built-in defaults, a preset, a view file, then URL parameters. View 1.x: minor versions only add optional properties, so a reader reports properties it does not know and ignores them.",
+  "type": "object",
+  "properties": {
+    "view_version": {
+      "type": "string",
+      "pattern": "^1\\.\\d+$",
+      "description": "The view schema version the file follows (major.minor; this schema is 1.x)."
+    },
+    "preset": {
+      "$ref": "#/$defs/PresetName"
+    },
+    "title": {
+      "type": ["string", "null"],
+      "description": "A title for the view; null: the consumer names it after the lab."
+    },
+    "layers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/LayerId"
+      },
+      "uniqueItems": true,
+      "description": "The layers that may be shown, as planes of the 3D snapshot and as 2D frames. A layer the facts have no content for is left out whatever this says. Absent or empty: every layer."
+    },
+    "frames": {
+      "$ref": "#/$defs/Frames"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/Snapshot"
+    },
+    "layout": {
+      "$ref": "#/$defs/Layout"
+    },
+    "plain": {
+      "type": "boolean",
+      "description": "Devices without facts (status skipped, such as a device of the topology with no configuration) are drawn as plain boxes with their name; false leaves them out."
+    },
+    "camera": {
+      "$ref": "#/$defs/Camera"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "PresetName": {
+      "type": "string",
+      "enum": ["card-frames", "lab-snapshot", "protocol-stack"],
+      "description": "A named set of properties applied over the defaults: card-frames (rotating 2D frames, one per layer, for a lab card), lab-snapshot (the exploded 3D snapshot, full screen), protocol-stack (every layer as a stacked plane, the classic 3D viewer)."
+    },
+    "LayerId": {
+      "type": "string",
+      "enum": ["physical", "ring", "igp", "mpls", "srv6", "bgp", "vrf", "pw", "evpn", "cfm"],
+      "description": "A layer: physical (devices, links, LAGs), ring (G.8032 rings), igp (IS-IS / OSPF adjacencies), mpls (SR policies, LSPs, MPLS-TP tunnels), srv6 (SRv6 locators, Flex-Algo), bgp (BGP sessions), vrf (VRFs / L3VPN), pw (VPWS pseudowires), evpn (EVPN instances), cfm (CFM MEGs and MEPs)."
+    },
+    "Frames": {
+      "type": "object",
+      "description": "The 2D frames a card rotates through, one per layer.",
+      "properties": {
+        "rule": {
+          "type": "string",
+          "enum": ["auto", "list"],
+          "description": "auto: one frame per shown layer the facts have content for, in the standard layer order; list: the layers of `list`, in that order (a layer without content is still skipped)."
+        },
+        "list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LayerId"
+          },
+          "uniqueItems": true,
+          "description": "The frames and their order, for rule list."
+        },
+        "start": {
+          "anyOf": [{"enum": ["signature", "first"]}, {"$ref": "#/$defs/LayerId"}],
+          "description": "The frame shown first: signature (the layer that tells this lab apart: the first shown frame in the order pw, evpn, vrf, mpls, srv6, ring, igp, bgp, cfm, physical, so its services, else its transport, else its IGP), first (the first frame), or a layer id (when that frame is shown; else signature)."
+        },
+        "period_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "A hint for consumers: seconds each frame stays before the next one; a consumer may slow down or pause (offscreen, reduced motion)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Snapshot": {
+      "type": "object",
+      "description": "The 3D snapshot: the shown layers as planes.",
+      "properties": {
+        "variant": {
+          "type": "string",
+          "enum": ["exploded", "stacked"],
+          "description": "exploded: the planes spread apart so each one reads on its own, with the links between them; stacked: the planes close together, one above the other."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Layout": {
+      "type": "object",
+      "description": "Where devices go: one layout shared by every frame and plane.",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["auto", "force", "hints"],
+          "description": "auto: chosen from the topology (a ring as a circle, a chain in columns, else force-directed); force: force-directed; hints: the positions of `hints`, the rest placed around them."
+        },
+        "hints": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "description": "Device name to [x, y]: diagram coordinates in any unit, y down (the same as a positions file). Used by algorithm hints; with another algorithm they seed it."
+        },
+        "aspect": {
+          "type": "string",
+          "enum": ["card", "wide", "free"],
+          "description": "The shape to fit: card (a small landscape card: at most `max_columns` columns, wrapping into rows so text stays readable), wide (a full screen), free (the topology's own shape)."
+        },
+        "max_columns": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "For aspect card: the most device columns before the layout wraps."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Camera": {
+      "type": "string",
+      "enum": ["fit", "top", "iso"],
+      "description": "The 3D view point: fit (front and above, far enough back for the whole stack), top (straight down), iso (isometric, from a corner)."
+    }
+  }
+}

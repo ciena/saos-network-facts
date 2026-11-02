@@ -1,0 +1,10 @@
+{
+  "view_version": "1.0",
+  "preset": "lab-snapshot",
+  "title": "Core and access",
+  "layers": ["physical", "igp", "mpls", "bgp", "vrf"],
+  "snapshot": {"variant": "exploded"},
+  "layout": {"algorithm": "hints", "hints": {"PE1": [0, 0], "P1": [1, 0], "PE2": [2, 0]}},
+  "plain": false,
+  "camera": "top"
+}

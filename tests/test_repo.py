@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Things that must agree across the repo: versions, and the npm package's copy of the schema."""
+"""Things that must agree across the repo: versions, and the npm package's copies of the schemas."""
 
 import json
 import tomllib
@@ -18,6 +18,7 @@ def test_versions_agree():
 
 def test_npm_schema_is_the_python_schema():
     assert json.loads((ROOT / "js/schema/facts-v1.schema.json").read_text()) == schema.load_schema()
+    assert json.loads((ROOT / "js/schema/view-v1.schema.json").read_text()) == schema.load_view_schema()
 
 
 def test_source_files_carry_the_spdx_header():

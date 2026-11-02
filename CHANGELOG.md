@@ -17,6 +17,32 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-02
+
+### Added
+
+- **View properties: schema `view-v1.schema.json` (view 1.0)** — a view file says what to show of a facts
+  file, so a site or a lab card never computes a layout or draws a diagram itself: the `layers` that may
+  be shown; the 2D `frames` a card rotates through (`rule` auto or list, `list`, `start`: `signature`,
+  `first` or a layer, `period_s` as a hint); the 3D `snapshot` (`variant` exploded or stacked); the
+  `layout` (`algorithm` auto, force or hints, `hints` per device, `aspect` card / wide / free,
+  `max_columns`); `plain` boxes for devices without facts; the `camera` (fit, top, iso); and three
+  presets: `card-frames`, `lab-snapshot`, `protocol-stack`. The defaults and presets are data
+  (`view-presets-v1.json`) beside the schema. Python: `schema.load_view_schema()`,
+  `schema.load_view_presets()`, `schema.view_errors(view)`. The facts schema is unchanged (1.8.0).
+- **npm reader: `resolveView(view?, urlParams?)`** — merges the defaults, the preset, the view file and
+  URL parameters (in that order; objects by property, lists replace, layout hints by device) into a view
+  with every property set, reporting unknown properties and bad values as warnings instead of throwing;
+  with `viewFromParams`, `viewFrames` (the frames a card shows and the one to start on), `LAYER_IDS`,
+  `VIEW_DEFAULTS`, `VIEW_PRESETS`, generated `ViewFile` types and the schema as
+  `@ciena/saos-network-facts/view-schema`.
+- **Viewer: view properties by URL and lab index** — a lab's `"view"` in the lab index, `?view=<url>` (over
+  it) and the URL parameters `preset`, `layers`, `frames`, `start`, `period`, `variant`, `layout`, `aspect`,
+  `columns`, `plain`, `camera`, `title` are resolved for the page: the layer toggles start from `layers`,
+  and the resolved view with its warnings is exposed as `window.netfactsView` for embedders and the
+  renderers to come. A missing view file is a console warning, not an error. No view: the page is as
+  before.
+
 ## [0.11.2] - 2026-11-02
 
 ### Fixed
