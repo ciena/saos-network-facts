@@ -25,6 +25,11 @@
       "id": "l3vpn-hosts",
       "title": "L3VPN with Linux hosts and a management VRF (fixture, links from --clab)",
       "facts": "l3vpn-hosts/facts.json"
+    },
+    {
+      "id": "line-system",
+      "title": "Optical line system, sites and notes (fixture, plain boxes from --extra)",
+      "facts": "line-system/facts.json"
     }
   ]
 }
