@@ -83,7 +83,15 @@ Linux hosts (`hosts[]`, schema 1.8) are CE nodes with their addresses and static
 metric of equal prefixes first), linked to a router by subnet like any device, else by the file's
 `links[]`; the Import tab lists their `exec` lines the extractor did not read. Two hosts in one subnet that
 are each cabled to another device are not linked: an L2 service (a VPWS, a VPLS) carries that subnet
-between the devices, and only the cables are drawn. VRFs (`vrf_instances`,
+between the devices, and only the cables are drawn; two hosts that are both cabled to routers are never
+linked to each other, even when the facts trace an address to no cable.
+
+The MPLS plane draws the transport wherever it exists, whatever the roles: every label-switching router
+(a label table with entries) gets a marker with its node SID label (SR-MPLS: SRGB base + index) or its
+label count (LDP), and, when there are no SR policies, an LSP between every two transport endpoints:
+the PEs and any router that ends a VRF (a P with a management VRF counts), a pseudowire, an EVPN
+instance or an MPLS-TP tunnel. The plane is listed when there is a tunnel, an SR policy or a
+label-switching router. Being an endpoint does not make a router a PE. VRFs (`vrf_instances`,
 schema 1.7) get a **VRFs / L3VPN** plane, shown only when the file has one (`engine/l3vpn.js`). The global
 table (`default`) and a VRF with nothing to route (no route distinguisher, route target, interface or
 static route, a name only such as `vlan501`) are left out: not drawn, not listed, and no reason for a PE

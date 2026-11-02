@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { hostPrefix } from '../engine/ip.js';
+import { prefixSidLabel } from '../engine/mpls.js';
 import { DEFAULT_LABELS, bgpLabel, lagLabel, nodeLabel } from './labels.js';
 
 // One plane per layer, LAYER_GAP apart in this order, for the layers the network has something on.
@@ -14,7 +15,7 @@ export const LAYERS = [
   { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8, has: (net) => net.topo.nodes.length > 0 },
   { id: 'ring', name: 'G.8032 rings', color: 0xe3b341, has: (net) => (net.g8032?.rings.length ?? 0) > 0 },
   { id: 'isis', name: 'IGP (IS-IS / OSPF)', color: 0x3fb950, has: (net) => net.igp.routers.length > 0 },
-  { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', color: 0xd29922, has: (net) => net.tp.tunnels.length > 0 || net.sr.policies.length > 0 || peLsps(net).length > 0 },
+  { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', color: 0xd29922, has: (net) => net.tp.tunnels.length > 0 || net.sr.policies.length > 0 || mplsRouters(net).length > 0 },
   { id: 'srv6', name: 'SRv6 locators / Flex-Algo', color: 0xffa657, has: (net) => (net.srv6?.locators.length ?? 0) > 0 || (net.srv6?.algorithms.length ?? 0) > 1 },
   { id: 'bgp', name: 'BGP', color: 0xa371f7, has: (net) => net.bgp.sessions.length > 0 },
   { id: 'vrf', name: 'VRFs / L3VPN', color: 0xa5d6ff, has: (net) => (net.l3vpn?.vrfs.length ?? 0) > 0 },
@@ -37,11 +38,32 @@ export function presentLayers(net) {
   return LAYERS.filter((l) => !net || l.has(net));
 }
 
-// The label-switched paths between every pair of PEs, along FTN / LFIB next hops (the MPLS plane
-// draws them when there are no SR policies): [{ src, dst, hops, labels: [{ from, to, label }] }].
-export function peLsps(net) {
+// The routers that label-switch: a label table (LFIB) with entries, under SR-MPLS or LDP.
+export function mplsRouters(net) {
+  if (net.mpls.mode === 'none') return [];
+  return net.topo.nodes.filter((n) => n.role !== 'ce' && n.loopback && Object.keys(net.mpls.lfib[n.id] ?? {}).length > 0).map((n) => n.id);
+}
+
+// The routers MPLS transport ends on: the PEs, and any router that ends a VRF (a P with a management
+// VRF too), a pseudowire, an EVPN instance or an MPLS-TP tunnel, so a walk to or from it has an LSP.
+// Roles stay as they are: a transport endpoint is not made a PE.
+export function transportEndpoints(net) {
+  const routers = new Set(net.topo.nodes.filter((n) => n.role !== 'ce' && n.loopback).map((n) => n.id));
+  const ends = new Set([
+    ...net.topo.nodes.filter((n) => n.role === 'pe').map((n) => n.id),
+    ...(net.topo.vrfs ?? []).flatMap((v) => v.sites.map((s) => s.pe)),
+    ...net.vpws.pseudowires.flatMap((p) => p.ends.map((e) => e.node)),
+    ...(net.evpn?.instances ?? []).flatMap((i) => i.members.map((m) => m.node)),
+    ...net.tp.tunnels.flatMap((t) => [t.src, t.dst]),
+  ]);
+  return net.topo.nodes.map((n) => n.id).filter((id) => routers.has(id) && ends.has(id));
+}
+
+// The label-switched paths between every pair of transport endpoints, along FTN / LFIB next hops (the
+// MPLS plane draws them when there are no SR policies): [{ src, dst, hops, labels: [{ from, to, label }] }].
+export function transportLsps(net) {
   const out = [];
-  const pes = net.topo.nodes.filter((n) => n.role === 'pe').map((n) => n.id);
+  const pes = transportEndpoints(net);
   for (const src of pes) {
     for (const dst of pes) {
       if (src === dst) continue;
@@ -347,7 +369,21 @@ export class LayerView {
     g.add(cone);
   }
 
+  // Every label-switching router: a marker with its node SID label (SR-MPLS: SRGB base + index) or its
+  // label table's size (LDP); the full table is in the device panel.
+  mplsNodes(g, net, L) {
+    for (const id of mplsRouters(net)) {
+      const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.45), new THREE.MeshStandardMaterial({ color: L.color }));
+      m.position.copy(this.pos(id, 'mpls'));
+      g.add(m);
+      const n = Object.keys(net.mpls.lfib[id]).length;
+      const text = net.mpls.mode === 'sr' ? `node SID ${prefixSidLabel(net.topo, net.vendor, id)} · ${n} labels` : `LDP · ${n} labels`;
+      g.add(label(text, 'edge-label', this.pos(id, 'mpls').setY(L.y - 0.9)));
+    }
+  }
+
   build_mpls(g, net, L) {
+    this.mplsNodes(g, net, L);
     // Static MPLS-TP tunnels: the forward LSP and, just above it, the reverse
     // LSP on the same hops, with the label on each hop.
     let base = 0;
@@ -379,8 +415,8 @@ export class LayerView {
       });
       return;
     }
-    // Otherwise one LSP per (ingress PE, egress PE) along FTN/LFIB next hops.
-    peLsps(net).forEach(({ hops, labels }, k) => {
+    // Otherwise one LSP per (ingress, egress) transport endpoint along FTN/LFIB next hops.
+    transportLsps(net).forEach(({ hops, labels }, k) => {
       const lift = 0.5 + base + k * 1.2;
       const color = k % 2 ? 0xf2cc60 : L.color;
       this.tube(g, hops, L.y + lift, color);

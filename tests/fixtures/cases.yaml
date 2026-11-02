@@ -32,3 +32,6 @@ l3vpn-hosts:
 vpws-hosts:
   clab: labs/vpws-hosts/topo.clab.yml
   recipe: vpws-hosts
+vpws-bonds:
+  clab: labs/vpws-bonds/topo.clab.yml
+  recipe: vpws-bonds

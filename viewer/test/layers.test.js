@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { buildNetwork } from '../src/engine/index.js';
 import { importFacts } from '../src/import/facts.js';
-import { LAYERS, peLsps, presentLayers, toggleState } from '../src/view/layers.js';
+import { LAYERS, mplsRouters, presentLayers, toggleState, transportEndpoints, transportLsps } from '../src/view/layers.js';
 import { LABS } from '../labs.config.js';
 
 const read = (source) => readFileSync(new URL(`../${source}`, import.meta.url), 'utf8');
@@ -73,9 +73,11 @@ describe('each layer appears exactly when it has something to draw', () => {
   });
   test('MPLS: an MPLS-TP tunnel, an SR policy or an LSP between PEs', () => {
     expect(has('mpls', example)).toBe(true); // SR policies
-    expect(peLsps(l3vpn).map((p) => `${p.src}>${p.dst}`)).toContain('PE1>PE2');
-    expect(has('mpls', l3vpn)).toBe(true); // LSPs only
-    expect(has('mpls', without(l3vpn, { mpls: { ...l3vpn.mpls, ftn: {} } }))).toBe(false);
+    expect(transportLsps(l3vpn).map((p) => `${p.src}>${p.dst}`)).toContain('PE1>PE2');
+    expect(has('mpls', l3vpn)).toBe(true); // LSPs and label tables
+    expect(has('mpls', without(l3vpn, { mpls: { ...l3vpn.mpls, lfib: {} } }))).toBe(false);
+    expect(mplsRouters(l3vpn)).toEqual(['PE1', 'P1', 'PE2']);
+    expect(transportEndpoints(l3vpn)).toEqual(['PE1', 'P1', 'PE2']); // P1 ends the management VRF
     expect(has('mpls', user)).toBe(false);
   });
   test('SRv6: a locator or a Flex-Algo', () => {

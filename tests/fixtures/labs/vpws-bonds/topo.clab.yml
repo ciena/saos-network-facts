@@ -1,0 +1,38 @@
+# Synthetic VPWS lab with bonded Linux hosts (documentation addresses only): the PEs of vpws-hosts, and
+# two hosts whose service addresses sit on VLAN sub-interfaces of LACP bonds (bond0.1100 over bond0 with
+# member eth2; bond1.1100 over bond1 with members eth3 and eth4), one subnet carried across the VPWS.
+name: vpws-bonds
+topology:
+  nodes:
+    PE1:
+      kind: linux
+      type: 3930-6x
+      startup-config: configs/PE1.cfg
+    PE2:
+      kind: linux
+      type: 3930-6x
+      startup-config: configs/PE2.cfg
+    c1:
+      kind: linux
+      image: alpine:3.20
+      exec:
+        - ip link add bond0 type bond mode 802.3ad
+        - ip link set eth2 master bond0
+        - ip link set bond0 up
+        - ip link add link bond0 name bond0.1100 type vlan id 1100
+        - ip addr add 192.168.60.1/24 dev bond0.1100
+        - ip -6 addr add 2001:db8:60::1/64 dev bond0.1100
+    c2:
+      kind: linux
+      image: alpine:3.20
+      exec:
+        - ip link add name bond1 type bond mode 802.3ad
+        - ip link set dev eth3 master bond1
+        - ip link set dev eth4 master bond1
+        - ip link add link bond1 name bond1.1100 type vlan id 1100
+        - ip addr add 192.168.60.2/24 dev bond1.1100
+  links:
+    - endpoints: ["PE1:1", "PE2:1"]
+    - endpoints: ["PE1:3", "c1:eth2"]
+    - endpoints: ["PE2:3", "c2:eth3"]
+    - endpoints: ["PE2:4", "c2:eth4"]
