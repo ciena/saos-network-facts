@@ -17,19 +17,26 @@ export type PresetName = "card-frames" | "lab-snapshot" | "protocol-stack";
  */
 export type LayerId = "physical" | "ring" | "igp" | "mpls" | "srv6" | "bgp" | "vrf" | "pw" | "evpn" | "cfm";
 /**
- * The 3D view point: fit (front and above, far enough back for the whole stack), top (straight down), iso (isometric, from a corner).
+ * The 3D view point: fit (front and above, far enough back for the whole stack), top (straight down on the top plane, the planes' common outline filling the view), iso (isometric, from a corner, the whole stack in view).
  *
  * This interface was referenced by `ViewFile`'s JSON-Schema
  * via the `definition` "Camera".
  */
 export type Camera = "fit" | "top" | "iso";
+/**
+ * How much the labels say: full (devices with name and loopback, every iBGP session, LAG labels), compact (device names only, only iBGP sessions that are down, LAG labels), minimal (device names only, no iBGP or LAG labels); null: the page's own choice (the 3D page's Labels panel, as the visitor left it). Label size stays the page's.
+ *
+ * This interface was referenced by `ViewFile`'s JSON-Schema
+ * via the `definition` "Density".
+ */
+export type Density = "full" | "compact" | "minimal" | null;
 
 /**
  * View properties: what a page or a card shows of a facts file, so a consumer never computes a layout or draws a diagram itself. Every property is optional: a view is merged, lowest first, from the built-in defaults, a preset, a view file, then URL parameters. View 1.x: minor versions only add optional properties, so a reader reports properties it does not know and ignores them.
  */
 export interface ViewFile {
   /**
-   * The view schema version the file follows (major.minor; this schema is 1.x).
+   * The view schema version the file follows (major.minor; this schema is 1.1: 1.1 added `density`).
    */
   view_version?: string;
   preset?: PresetName;
@@ -49,6 +56,7 @@ export interface ViewFile {
    */
   plain?: boolean;
   camera?: Camera;
+  density?: Density;
 }
 /**
  * The 2D frames a card rotates through, one per layer.

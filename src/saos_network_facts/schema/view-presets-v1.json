@@ -1,13 +1,14 @@
 {
   "defaults": {
-    "view_version": "1.0",
+    "view_version": "1.1",
     "title": null,
     "layers": ["physical", "ring", "igp", "mpls", "srv6", "bgp", "vrf", "pw", "evpn", "cfm"],
     "frames": {"rule": "auto", "list": [], "start": "signature", "period_s": 4},
     "snapshot": {"variant": "exploded"},
     "layout": {"algorithm": "auto", "hints": {}, "aspect": "free", "max_columns": 6},
     "plain": true,
-    "camera": "fit"
+    "camera": "fit",
+    "density": null
   },
   "presets": {
     "card-frames": {
@@ -18,7 +19,8 @@
     "lab-snapshot": {
       "snapshot": {"variant": "exploded"},
       "layout": {"aspect": "wide"},
-      "camera": "iso"
+      "camera": "iso",
+      "density": "compact"
     },
     "protocol-stack": {
       "snapshot": {"variant": "stacked"},

@@ -16,12 +16,15 @@ test("no view: the defaults, every property set", () => {
   assert.equal(view.view_version, VIEW_VERSION);
   assert.deepEqual(view.frames, { rule: "auto", list: [], start: "signature", period_s: 4 });
   assert.equal(view.camera, "fit");
+  assert.equal(view.density, null);
 });
 
 test("the presets: card-frames, lab-snapshot, protocol-stack", () => {
   assert.deepEqual(PRESET_NAMES, ["card-frames", "lab-snapshot", "protocol-stack"]);
   assert.deepEqual(resolveView({ preset: "card-frames" }).view.layout, { algorithm: "auto", hints: {}, aspect: "card", max_columns: 4 });
   assert.deepEqual(resolveView({ preset: "lab-snapshot" }).view.camera, "iso");
+  assert.equal(resolveView({ preset: "lab-snapshot" }).view.density, "compact");
+  assert.equal(resolveView({ preset: "protocol-stack" }).view.density, null);
   assert.deepEqual(resolveView({ preset: "protocol-stack" }).view.snapshot, { variant: "stacked" });
   for (const name of PRESET_NAMES) assert.deepEqual(resolveView({ preset: name }).warnings, [], name);
 });
@@ -102,6 +105,16 @@ test("URL parameters", () => {
   });
   assert.deepEqual(viewFromParams("?facts=a.json&lab=x&view=v.json"), {});
   assert.deepEqual(resolveView(undefined, "?period=soon").warnings, ["URL: frames.period_s: expected a number of seconds above 0"]);
+});
+
+test("density: full, compact, minimal or null (the page's own choice)", () => {
+  assert.equal(resolveView({ density: "minimal" }).view.density, "minimal");
+  assert.equal(resolveView(undefined, "?density=full").view.density, "full");
+  // null in a file is a value: it undoes a preset's density
+  assert.equal(resolveView({ preset: "lab-snapshot", density: null }).view.density, null);
+  const bad = resolveView({ preset: "lab-snapshot" }, "?density=sparse");
+  assert.equal(bad.view.density, "compact");
+  assert.deepEqual(bad.warnings, ['URL: density: "sparse" is not one of full, compact, minimal']);
 });
 
 test("the example view files resolve without warnings", () => {

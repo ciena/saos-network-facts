@@ -6,7 +6,7 @@ import type { PresetName, ViewFile } from "./view.ts";
 /** The built-in view defaults (every property set) and the named presets. */
 export const VIEW_PRESETS_DATA: { defaults: ViewFile; presets: Record<PresetName, ViewFile> } = {
   "defaults": {
-    "view_version": "1.0",
+    "view_version": "1.1",
     "title": null,
     "layers": [
       "physical",
@@ -36,7 +36,8 @@ export const VIEW_PRESETS_DATA: { defaults: ViewFile; presets: Record<PresetName
       "max_columns": 6
     },
     "plain": true,
-    "camera": "fit"
+    "camera": "fit",
+    "density": null
   },
   "presets": {
     "card-frames": {
@@ -58,7 +59,8 @@ export const VIEW_PRESETS_DATA: { defaults: ViewFile; presets: Record<PresetName
       "layout": {
         "aspect": "wide"
       },
-      "camera": "iso"
+      "camera": "iso",
+      "density": "compact"
     },
     "protocol-stack": {
       "snapshot": {

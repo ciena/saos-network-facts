@@ -8,7 +8,7 @@
     "view_version": {
       "type": "string",
       "pattern": "^1\\.\\d+$",
-      "description": "The view schema version the file follows (major.minor; this schema is 1.x)."
+      "description": "The view schema version the file follows (major.minor; this schema is 1.1: 1.1 added `density`)."
     },
     "preset": {
       "$ref": "#/$defs/PresetName"
@@ -40,6 +40,9 @@
     },
     "camera": {
       "$ref": "#/$defs/Camera"
+    },
+    "density": {
+      "$ref": "#/$defs/Density"
     }
   },
   "additionalProperties": false,
@@ -132,7 +135,12 @@
     "Camera": {
       "type": "string",
       "enum": ["fit", "top", "iso"],
-      "description": "The 3D view point: fit (front and above, far enough back for the whole stack), top (straight down), iso (isometric, from a corner)."
+      "description": "The 3D view point: fit (front and above, far enough back for the whole stack), top (straight down on the top plane, the planes' common outline filling the view), iso (isometric, from a corner, the whole stack in view)."
+    },
+    "Density": {
+      "type": ["string", "null"],
+      "enum": ["full", "compact", "minimal", null],
+      "description": "How much the labels say: full (devices with name and loopback, every iBGP session, LAG labels), compact (device names only, only iBGP sessions that are down, LAG labels), minimal (device names only, no iBGP or LAG labels); null: the page's own choice (the 3D page's Labels panel, as the visitor left it). Label size stays the page's."
     }
   }
 }
