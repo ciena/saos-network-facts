@@ -17,6 +17,28 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-02
+
+### Added
+
+- **Viewer: the view's layers, camera and label density on the 3D page** — the resolved view (`resolveView`:
+  a lab's view file, `?view=`, URL parameters) now drives more than the layer toggles. `layers`: the page
+  draws and lists only the planes that are both in the view and in the facts (`viewprops.js` `viewLayers`,
+  on top of the planes the facts have); a layer the view leaves out is no longer drawn unchecked, and when
+  the view names none of the facts' layers every plane is shown with a warning. `camera`: the camera starts
+  at `fit` (front and above, the page's camera as it was; aimed at the middle of the planes left when the
+  view removes some), `top` (straight down on the top plane, the outline filling the stage between the side
+  panels) or `iso` (from the front right corner, the whole stack in view) (`cameraPose`); a Camera menu in
+  the Layers section switches it, and `window.netfactsView.camera` gives the pose it started from.
+  `density`: the Labels panel starts from it for this page without storing it. So
+  `?preset=protocol-stack&layers=igp,mpls&camera=top` opens on the IGP and MPLS planes from above, the same
+  every time, and `?preset=lab-snapshot` opens from the corner with compact labels. No view: the same
+  planes, camera and labels as before.
+- **View schema 1.1: `density`** — `full`, `compact`, `minimal` or `null` (the default: the page's own
+  choice), as the view property and the URL parameter `density`; the preset `lab-snapshot` sets `compact`.
+  An optional property, so a 1.0 view is still valid and a 1.0 reader reports it and ignores it. The facts
+  schema is unchanged (1.8.0).
+
 ## [0.14.0] - 2026-11-02
 
 ### Added

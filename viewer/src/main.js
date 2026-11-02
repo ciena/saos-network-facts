@@ -5,8 +5,9 @@
 // overview / device / service panels, walks and failure replays. Routes:
 // #device=NAME, #service=ID, #topology (panels hidden); anything else is the overview.
 // View properties (viewprops.js) come from the lab's view file, ?view= and the URL; the page
-// applies their layers, plain boxes and layout (the library's, js/src/layout.ts) and exposes the
-// whole resolved view, with the layout it used, as window.netfactsView.
+// applies their layers, plain boxes, layout (the library's, js/src/layout.ts), camera and label
+// density and exposes the whole resolved view, with the layout it used and the camera it started
+// from, as window.netfactsView.
 
 import exampleFacts from '../../examples/adaptive-sr-cfm/facts.json?raw';
 import { buildNetwork, ccmWalk, evpnWalk, hostSources, hostTargets, hostWalk, isisFloodWalk, locatorTargets, ospfFloodAreas, ospfFloodWalk, failureModes, replayFailure, srv6PingWalk, tpTunnelWalk, vpnRouteChoices, vpnUpdateWalk, vpwsWalk } from './engine/index.js';
@@ -14,11 +15,11 @@ import { importFacts } from './import/facts.js';
 import { labChoices, labParams, loadFromParams, loadLab, loadView } from './labs.js';
 import { renderDevice, renderOverview, renderService } from './panels.js';
 import { Animator, DWELL_MS, TRAVEL_MS } from './view/animator.js';
-import { LAYERS, LayerView, hex, presentLayers } from './view/layers.js';
+import { LAYERS, LAYER_GAP, LayerView, hex, presentLayers } from './view/layers.js';
 import { labelOptions } from './view/labels.js';
 import { markStep, renderImportReport, renderStep, renderStepList } from './view/panel.js';
 import { createScene } from './view/scene.js';
-import { importOptions, layerVisibility, pageView } from './viewprops.js';
+import { cameraPose, densityLabels, importOptions, pageView, viewLayers } from './viewprops.js';
 import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
@@ -31,26 +32,27 @@ const layers = new LayerView(scene);
 const animator = new Animator(scene, layers);
 
 // present: the layers the loaded facts have content for, decided from the network with no failure.
-const state = { imp: null, net: null, present: null, failures: [], walk: null, step: 0, playing: false, speed: 1, elapsed: 0, replay: null, view: null };
+const state = { imp: null, net: null, present: null, narrowed: false, layerWarnings: [], failures: [], walk: null, step: 0, playing: false, speed: 1, elapsed: 0, replay: null, view: null };
 
 // ---- loading ---------------------------------------------------------------
 
 // The view file the page's ?view= names, for what is not a lab of the index (the example, a visitor's file).
 let urlView = { viewText: null, viewError: null };
 
-// Exposes the resolved view (pageView) for what is shown and applies its layers (each present layer's
-// toggle); its layout was applied by the import.
+// Exposes the view resolved for what is shown (pageView), with what rebuild() could not apply of its
+// layers and the layout the import used, and starts every plane it drew shown (rebuild drew only the
+// view's layers), from its camera.
 function applyView({ view, warnings }, layout) {
-  state.view = view;
-  window.netfactsView = { view, warnings, layout };
-  for (const w of warnings) console.warn(`view properties: ${w}`);
-  const shown = layerVisibility(view);
+  const all = [...warnings, ...state.layerWarnings];
+  window.netfactsView = { view, warnings: all, layout, camera: null };
+  for (const w of all) console.warn(`view properties: ${w}`);
   for (const id of layers.present) {
-    const on = shown[id] !== false;
-    layers.setVisible(id, on);
+    layers.setVisible(id, true);
     const input = document.querySelector(`#layer-toggles input[data-layer="${id}"]`);
-    if (input) input.checked = on;
+    if (input) input.checked = true;
   }
+  $('camera-view').value = view.camera;
+  fitCamera(view.camera);
 }
 
 // shown: what the lab menu names ({ lab: id }, { example: true } or { file: name }; see labs.js labChoices).
@@ -66,15 +68,16 @@ function load(text, name, positions = null, shown = { file: name }, view = urlVi
   }
   showError(null);
   state.imp = imp;
+  state.view = resolved.view;
   state.present = null;
   state.shown = shown;
+  showLabels(densityLabels(resolved.view.density, storedLabels()), false);
   fillLabSelect();
   state.failures = [];
   state.replay = null;
   setWalk(null);
   rebuild();
   applyView(resolved, imp.layout);
-  fitCamera();
   renderImportReport($('tab-import'), imp.report);
   fillSelects();
   route();
@@ -91,10 +94,14 @@ function rebuild(net = null) {
   state.net = net ?? buildNetwork(imp.topology, { labelMode: imp.labelMode, failures: state.failures });
   if (!state.present) {
     const base = state.failures.length ? buildNetwork(imp.topology, { labelMode: imp.labelMode }) : state.net;
-    state.present = presentLayers(base).map((l) => l.id);
+    const { layers: shown, narrowed, warnings } = viewLayers(state.view, presentLayers(base).map((l) => l.id));
+    state.present = shown;
+    state.narrowed = narrowed;
+    state.layerWarnings = warnings;
   }
   layers.build(state.net, state.present);
-  // Only the layers the facts have are listed; a hidden one's toggle is reset (layers.visible is too).
+  // Only the layers drawn (the facts have them and the view names them) are listed; a hidden one's
+  // toggle is reset (layers.visible is too).
   for (const el of document.querySelectorAll('#layer-toggles label')) {
     el.hidden = !layers.present.includes(el.dataset.layer);
     if (el.hidden) el.querySelector('input').checked = true;
@@ -107,29 +114,37 @@ function rebuild(net = null) {
   if (current.tab === 'service') renderService($('tab-service'), imp, state.net, current.id, walkActions);
 }
 
-// Frame the layer stack: look at its middle from the front and above, far enough back for the
-// widest side, with the projection shifted so the stack sits between the two side panels.
-function fitCamera() {
-  const { x0, x1, z0, z1 } = layers.box;
-  const cx = (x0 + x1) / 2;
-  const cz = (z0 + z1) / 2;
-  const size = Math.max(x1 - x0, (z1 - z0) * 1.6);
-  controls.target.set(cx, 13, cz);
-  camera.position.set(cx, 13 + size * 0.85, cz + size * 1.4);
+// Frame the layer stack from a camera of the view (viewprops.js cameraPose: fit, top or iso), with
+// the projection shifted so the stack sits between the two side panels. Exposed as
+// window.netfactsView.camera, so a page or a test can check where it started.
+function fitCamera(name = state.view?.camera ?? 'fit') {
+  const pose = cameraPose(layers.box, name, { planes: layers.present.length, gap: LAYER_GAP, aspect: stageArea().aspect, fov: camera.fov, narrowed: state.narrowed });
+  controls.target.set(...pose.target);
+  camera.position.set(...pose.position);
+  // top and iso back off as far as a big lab needs; fit keeps the page's 200 as it always did
+  controls.maxDistance = name === 'fit' ? 200 : Math.max(200, camera.position.distanceTo(controls.target) * 1.5);
   offsetView();
   controls.update();
+  if (window.netfactsView) window.netfactsView.camera = { name, ...pose };
+}
+
+// The part of the page the stack is seen in: between the side panels on a wide page, else all of it.
+function stageArea() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const left = $('controls').getBoundingClientRect().width;
+  const right = $('detail').getBoundingClientRect().width;
+  const wide = w > 900 && !document.body.classList.contains('topology-only');
+  return { w, h, left, right, wide, aspect: (wide ? Math.max(1, w - left - right) : w) / h };
 }
 
 function offsetView() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  const left = $('controls').getBoundingClientRect();
-  const right = $('detail').getBoundingClientRect();
-  const wide = w > 900 && !document.body.classList.contains('topology-only');
-  const shift = wide ? (right.width - left.width) / 2 : 0;
+  const { w, h, left, right, wide } = stageArea();
+  const shift = wide ? (right - left) / 2 : 0;
   camera.setViewOffset(w, h, shift, 0, w, h);
   camera.updateProjectionMatrix();
 }
+$('camera-view').addEventListener('change', (e) => fitCamera(e.target.value));
 window.addEventListener('resize', offsetView);
 
 // ---- routes and tabs -------------------------------------------------------
@@ -195,24 +210,31 @@ function storedLabels() {
   }
 }
 
-function applyLabels(opts, rebuildLayers) {
+// persist: the visitor's choice (the panel); a view's density (load) is not kept.
+function applyLabels(opts, rebuildLayers, persist = true) {
   layers.setLabels(opts);
   document.documentElement.style.setProperty('--label-scale', String(opts.scale));
-  try {
-    localStorage.setItem(LABELS_KEY, JSON.stringify(opts));
-  } catch {
-    // no storage (private window): the choice lasts for this page
+  if (persist) {
+    try {
+      localStorage.setItem(LABELS_KEY, JSON.stringify(opts));
+    } catch {
+      // no storage (private window): the choice lasts for this page
+    }
   }
   if (rebuildLayers && state.net) layers.build(state.net);
 }
 
-{
-  const opts = storedLabels();
+// Shows options in the panel and applies them (not stored): the stored choice, or a view's density.
+function showLabels(opts, rebuildLayers) {
   $('lbl-node').value = opts.node;
   $('lbl-bgp').value = opts.bgp;
   $('lbl-lag').checked = opts.lag;
   $('lbl-scale').value = String(opts.scale);
-  applyLabels(opts, false);
+  applyLabels(opts, rebuildLayers, false);
+}
+
+{
+  showLabels(storedLabels(), false);
   const read = () => labelOptions({ node: $('lbl-node').value, bgp: $('lbl-bgp').value, lag: $('lbl-lag').checked, scale: Number($('lbl-scale').value) });
   for (const id of ['lbl-node', 'lbl-bgp', 'lbl-lag']) $(id).addEventListener('change', () => applyLabels(read(), true));
   $('lbl-scale').addEventListener('input', () => applyLabels(read(), false));

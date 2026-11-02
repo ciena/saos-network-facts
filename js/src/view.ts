@@ -5,13 +5,13 @@
 // warning and ignored (the lower layer's value stays), never fatal, so an older reader still shows a
 // newer view. Pure functions, no Node or DOM APIs.
 
-import type { Camera, Frames, LayerId, Layout, PresetName, Snapshot, ViewFile } from "./generated/view.ts";
+import type { Camera, Density, Frames, LayerId, Layout, PresetName, Snapshot, ViewFile } from "./generated/view.ts";
 import { VIEW_PRESETS_DATA } from "./generated/view-presets.ts";
 
 export type * from "./generated/view.ts";
 
 /** The view schema version this reader writes and understands (any 1.x view is read). */
-export const VIEW_VERSION = "1.0";
+export const VIEW_VERSION = "1.1";
 /** The view schema major version this reader understands. */
 export const VIEW_MAJOR = 1;
 
@@ -33,6 +33,8 @@ export interface ResolvedView {
   layout: Required<Layout>;
   plain: boolean;
   camera: Camera;
+  /** Label density, or null: the page's own choice. */
+  density: Density;
 }
 
 export interface ResolvedViewResult {
@@ -42,7 +44,7 @@ export interface ResolvedViewResult {
 }
 
 /** The URL parameters `resolveView` reads; any other parameter belongs to the page and is left alone. */
-export const VIEW_PARAMS = ["preset", "title", "layers", "frames", "start", "period", "variant", "layout", "aspect", "columns", "plain", "camera"] as const;
+export const VIEW_PARAMS = ["preset", "title", "layers", "frames", "start", "period", "variant", "layout", "aspect", "columns", "plain", "camera", "density"] as const;
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
@@ -87,6 +89,7 @@ const SPECS: Record<string, (where: string, v: unknown, warn: Warn) => unknown> 
   layers: layerList,
   plain: (where, v, warn) => (typeof v === "boolean" ? v : warn(`${where}: expected true or false`)),
   camera: (where, v, warn) => oneOf(where, v, ["fit", "top", "iso"], warn),
+  density: (where, v, warn) => (v === null ? null : oneOf(where, v, ["full", "compact", "minimal"], warn)),
 };
 
 const OBJECT_SPECS: Record<"frames" | "snapshot" | "layout", Record<string, (where: string, v: unknown, warn: Warn) => unknown>> = {
@@ -164,7 +167,7 @@ export function viewFromParams(params: string | URLSearchParams | Record<string,
     if (b) out[a] = { ...((out[a] as object) ?? {}), [b]: value };
     else out[a] = value;
   };
-  for (const [param, path] of [["preset", "preset"], ["title", "title"], ["start", "frames.start"], ["variant", "snapshot.variant"], ["layout", "layout.algorithm"], ["aspect", "layout.aspect"], ["camera", "camera"]] as const) {
+  for (const [param, path] of [["preset", "preset"], ["title", "title"], ["start", "frames.start"], ["variant", "snapshot.variant"], ["layout", "layout.algorithm"], ["aspect", "layout.aspect"], ["camera", "camera"], ["density", "density"]] as const) {
     const v = get(param);
     if (v !== null) set(path, v);
   }
