@@ -439,3 +439,26 @@ def test_ipv6_and_replace_exec_lines_are_read():
                                       "ip addr add dev eth3 label eth3:1 192.0.2.9/24", "ip addr add dev eth4"])
     assert parsed["addresses"] == [("eth2", "2001:db8::5/64"), ("eth3", "192.0.2.9/24")]
     assert parsed["ignored"] == ["ip -4 addr add 2001:db8::6/64 dev eth2", "ip addr add dev eth4"]
+
+
+def test_bond_and_vlan_exec_lines_trace_an_address_to_its_cable():
+    """L3b: an address on bond0.1100 (a VLAN of bond0, whose member eth2 is cabled to PE1 port 3) is
+    attached to PE1 port 3; with two members, the first cabled one in join order."""
+    hosts = {h["name"]: h for h in run_case("vpws-bonds")["hosts"]}
+    c1 = {i["name"]: i for i in hosts["c1"]["interfaces"]}
+    assert c1["bond0.1100"]["addresses"] == ["192.168.60.1/24", "2001:db8:60::1/64"]
+    assert c1["bond0.1100"]["attached"] == {"device": "PE1", "port": "3"}
+    c2 = {i["name"]: i for i in hosts["c2"]["interfaces"]}
+    assert c2["bond1.1100"]["attached"] == {"device": "PE2", "port": "3"}
+    assert hosts["c1"]["ignored_commands"] == ["ip link set bond0 up"]
+    assert hosts["c2"]["ignored_commands"] == []
+
+
+def test_link_commands_parsed():
+    parsed = extract.parse_host_exec([
+        "ip link add bond0 type bond mode 802.3ad", "ip link set dev eth2 master bond0", "ip link set eth3 master bond0",
+        "ip link add link bond0 name bond0.7 type vlan id 7", "ip link add link eth5 eth5.9 type vlan id 9",
+        "ip link add br0 type bridge", "ip link set eth2 up"])
+    assert parsed["parents"] == {"bond0.7": "bond0", "eth5.9": "eth5"}
+    assert parsed["members"] == {"bond0": ["eth2", "eth3"]}
+    assert parsed["ignored"] == ["ip link add br0 type bridge", "ip link set eth2 up"]

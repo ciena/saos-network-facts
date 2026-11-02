@@ -17,6 +17,26 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-02
+
+### Fixed
+
+- **Viewer: the MPLS plane draws the transport wherever it exists** — it drew only LSPs, SR policies or
+  tunnels between two PEs, so a lab with one PE (a management VRF on the PE that faces the DCN
+  gateways, the other routers P) lost the MPLS plane, although its walks pushed the labels. Every
+  label-switching router now gets a marker with its node SID label (SR-MPLS) or its label count (LDP),
+  and LSPs run between the transport endpoints: the PEs and any router that ends a VRF (a P with a
+  management VRF counts), a pseudowire, an EVPN instance or an MPLS-TP tunnel. The plane is listed when
+  there is a tunnel, an SR policy or a label-switching router. Roles do not change.
+- **Hosts: addresses on bond VLAN sub-interfaces are traced to their cable** — `ip link add ... type bond
+  | vlan` and `ip link set ... master` were ignored, so an address on `bond0.1100` (over `bond0`, member
+  `eth2`) had no `attached`, and the viewer linked two such hosts across a VPWS subnet. The extractor
+  now reads those lines and attaches a sub-interface where its bond's members are cabled (the first
+  cabled member). As a safety net the viewer never links two hosts that are both cabled to routers.
+- **Fixtures** — a new clab lab `labs/vpws-bonds` (the vpws-hosts PEs; hosts with LACP bonds and VLAN
+  sub-interfaces, one bond with two members); no translator calls. The other expected files only gain the
+  new version.
+
 ## [0.11.1] - 2026-11-02
 
 ### Fixed

@@ -263,8 +263,10 @@ host has no device facts, but its addresses, routes and cabling are what a packe
 end. They come from the `linux` nodes of a containerlab topology, whose `exec` lines are read
 (`ip [-4|-6] addr add|replace <address> dev <if>`, IPv4 or IPv6, its options in any order;
 `ip [-4|-6] route add|replace <prefix>|default [via <next hop>] [dev <if>] [metric <n>]`), and from a
-`--hosts` file. Every other `exec` line is listed in
-`ignored_commands`, so nothing is dropped silently.
+`--hosts` file. The lines that build bonds and VLAN sub-interfaces are read too (`ip link add [link
+<parent>] [name] <if> type vlan|bond ...`, `ip link set [dev] <if> master <bond>`), so an address on
+`bond0.1100` is `attached` where the bond's members are cabled (the first cabled member, in the order
+they joined). Every other `exec` line is listed in `ignored_commands`, so nothing is dropped silently.
 
 ```json
 {

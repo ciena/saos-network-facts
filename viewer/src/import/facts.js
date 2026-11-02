@@ -379,16 +379,20 @@ function topologyLinks(file, links, nodes, report) {
     for (const i of h.interfaces ?? []) {
       if (!i.attached || cabled.has(`${h.name}|${i.name}`)) continue;
       cabled.set(`${h.name}|${i.name}`, `${i.attached.device}|${i.attached.port}`);
-      cabled.set(`${i.attached.device}|${i.attached.port}`, `${h.name}|${i.name}`);
+      if (!cabled.has(`${i.attached.device}|${i.attached.port}`)) cabled.set(`${i.attached.device}|${i.attached.port}`, `${h.name}|${i.name}`);
     }
   }
   const elsewhere = (e, far) => e.port && cabled.has(`${e.node}|${e.port}`) && cabled.get(`${e.node}|${e.port}`) !== `${far.node}|${far.port}`;
   // Two hosts in one subnet, each cabled to another device: the subnet is carried by an L2 service
   // (a VPWS, a VPLS) between those devices, which is not a link of its own: only the cables are drawn.
+  // As a safety net (an address on an interface the facts trace to no cable), two hosts that are both
+  // cabled to routers are never linked to each other.
   const hostIds = new Set(nodes.filter((n) => n.host).map((n) => n.id));
-  const acrossService = links.filter((l) => hostIds.has(l.a.node) && hostIds.has(l.b.node) && (elsewhere(l.a, l.b) || elsewhere(l.b, l.a)));
+  const routerIds = new Set(nodes.filter((n) => n.role !== 'ce').map((n) => n.id));
+  const toRouter = (host) => [...cabled].some(([from, to]) => from.startsWith(`${host}|`) && routerIds.has(to.split('|')[0]));
+  const acrossService = links.filter((l) => hostIds.has(l.a.node) && hostIds.has(l.b.node) && (elsewhere(l.a, l.b) || elsewhere(l.b, l.a) || (toRouter(l.a.node) && toRouter(l.b.node))));
   for (const l of acrossService) links.splice(links.indexOf(l), 1);
-  if (acrossService.length) report.add('physical', 'derived', `${acrossService.length} host subnets across an L2 service`, `${acrossService.map((l) => `${l.a.node} and ${l.b.node} (${l.subnet})`).join('; ')}: the two hosts share a subnet but are cabled to other devices, so an L2 service carries it between them; not drawn as a link (only the cables are)`);
+  if (acrossService.length) report.add('physical', 'derived', `${acrossService.length} host subnets across an L2 service`, `${acrossService.map((l) => `${l.a.node} and ${l.b.node} (${l.subnet})`).join('; ')}: the two hosts share a subnet but are cabled to other devices (routers), so an L2 service carries it between them; not drawn as a link (only the cables are)`);
   const bridged = links.filter((l) => !l.lag && (elsewhere(l.a, l.b) || elsewhere(l.b, l.a)));
   for (const l of bridged) {
     l.bridged = [l.a, l.b].map((e) => `${e.node} ${e.if} (port ${e.port ?? '?'}, cabled to ${(cabled.get(`${e.node}|${e.port}`) ?? '?').replace('|', ' port ')})`).join(', ');

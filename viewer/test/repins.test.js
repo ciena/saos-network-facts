@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { buildNetwork, hostWalk } from '../src/engine/index.js';
 import { importFacts } from '../src/import/facts.js';
-import { presentLayers } from '../src/view/layers.js';
+import { mplsRouters, presentLayers, transportEndpoints, transportLsps } from '../src/view/layers.js';
 
 const read = (name) => readFileSync(new URL(`../../tests/fixtures/expected/${name}.facts.json`, import.meta.url), 'utf8');
 const load = (file) => {
@@ -103,5 +103,57 @@ describe('L3: hosts sharing a subnet across a VPWS', () => {
     file.hosts[0].interfaces[0].attached = { device: 'c2', port: 'eth1' };
     file.hosts[1].interfaces[0].attached = { device: 'c1', port: 'eth1' };
     expect(importFacts(file).topology.links.map((l) => l.id)).toContain('c1-c2');
+  });
+});
+
+// 0.11.2 ------------------------------------------------------------------------------------------
+
+describe('M1: the MPLS transport with a single PE', () => {
+  // l3vpn-hosts without VRF BLUE: PE1 (the DCN gateways' PE) is the only PE; P1 and PE2 carry only the
+  // management VRF, so they are P routers.
+  const onePe = () => {
+    const file = JSON.parse(read('l3vpn-hosts'));
+    for (const d of ['PE1', 'PE2']) {
+      const f = facts(file, d);
+      f.vrf_instances = f.vrf_instances.filter((v) => v.name !== 'BLUE');
+      for (const i of f.interfaces) if (i.vrf === 'BLUE') i.vrf = null;
+    }
+    file.hosts = file.hosts.filter((h) => h.name.startsWith('dcn'));
+    file.devices = file.devices.filter((r) => !['h1', 'h2'].includes(r.device));
+    return file;
+  };
+  const { imp, net } = load(onePe());
+  test('one PE; the others stay P (no false PE roles)', () => {
+    expect(imp.topology.nodes.filter((n) => !n.host).map((n) => [n.id, n.role])).toEqual([['PE1', 'pe'], ['P1', 'p'], ['PE2', 'p']]);
+  });
+  test('the MPLS plane is present, with every router\'s node SID and LSPs to the management VRF\'s routers', () => {
+    expect(presentLayers(net).map((l) => l.id)).toContain('mpls');
+    expect(mplsRouters(net)).toEqual(['PE1', 'P1', 'PE2']);
+    expect(transportEndpoints(net)).toEqual(['PE1', 'P1', 'PE2']);
+    expect(transportLsps(net).map((p) => `${p.src}>${p.dst}`)).toEqual(['PE1>P1', 'PE1>PE2', 'P1>PE1', 'P1>PE2', 'PE2>PE1', 'PE2>P1']);
+  });
+  test('the walk the plane shows pushes the same labels', () => {
+    const w = hostWalk(net, 'PE2', '198.51.100.10', { vrf: 'MGMT' });
+    expect(w.delivered).toBe(true);
+    expect(w.steps[0].headers.filter((h) => h.name === 'MPLS').map((h) => h.fields.label)).toContain(16001);
+  });
+  test('a P router with no VRF, pseudowire or tunnel is no transport endpoint', () => {
+    const file = onePe();
+    facts(file, 'PE2').vrf_instances = facts(file, 'PE2').vrf_instances.filter((v) => v.name !== 'MGMT');
+    expect(transportEndpoints(load(file).net)).toEqual(['PE1', 'P1']);
+  });
+});
+
+describe('L3b: hosts on bond VLAN sub-interfaces across a VPWS', () => {
+  const { imp } = load(read('vpws-bonds'));
+  test('no host-to-host link: the sub-interfaces are traced to the PEs', () => {
+    expect(imp.topology.links.map((l) => l.id)).toEqual(['PE1-PE2', 'PE1-c1', 'PE2-c2', 'PE2-c2 4/eth4']);
+  });
+  test('safety net: two hosts both cabled to routers never link, even without a traced interface', () => {
+    const file = JSON.parse(read('vpws-bonds'));
+    for (const h of file.hosts) for (const i of h.interfaces) if (i.name.includes('.')) i.attached = null;
+    const x = importFacts(file);
+    expect(x.topology.links.some((l) => l.a.node.startsWith('c') && l.b.node.startsWith('c'))).toBe(false);
+    expect(x.report.gaps.physical.some((g) => g.item === '1 host subnets across an L2 service')).toBe(true);
   });
 });

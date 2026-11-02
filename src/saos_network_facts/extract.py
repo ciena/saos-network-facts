@@ -197,11 +197,15 @@ def parse_host_exec(lines):
     Read: ``ip [-4|-6] addr add|replace <address>[/<len>] dev <if>`` (an interface address, IPv4 or
     IPv6, its options in any order: ``ip -6 addr add dev eth1 2001:db8::1/64 nodad``) and
     ``ip [-4|-6] route add|replace <prefix>|default [via <next hop>] [dev <if>] [metric <n>]`` (a
-    route; ``default`` is 0.0.0.0/0, or ::/0 with ``-6`` or an IPv6 next hop). Every other command
+    route; ``default`` is 0.0.0.0/0, or ::/0 with ``-6`` or an IPv6 next hop). The interfaces the lines
+    build are read too, so an address on one can be traced to a cable: ``ip link add [link <parent>]
+    [name] <if> type vlan id <n>`` (a VLAN sub-interface of its parent), ``ip link add [name] <if> type
+    bond ...`` (a bond) and ``ip link set [dev] <if> master <bond>`` (a member of that bond). Every other command
     (``ip link set``, ``sysctl``, a script) sets nothing the facts describe and is returned in
     ``ignored`` as written, so a reader can see what was not read.
-    Returns ``{"addresses": [(if, address)], "routes": [route], "ignored": [command]}``."""
-    out = {"addresses": [], "routes": [], "ignored": []}
+    Returns ``{"addresses": [(if, address)], "routes": [route], "parents": {vlan if: parent},
+    "members": {bond: [member]}, "ignored": [command]}``."""
+    out = {"addresses": [], "routes": [], "parents": {}, "members": {}, "ignored": []}
     for raw in lines or []:
         command = str(raw).strip()
         if not command:
@@ -224,6 +228,8 @@ def parse_host_exec(lines):
                 continue
             out["ignored"].append(command)
             continue
+        if len(words) >= 4 and words[0] == "ip" and words[1] in ("l", "link") and _link_command(words, out):
+            continue
         if len(words) >= 4 and words[0] == "ip" and words[1] in ("r", "ro", "route") and words[2] in ("add", "replace"):
             via, dev, metric = _option(words, "via"), _option(words, "dev"), _option(words, "metric")
             target = _operand(words[3:]) or words[3]
@@ -245,6 +251,51 @@ def parse_host_exec(lines):
 IP_VALUE_OPTIONS = {"dev", "via", "metric", "label", "scope", "valid_lft", "preferred_lft", "peer", "broadcast",
                     "brd", "anycast", "table", "proto", "protocol", "src", "mtu", "realm", "weight"}
 IP_FLAGS = {"nodad", "noprefixroute", "home", "mngtmpaddr", "optimistic", "autojoin", "permanent", "onlink"}
+
+
+def _link_command(words, out):
+    """Read an ``ip link`` command that builds an interface the facts can trace: a VLAN sub-interface
+    (``ip link add link bond0 name bond0.1100 type vlan id 1100``), a bond (``ip link add bond0 type
+    bond mode 802.3ad``) or a bond member (``ip link set eth2 master bond0``). True when it was read."""
+    verb, rest = words[2], words[3:]
+    if verb == "add" and "type" in rest[:-1]:
+        kind = rest[rest.index("type") + 1]
+        name = _option(rest, "name") or next((w for w in rest if w not in ("link", "name", "type") and w != _option(rest, "link")), None)
+        if kind == "vlan" and name and _option(rest, "link"):
+            out["parents"][name] = _option(rest, "link")
+            return True
+        if kind == "bond" and name:
+            out["members"].setdefault(name, [])
+            return True
+        return False
+    if verb == "set" and "master" in rest[:-1]:
+        member = _option(rest, "dev") or rest[0]
+        bond = _option(rest, "master")
+        if member and bond and member not in ("dev", "master"):
+            members = out["members"].setdefault(bond, [])
+            if member not in members:
+                members.append(member)
+            return True
+    return False
+
+
+def _cabled_through(host, ifname, parents, members, seen=None):
+    """Where an interface without a cable of its own is cabled: through its VLAN parent, and through a
+    bond's members in the order they joined it (the first cabled one). None when nothing is cabled."""
+    seen = seen or set()
+    if ifname in seen:
+        return None
+    seen.add(ifname)
+    own = next((i["attached"] for i in host["interfaces"] if i["name"] == ifname and i["attached"]), None)
+    if own:
+        return own
+    if ifname in parents:
+        return _cabled_through(host, parents[ifname], parents, members, seen)
+    for member in members.get(ifname, []):
+        found = _cabled_through(host, member, parents, members, seen)
+        if found:
+            return found
+    return None
 
 
 def _operand(words):
@@ -312,6 +363,11 @@ def hosts_from_clab(path):
                 iface["addresses"].append(address)
         for route in parsed["routes"]:
             _add_route(host, route)
+        # an address on a VLAN sub-interface of a bond is cabled where the bond's members are
+        for iface in host["interfaces"]:
+            if iface["addresses"] and not iface["attached"]:
+                found = _cabled_through(host, iface["name"], parsed["parents"], parsed["members"])
+                iface["attached"] = dict(found) if found else None
         host["ignored_commands"] = parsed["ignored"]
     return hosts
 
