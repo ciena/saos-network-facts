@@ -51,4 +51,15 @@ import viewSchema from "@ciena/saos-network-facts/view-schema" with { type: "jso
   view the URL parameters ask for. `viewFrames(view, presentLayers)`: the frames a card shows and the
   one to start on.
 
+- `layoutFacts(model, layout?)`: where the devices go (a view's `layout`: `algorithm` auto, force or
+  hints, `hints`, `aspect`, `max_columns`), as `{ positions, method, description, core, warnings }`:
+  positions in grid units (x columns right, y rows down, 1 apart), deterministic. `model` is
+  `{ nodes: [{ id, role?, plain? }], links: [{ a, b }], rings?: [{ nodes, links? }] }` (link ends a
+  name, `{ node }` or `{ device }`; p and pe roles are the IGP routers); the viewer's imported topology
+  is one. Auto: the core (IGP routers, else the G.8032 ring, else the longest cycle) as a two-row
+  ladder, the rest hung outward (a dual-homed device between its neighbours), no device on a link;
+  `aspect: "card"` keeps it within `max_columns` columns. Hints are used when they place every device
+  (a hint for `NAME` places `NAME-*` devices without their own; plain boxes without one go beside their
+  neighbours). `forceLayout(ids, edges)`: the force-directed layout alone.
+
 Types, `schema/` and the view presets are generated from the Python package's schemas (`npm run generate`).

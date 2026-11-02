@@ -3,7 +3,7 @@
 // interfaces ride a port (SAOS 10: flow point -> forwarding domain -> interface; SAOS 6: the VLANs
 // the port carries), loopbacks, BGP neighbours, the parts of an IS-IS NET, IS-IS interface metrics,
 // CCM intervals, G.8032 rings and the devices on a ring, SRv6 locators, Flex-Algo definitions,
-// EVPN instances, VRFs and static routes, Linux hosts; and view properties (view.ts). Pure
+// EVPN instances, VRFs and static routes, Linux hosts; view properties (view.ts) and the layout computed from them (layout.ts). Pure
 // functions, no Node APIs, so this entry point works in a browser too; `@ciena/saos-network-facts/node` adds `readFacts(file)`.
 
 import type {
@@ -13,6 +13,7 @@ import type {
 
 export type * from "./generated/facts.ts";
 export * from "./view.ts";
+export * from "./layout.ts";
 
 /** The schema major version this reader understands. */
 export const SCHEMA_MAJOR = 1;

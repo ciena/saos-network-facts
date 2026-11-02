@@ -94,11 +94,11 @@ export interface Snapshot {
  */
 export interface Layout {
   /**
-   * auto: chosen from the topology (a ring as a circle, a chain in columns, else force-directed); force: force-directed; hints: the positions of `hints`, the rest placed around them.
+   * auto: computed from the facts: the core (the IGP routers, else the G.8032 ring, else the longest cycle, else the devices that link others; with plain boxes in its path and a second cycle linked to it) as a ladder on the ring or the core's longest cycle (in columns when it has no cycle), everything else hung outward, a dual-homed device between its neighbours, no device on a link; force: force-directed; hints: the positions of `hints` when they place every device, else auto with a warning.
    */
   algorithm?: "auto" | "force" | "hints";
   /**
-   * Device name to [x, y]: diagram coordinates in any unit, y down (the same as a positions file). Used by algorithm hints; with another algorithm they seed it.
+   * Device name to [x, y]: diagram coordinates in any unit, y down (the same as a positions file). Used, with algorithm auto or hints, when they place every device: a device without a hint takes the hint of the name it extends (NAME for NAME-O-1), and plain boxes still without one go beside their neighbours; otherwise they are reported and the computed layout is used. Ignored by algorithm force.
    */
   hints?: {
     /**
@@ -108,7 +108,7 @@ export interface Layout {
     [k: string]: [number, number];
   };
   /**
-   * The shape to fit: card (a small landscape card: at most `max_columns` columns, wrapping into rows so text stays readable), wide (a full screen), free (the topology's own shape).
+   * The shape to fit: card (a small landscape card: at most `max_columns` columns, so text stays readable: a ring too long for a two-row ladder runs round a rectangle, a chain wraps into bands, outer devices hang above and below), wide (a full screen; laid out as free), free (the topology's own shape).
    */
   aspect?: "card" | "wide" | "free";
   /**

@@ -20,7 +20,8 @@ export function layerVisibility(view) {
   return Object.fromEntries(LAYER_IDS.map((id) => [pageLayerId(id), view.layers.includes(id)]));
 }
 
-// The importer's options from the view: plain boxes for devices without facts unless plain is false.
+// The importer's options from the view: plain boxes for devices without facts unless plain is false,
+// and the layout properties (js/src/layout.ts layoutFacts).
 export function importOptions(view) {
-  return { plain: view.plain !== false };
+  return { plain: view.plain !== false, layout: view.layout };
 }

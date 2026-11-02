@@ -389,7 +389,8 @@ bare `index.html` open, is the lab marked `"default": true`, else the one the in
 ```
 
 Positions are optional: `{"positions": {"PE1": [100, 300], "P1": [300, 150], ...}}`, diagram
-coordinates in any unit with y down, one per device (else the view lays the topology out itself).
+coordinates in any unit with y down, one per device (else the page uses the view's layout, computed
+from the facts by default: see `layout` under [view properties](#view-properties)).
 In CI, for example a GitHub Pages workflow:
 
 ```yaml
@@ -426,7 +427,7 @@ Every property is optional:
   "layers": ["physical", "ring", "igp", "mpls", "pw", "cfm"],
   "frames": {"rule": "list", "list": ["igp", "ring", "pw", "cfm"], "start": "signature", "period_s": 5},
   "snapshot": {"variant": "exploded"},
-  "layout": {"algorithm": "hints", "hints": {"PE1": [0, 0], "P1": [1, 0]}, "aspect": "card", "max_columns": 4},
+  "layout": {"algorithm": "auto", "aspect": "card", "max_columns": 4},
   "plain": true,
   "camera": "fit"
 }
@@ -440,8 +441,9 @@ Every property is optional:
 | `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport), `first`, or a layer |
 | `frames.period_s` | `4`: seconds per frame, a hint (a consumer may pause offscreen or for reduced motion) |
 | `snapshot.variant` | `exploded`, `stacked` |
-| `layout.algorithm` | `auto`, `force`, `hints` (`layout.hints`: device name to `[x, y]`, y down, as a positions file) |
-| `layout.aspect` | `free`, `card` (wrap at `layout.max_columns`, default 6, so text stays readable on a card), `wide` |
+| `layout.algorithm` | `auto` (computed from the facts, below), `force` (force-directed), `hints` |
+| `layout.hints` | `{}`: device name to `[x, y]`, y down, as a positions file; used when they place every device (with `auto` or `hints`): a hint for `LS` places `LS-O-1`, `LS-T-1`… when there is no device `LS`, and plain boxes without a hint go beside their neighbours |
+| `layout.aspect` | `free`, `card` (at most `layout.max_columns` columns, default 6, so text stays readable on a card), `wide` (as `free`) |
 | `plain` | `true`: devices without facts drawn as plain boxes with their name |
 | `camera` | `fit`, `top`, `iso` |
 | `title` | `null` (named after the lab) |
@@ -455,15 +457,40 @@ index), or from `?view=<url>` (which replaces it), then these URL parameters: `p
 `layers` and `frames` (comma-separated; `frames` sets the rule to `list`), `start`, `period`, `variant`,
 `layout`, `aspect`, `columns`, `plain` (`1` / `0`), `camera`; for example
 `index.html?lab=core&preset=card-frames&frames=igp,ring`. Today the 3D page applies `layers` (the
-layer toggles start from it) and `plain` (`?plain=0` leaves devices without facts out) and exposes the whole resolved view, with its warnings, as
-`window.netfactsView`; the frames, snapshot, layout and camera properties are for the renderers that
-read them. From JavaScript:
+layer toggles start from it), `plain` (`?plain=0` leaves devices without facts out) and `layout`
+(where the devices go, unless a positions file places every one), and exposes the whole resolved view,
+with its warnings and the layout it used, as `window.netfactsView`; the frames, snapshot and camera
+properties are for the renderers that read them.
+
+The layout (`algorithm` `auto`) is computed from the facts, deterministically (the same facts give the
+same positions), and shared by every renderer:
+
+1. **The core**: the IGP routers (P and PE); in a lab without one, the G.8032 ring members; else the
+   devices on the longest cycle; else (a chain or a tree) the devices that link others. A plain box
+   between two core devices is core too, and so is a second cycle linked to the core (such as MPLS-TP
+   nodes without an IGP on a ring of their own).
+2. **A ladder**: the ring (else the core's longest cycle) as a racetrack of two rows, at the rotation
+   and split that keep the other core links short and uncrossed and put the devices facing customers at
+   the row ends; core devices off it sit between the rows. A core without a cycle is laid out in
+   columns by hops.
+3. **Everything else** (CEs, hosts, plain boxes) hangs off its core neighbour, outward: sideways off a
+   row end, else up from the top row and down from the bottom row; a dual-homed device sits between its
+   two neighbours.
+4. **No device on a link**: a spot on a link, or whose own links would run through a device, is never
+   taken; a last pass swaps or moves devices while that removes crossings.
+
+With `aspect` `card`, nothing is wider than `max_columns` columns: a ring too long for the ladder runs
+round a rectangle that wide (its rows, sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
+10-device lab stays readable on a ~330 px card (the `card-frames` preset: 4 columns). From JavaScript:
 
 ```ts
-import { resolveView, viewFrames } from "@ciena/saos-network-facts";
+import { layoutFacts, resolveView, viewFrames } from "@ciena/saos-network-facts";
 
 const { view, warnings } = resolveView(viewFileJson, location.search);   // both optional
 viewFrames(view, ["physical", "igp", "pw"]);   // { frames: ["physical", "igp", "pw"], start: "pw" }
+// { nodes: [{ id, role?, plain? }], links: [{ a, b }], rings?: [{ nodes, links? }] }: the viewer
+// importer's topology is one
+const { positions, method } = layoutFacts(model, view.layout);   // positions: { PE1: { x, y }, ... }, grid units, y down
 ```
 
 In Python, `saos_network_facts.schema.view_errors(view)` validates a view file.

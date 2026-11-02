@@ -5,7 +5,8 @@
 // overview / device / service panels, walks and failure replays. Routes:
 // #device=NAME, #service=ID, #topology (panels hidden); anything else is the overview.
 // View properties (viewprops.js) come from the lab's view file, ?view= and the URL; the page
-// applies their layers and plain boxes and exposes the whole resolved view as window.netfactsView.
+// applies their layers, plain boxes and layout (the library's, js/src/layout.ts) and exposes the
+// whole resolved view, with the layout it used, as window.netfactsView.
 
 import exampleFacts from '../../examples/adaptive-sr-cfm/facts.json?raw';
 import { buildNetwork, ccmWalk, evpnWalk, hostSources, hostTargets, hostWalk, isisFloodWalk, locatorTargets, ospfFloodAreas, ospfFloodWalk, failureModes, replayFailure, srv6PingWalk, tpTunnelWalk, vpnRouteChoices, vpnUpdateWalk, vpwsWalk } from './engine/index.js';
@@ -37,10 +38,11 @@ const state = { imp: null, net: null, present: null, failures: [], walk: null, s
 // The view file the page's ?view= names, for what is not a lab of the index (the example, a visitor's file).
 let urlView = { viewText: null, viewError: null };
 
-// Exposes the view resolved for what is shown (pageView) and applies its layers (each present layer's toggle).
-function applyView({ view, warnings }) {
+// Exposes the resolved view (pageView) for what is shown and applies its layers (each present layer's
+// toggle); its layout was applied by the import.
+function applyView({ view, warnings }, layout) {
   state.view = view;
-  window.netfactsView = { view, warnings };
+  window.netfactsView = { view, warnings, layout };
   for (const w of warnings) console.warn(`view properties: ${w}`);
   const shown = layerVisibility(view);
   for (const id of layers.present) {
@@ -71,7 +73,7 @@ function load(text, name, positions = null, shown = { file: name }, view = urlVi
   state.replay = null;
   setWalk(null);
   rebuild();
-  applyView(resolved);
+  applyView(resolved, imp.layout);
   fitCamera();
   renderImportReport($('tab-import'), imp.report);
   fillSelects();

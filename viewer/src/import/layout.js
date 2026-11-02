@@ -1,54 +1,30 @@
 // SPDX-License-Identifier: Apache-2.0
-// Node positions for a topology that has none: a force-directed layout
-// (Fruchterman & Reingold, "Graph Drawing by Force-directed Placement", 1991)
-// from a fixed start on a circle, so the same nodes and links always give the
-// same picture. The result is centred and scaled to the extent the scene's
-// camera frames (about 50 x 30 units).
+// Node positions in the scene: the library's layout computed from the facts (js/src/layout.ts
+// layoutFacts: a ladder on the ring or the core's longest cycle, the rest hung outward; or the
+// force-directed layout), or authored positions, centred and scaled to the extent the scene's camera
+// frames (about 50 x 30 units). The scene's z is the layout's y (down the screen).
+import { forceLayout, layoutFacts } from '../../../js/src/index.ts';
 
-const ITERATIONS = 400;
 const WIDTH = 50;
 const DEPTH = 30;
 
+// { pos: { id: { x, z } }, result } for the importer's topology ({ nodes, links, rings }) and a view's
+// layout. A computed layout keeps its rows and columns (a card's wrapping stays) and is stretched to
+// the frame on each axis, at most 2:1, so a two-row ladder is not a thin strip under the tilted camera;
+// force and authored layouts turn a tall picture a quarter so its long side runs along x and keep
+// their proportions, as the page always has.
+export function placeLayout(model, layout) {
+  const result = layoutFacts(model, layout);
+  const ids = model.nodes.map((n) => n.id);
+  const drawn = result.method === 'force' || result.method === 'hints';
+  return { pos: fit(ids, ids.map((id) => ({ x: result.positions[id].x, z: result.positions[id].y })), { turn: drawn, stretch: !drawn }), result };
+}
+
+// The force-directed layout of `ids` and `edges` ([a, b] pairs), fitted to the scene.
 export function layoutNodes(ids, edges) {
-  const n = ids.length;
-  if (!n) return {};
-  const index = new Map(ids.map((id, i) => [id, i]));
-  const pairs = edges.map(([a, b]) => [index.get(a), index.get(b)]).filter(([a, b]) => a !== undefined && b !== undefined && a !== b);
-  const pos = ids.map((_, i) => ({ x: Math.cos((2 * Math.PI * i) / n) * 10, z: Math.sin((2 * Math.PI * i) / n) * 10 }));
-  const k = Math.sqrt(400 / n); // ideal edge length for a 20 x 20 frame
-  let temp = 5;
-  for (let it = 0; it < ITERATIONS; it++) {
-    const disp = pos.map(() => ({ x: 0, z: 0 }));
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const dx = pos[i].x - pos[j].x;
-        const dz = pos[i].z - pos[j].z;
-        const d = Math.max(Math.hypot(dx, dz), 0.01);
-        const f = (k * k) / d; // repulsion between every pair
-        disp[i].x += (dx / d) * f;
-        disp[i].z += (dz / d) * f;
-        disp[j].x -= (dx / d) * f;
-        disp[j].z -= (dz / d) * f;
-      }
-    }
-    for (const [a, b] of pairs) {
-      const dx = pos[a].x - pos[b].x;
-      const dz = pos[a].z - pos[b].z;
-      const d = Math.max(Math.hypot(dx, dz), 0.01);
-      const f = (d * d) / k; // attraction along every link
-      disp[a].x -= (dx / d) * f;
-      disp[a].z -= (dz / d) * f;
-      disp[b].x += (dx / d) * f;
-      disp[b].z += (dz / d) * f;
-    }
-    for (let i = 0; i < n; i++) {
-      const d = Math.max(Math.hypot(disp[i].x, disp[i].z), 0.01);
-      pos[i].x += (disp[i].x / d) * Math.min(d, temp);
-      pos[i].z += (disp[i].z / d) * Math.min(d, temp);
-    }
-    temp = Math.max(0.05, temp * 0.985);
-  }
-  return fit(ids, pos);
+  if (!ids.length) return {};
+  const p = forceLayout(ids, edges);
+  return fit(ids, ids.map((id) => ({ x: p[id].x, z: p[id].y })));
 }
 
 // Authored positions, as a diagram gives them: { NAME: [x, y] } or { NAME: { x, y } } in any unit,
@@ -63,13 +39,17 @@ export function scalePositions(ids, positions) {
   return { pos: fit(ids, ids.map((id) => ({ x: xy(table[id])[0], z: xy(table[id])[1] }))), missing };
 }
 
-// Centre on the origin; the longer side of the layout along x, scaled into WIDTH x DEPTH.
-function fit(ids, pos) {
+// Centre on the origin, scaled into WIDTH x DEPTH; with `turn`, the longer side along x first; with
+// `stretch`, each axis scaled on its own, at most twice the other.
+function fit(ids, pos, { turn = true, stretch = false } = {}) {
   const span = (axis) => Math.max(...pos.map((p) => p[axis])) - Math.min(...pos.map((p) => p[axis]));
-  if (span('z') > span('x')) for (const p of pos) [p.x, p.z] = [p.z, p.x];
+  if (turn && span('z') > span('x')) for (const p of pos) [p.x, p.z] = [p.z, p.x];
   const cx = (Math.max(...pos.map((p) => p.x)) + Math.min(...pos.map((p) => p.x))) / 2;
   const cz = (Math.max(...pos.map((p) => p.z)) + Math.min(...pos.map((p) => p.z))) / 2;
-  const scale = Math.min(WIDTH / (span('x') || 1), DEPTH / (span('z') || 1));
-  const round = (v) => Math.round(v * 100) / 100;
-  return Object.fromEntries(ids.map((id, i) => [id, { x: round((pos[i].x - cx) * scale), z: round((pos[i].z - cz) * scale) }]));
+  let sx = WIDTH / (span('x') || 1);
+  let sz = DEPTH / (span('z') || 1);
+  if (stretch) [sx, sz] = [Math.min(sx, 2 * sz), Math.min(sz, 2 * sx)];
+  else sx = sz = Math.min(sx, sz);
+  const round = (v) => Math.round(v * 100) / 100 + 0;
+  return Object.fromEntries(ids.map((id, i) => [id, { x: round((pos[i].x - cx) * sx), z: round((pos[i].z - cz) * sz) }]));
 }
