@@ -9,4 +9,5 @@ js/LICENSE
 js/NOTICE
 viewer/node_modules/
 viewer/dist/
+viewer/dist-render/
 docs/pr-draft.md

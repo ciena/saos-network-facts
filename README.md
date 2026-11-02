@@ -466,7 +466,7 @@ Camera menu switches it) and `density` (the Labels panel starts from it; the vis
 stored for pages without one), and exposes the whole resolved view, with its warnings, the layout it
 used and the camera it started from (`camera: { name, target, position }`), as `window.netfactsView`.
 For example `index.html?preset=protocol-stack&layers=igp,mpls&camera=top` opens on the IGP and MPLS
-planes, seen from above. The frames and snapshot properties are for the renderers that read them.
+planes, seen from above. The frames and snapshot properties are for the renderers that read them ([Frames and snapshot](#frames-and-snapshot-the-lab-as-static-svg)).
 
 The layout (`algorithm` `auto`) is computed from the facts, deterministically (the same facts give the
 same positions), and shared by every renderer:
@@ -500,6 +500,48 @@ const { positions, method } = layoutFacts(model, view.layout);   // positions: {
 ```
 
 In Python, `saos_network_facts.schema.view_errors(view)` validates a view file.
+
+## Frames and snapshot: the lab as static SVG
+
+For a lab card or a page without WebGL, the viewer renders a facts file and a view to two SVG files,
+with the same layout as the 3D page:
+
+- **`frames.svg`**: one flat frame per layer the lab has content for: physical; G.8032 rings over the
+  physical links; the IGP (metrics, loopbacks, prefix SIDs); SR policies and MPLS-TP tunnels over the IGP
+  (only when there is no pseudowire frame, which shows the transport already); SRv6 locators and
+  Flex-Algo; BGP (sessions, route reflector, sessions not established); L3VPN VRFs; pseudowires over the
+  IGP; EVPN instances; CFM MEGs. The view picks them (`layers`, `frames.rule` / `frames.list`) and the
+  frame to start on (`frames.start`, by default the lab's signature layer: its services, else its
+  transport). Devices stay put from frame to frame; each object carries two or three short labels, each
+  frame a title, devices without facts are dashed plain boxes. Each frame is a group `<g id="f-<layer>">`
+  shown by CSS `:target`, so `<img src="frames.svg#f-igp">` shows one frame without any script, and
+  `<img src="frames.svg">` shows the start frame. A card rotates through them by stacking one `<img>` per
+  frame (or by inlining the SVG and showing one group at a time).
+- **`snapshot.svg`**: the 3D view's planes, one per layer, exploded (planes apart, nothing overlaps) or
+  `stacked` (`snapshot.variant`): every device straight above itself on each plane, tied by a dotted riser,
+  objects with short labels, hover titles with the full properties. Chips at the top switch planes off and
+  on and the planes above close the gap (a small inline script: inline in a page, in `<object>` or
+  `<iframe>`; as an `<img>` it is a still picture).
+
+Both files are self-contained (no external script, font or image) and byte-stable: the same facts and
+view give the same bytes, so a CI job can check them in or diff them.
+
+```bash
+# from a checkout (Node 22.18+), or node render/saos-network-facts-render.mjs from the viewer release tgz
+saos-network-facts-render facts.json --view card.view.json --frames frames.svg --snapshot snapshot.svg
+saos-network-facts-render facts.json --params "preset=card-frames&start=igp" > frames.svg
+```
+
+`--view` takes a view file, `--params` view URL parameters (as the viewer page reads them); warnings
+(properties ignored, hints not used) go to standard error. From JavaScript, the viewer release tgz's
+`render/render.js` (in the release asset only, not on the Pages site) (an ES module with the importer and engine bundled in, no three.js) exports the same:
+
+```js
+import { frames, snapshot } from './render/render.js';
+
+const card = frames(factsText, { preset: 'card-frames' });   // { svg, frames: [{ id, title }], start, width, height, warnings }
+const full = snapshot(factsText, { preset: 'lab-snapshot' });   // { svg, layers, width, height, warnings }
+```
 
 ## Reading facts from JavaScript / TypeScript
 
