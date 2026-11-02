@@ -17,6 +17,25 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-02
+
+### Added
+
+- **Viewer: devices without facts as plain boxes** — the importer dropped the records the extractor
+  skipped or failed on (an optical line system, a third-party router, a controller) and the `links[]` to
+  them ("not shown"). They are now drawn on the physical plane as dim outlined boxes with their name and
+  type, with the file's links to them as dashed lines; the device panel and the overview name them
+  "plain box" and the Import tab says "shown as plain box". They live in `topology.plain` (`{ nodes,
+  links }`, each with `plain: true`), apart from `topology.nodes`, so the engine never sees them: every
+  existing lab computes exactly what it did, and no published lab has one. A record the extractor
+  failed on (`status: error`) is a plain box too and is still reported with its status and reason.
+  `drawnNodes` / `drawnLinks` give every device and link a 2D view or layout draws. The page applies
+  the view property `plain` from `resolveView` (a view file's `"plain": false`, or `?plain=0`), passing
+  `importFacts(text, { plain })`; false leaves them out as before.
+- **Fixtures** — a new clab lab `labs/plain-box` (the sr-l2 PEs with a line system of kind `generic_vm`
+  between them; no new translator calls), a test fixture only (not in the site's lab menu). The other expected
+  files only gain the new version.
+
 ## [0.12.0] - 2026-11-02
 
 ### Added

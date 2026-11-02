@@ -56,12 +56,14 @@ describe('Linux hosts (schema 1.8)', () => {
     expect(importFacts(file).report.warnings).toContain('host PE1: also a device with facts; the device is shown');
   });
 
-  test('a file without hosts (schema 1.7) imports as before', () => {
+  test('a file without hosts (schema 1.7) imports as before, its Linux records as plain boxes', () => {
     const file = JSON.parse(l3vpnText);
     delete file.hosts;
     const x = importFacts(file);
     expect(x.topology.nodes.some((n) => n.host)).toBe(false);
-    expect(x.report.warnings.filter((w) => w.endsWith('not shown'))).toHaveLength(4);
+    expect(x.report.warnings.filter((w) => w.endsWith('shown as plain box'))).toHaveLength(4);
+    expect(x.topology.plain.nodes.map((n) => n.id)).toEqual(['h1', 'h2', 'dcn1', 'dcn2']);
+    expect(importFacts(file, { plain: false }).report.warnings.filter((w) => w.endsWith('not shown'))).toHaveLength(4);
   });
 });
 

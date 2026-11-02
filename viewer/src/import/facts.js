@@ -1090,30 +1090,90 @@ function buildServices(pseudowires, megs) {
 }
 
 // Node positions: the authored ones when they place every device (see layout.js
-// scalePositions), else a force-directed layout of the links.
-function placeNodes(nodes, links, positions, report) {
+// scalePositions), else a force-directed layout of the links. Plain boxes take part in the computed
+// layout; authored positions that leave one out put it beside the devices it is cabled to.
+function placeNodes(nodes, links, positions, report, plain = { nodes: [], links: [] }) {
   const ids = nodes.map((n) => n.id);
+  const plainIds = plain.nodes.map((n) => n.id);
   if (positions) {
+    const all = scalePositions([...ids, ...plainIds], positions);
+    if (!all.missing.length) {
+      report.add('physical', 'authored', 'positions', 'from the positions file');
+      return all.pos;
+    }
     const { pos, missing } = scalePositions(ids, positions);
     if (!missing.length) {
-      report.add('physical', 'authored', 'positions', 'from the positions file');
-      return pos;
+      report.add('physical', 'authored', 'positions', `from the positions file; ${all.missing.join(', ')} (plain) beside the devices cabled to them`);
+      return { ...pos, ...placePlain(plain, pos) };
     }
     report.warn(`positions: no position for ${missing.join(', ')}; the layout is computed instead`);
   }
   report.add('physical', 'derived', 'positions', 'the facts carry no layout: a force-directed layout of the links');
-  return layoutNodes(ids, links.map((l) => [l.a.node, l.b.node]));
+  return layoutNodes([...ids, ...plainIds], [...links, ...plain.links].map((l) => [l.a.node, l.b.node]));
+}
+
+// A plain box the positions file leaves out: a little off the middle of the devices it is cabled to;
+// one cabled to none in a row in front of the devices.
+function placePlain(plain, pos) {
+  const out = {};
+  const front = Math.max(0, ...Object.values(pos).map((p) => p.z)) + 6;
+  let row = 0;
+  for (const n of plain.nodes) {
+    const near = plain.links.flatMap((l) => [[l.a.node, l.b.node], [l.b.node, l.a.node]]).filter(([x, far]) => x === n.id && pos[far]).map(([, far]) => pos[far]);
+    if (!near.length) {
+      out[n.id] = { x: -20 + 6 * row++, z: front };
+      continue;
+    }
+    const x = near.reduce((t, p) => t + p.x, 0) / near.length;
+    const z = near.reduce((t, p) => t + p.z, 0) / near.length;
+    out[n.id] = near.length === 1 ? { x: x + 6, z } : { x, z: z + 4 };
+  }
+  return out;
+}
+
+// Plain boxes: the records without facts (a device the extractor skipped, such as an optical line
+// system, a third-party router or a controller, or one it failed on) that are not Linux hosts, with
+// the file's links[] that reach them. They carry no protocol: the engine never sees them (they are
+// topology.plain, not topology.nodes), the scene draws them as boxes with their name and type.
+// `show` false (the view property plain) leaves them out, as before.
+function plainNodes(file, devices, hostNames, report, show) {
+  const out = [];
+  for (const r of file.devices) {
+    if (devices.has(r.device) || hostNames.has(r.device)) continue;
+    report.warn(`${r.device}: ${r.status}${r.reason ? ` (${r.reason})` : ''}; ${show ? 'shown as plain box' : 'not shown'}`);
+    if (show && !out.some((n) => n.id === r.device)) out.push({ id: r.device, role: 'plain', plain: true, type: r.type ?? null, platform: r.platform ?? null, status: r.status, reason: r.reason ?? null });
+  }
+  return out;
+}
+
+// The file's links[] with a plain box at one end and a drawn device (or another plain box) at the other.
+function plainLinks(file, plain, nodes, report) {
+  const plainIds = new Set(plain.map((n) => n.id));
+  const known = new Set([...nodes.map((n) => n.id), ...plainIds]);
+  const ids = new Set();
+  const links = [];
+  for (const l of file.links ?? []) {
+    const [a, b] = [l.a, l.b];
+    if (a.device === b.device || !(plainIds.has(a.device) || plainIds.has(b.device)) || !known.has(a.device) || !known.has(b.device)) continue;
+    let id = `${a.device}-${b.device}`;
+    if (ids.has(id)) id = `${id} ${a.port}/${b.port}`;
+    ids.add(id);
+    links.push({ id, kind: 'plain', plain: true, a: { node: a.device, port: a.port }, b: { node: b.device, port: b.port } });
+  }
+  if (plain.length) report.add('physical', 'facts', `${plain.length} plain box${plain.length === 1 ? '' : 'es'}`, `${plain.map((n) => n.id).join(', ')}: devices without facts, drawn as plain boxes with their name and type${links.length ? `, and ${links.length} links to them from the file's links[]` : ''}; no protocol runs on them or over those links`);
+  return links;
 }
 
 // facts file (JSON text or value) -> { topology, file, devices, services, labelMode, report }
-// `positions`: optional authored node positions (layout.js scalePositions).
-export function importFacts(input, { name, positions } = {}) {
+// `positions`: optional authored node positions (layout.js scalePositions). `plain` (the view
+// property, default true): devices without facts as plain boxes (topology.plain), false leaves them out.
+export function importFacts(input, { name, positions, plain: showPlain = true } = {}) {
   const file = parseFacts(input);
   const devices = devicesByName(file);
   const report = new Report();
   if (!devices.size) throw new Error('no device in this facts file has facts (status ok or partial)');
   const hostNames = new Set(factsHosts(file).map((h) => h.name));
-  for (const r of file.devices) if (!devices.has(r.device) && !hostNames.has(r.device)) report.warn(`${r.device}: ${r.status}${r.reason ? ` (${r.reason})` : ''}; not shown`);
+  const plain = { nodes: plainNodes(file, devices, hostNames, report, showPlain), links: [] };
 
   const igp = chooseIgp(devices, report);
   // The IS-IS level the view runs: the first instance's (level 1-2 runs as 2).
@@ -1123,6 +1183,7 @@ export function importFacts(input, { name, positions } = {}) {
   nodes.push(...hostImport.nodes);
   const links = buildLinks(devices, nodes, igp, levels[0] ?? 2, report, hostImport.facts);
   topologyLinks(file, links, nodes, report);
+  plain.links = plainLinks(file, plain.nodes, nodes, report);
   const owner = ownerIndex(devices);
   const bgp = buildBgp(devices, owner, report);
   const srgb = srgbOf(devices, report);
@@ -1157,8 +1218,8 @@ export function importFacts(input, { name, positions } = {}) {
     report.add('ospf', noRid.length ? 'default' : 'facts', 'router ids', noRid.length ? `${noRid.join(', ')}: no router id configured, the loopback is used` : 'ospf instance router-id');
   }
 
-  const placed = placeNodes(nodes, links, positions, report);
-  for (const n of nodes) n.pos = placed[n.id];
+  const placed = placeNodes(nodes, links, positions, report, plain);
+  for (const n of [...nodes, ...plain.nodes]) n.pos = placed[n.id];
 
   const recipe = file.devices.find((r) => r.recipe)?.recipe;
   // Labels: SR-MPLS with an SRGB; static only when MPLS-TP tunnels carry every pseudowire; else LDP.
@@ -1182,6 +1243,7 @@ export function importFacts(input, { name, positions } = {}) {
     srv6,
     flexAlgos,
     evpn,
+    plain,
   };
   return {
     topology,
@@ -1191,4 +1253,14 @@ export function importFacts(input, { name, positions } = {}) {
     labelMode,
     report: { topology, gaps: report.gaps, warnings: report.warnings },
   };
+}
+
+// Every device the page draws, plain boxes last, and every link: what a 2D view or a layout needs
+// beside the engine's topology (topology.plain is not in topology.nodes / links).
+export function drawnNodes(topology) {
+  return [...topology.nodes, ...(topology.plain?.nodes ?? [])];
+}
+
+export function drawnLinks(topology) {
+  return [...topology.links, ...(topology.plain?.links ?? [])];
 }

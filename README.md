@@ -56,7 +56,8 @@ How files map to devices:
   has files for it. A node of kind `linux` is a host: its record is `skipped` and its addresses and
   routes, read from its `exec` lines, go into `hosts` (below), unless the extractor reads it as a SAOS
   device (a vrnetlab SAOS image run as kind `linux`, whose type, platform map or startup configuration
-  says SAOS): then it is a device and not a host. Nodes of other kinds are `skipped`;
+  says SAOS): then it is a device and not a host. Nodes of other kinds are `skipped` (the viewer draws
+  such a device as a plain box, with its links);
 - `--hosts`: YAML or JSON, `hosts: {NAME: {interfaces: [{name, addresses, attached: {device, port}}],
   routes: [{prefix, next_hop, interface, metric}], gateway: ADDRESS | {ipv4, ipv6}}}`, for hosts no
   `exec` line describes; an entry for a containerlab host adds to it;
@@ -454,7 +455,7 @@ index), or from `?view=<url>` (which replaces it), then these URL parameters: `p
 `layers` and `frames` (comma-separated; `frames` sets the rule to `list`), `start`, `period`, `variant`,
 `layout`, `aspect`, `columns`, `plain` (`1` / `0`), `camera`; for example
 `index.html?lab=core&preset=card-frames&frames=igp,ring`. Today the 3D page applies `layers` (the
-layer toggles start from it) and exposes the whole resolved view, with its warnings, as
+layer toggles start from it) and `plain` (`?plain=0` leaves devices without facts out) and exposes the whole resolved view, with its warnings, as
 `window.netfactsView`; the frames, snapshot, layout and camera properties are for the renderers that
 read them. From JavaScript:
 

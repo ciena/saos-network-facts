@@ -1,0 +1,20 @@
+# Synthetic two-PE SR-MPLS lab (the sr-l2 configurations) with an optical line system between the
+# PEs: OLS1 has no extractor, so its record is skipped and the viewer draws it as a plain box with
+# the two cables to it (documentation addresses only).
+name: plain-box
+topology:
+  defaults:
+    kind: ciena_saos
+  nodes:
+    PE1:
+      type: '5164'
+      startup-config: configs/PE1.cfg
+    PE2:
+      type: '5162'
+      startup-config: configs/PE2.xml
+    OLS1:
+      kind: generic_vm
+      type: line-system
+  links:
+    - endpoints: ["PE1:1", "OLS1:1"]
+    - endpoints: ["OLS1:2", "PE2:1"]

@@ -35,3 +35,6 @@ vpws-hosts:
 vpws-bonds:
   clab: labs/vpws-bonds/topo.clab.yml
   recipe: vpws-bonds
+plain-box:
+  clab: labs/plain-box/topo.clab.yml
+  recipe: plain-box
