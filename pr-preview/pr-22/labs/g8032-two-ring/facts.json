@@ -1,0 +1,1626 @@
+{
+  "devices": [
+    {
+      "device": "RM_1",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "CLASSIFIER-100": [
+            "100"
+          ]
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "ring_1-fd"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "1",
+            "name": "ring_1-p0-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "2",
+            "name": "ring_1-p1-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "3",
+            "name": "ring_1-p2-fp"
+          }
+        ],
+        "gateway": null,
+        "hostname": "RM_1",
+        "interfaces": [],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 5,
+        "objects": 5,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "3": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 5,
+        "rings": [
+          {
+            "east": "2",
+            "instances": [
+              {
+                "members": [
+                  "ring_1-fd"
+                ],
+                "name": "erp_1",
+                "raps_level": "7",
+                "raps_vid": "4090",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "neighbor"
+                  },
+                  {
+                    "interface": "2",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "major",
+                "virtual_channel": null
+              }
+            ],
+            "name": "ring_1",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "1",
+            "west": "1"
+          },
+          {
+            "east": "3",
+            "instances": [
+              {
+                "members": [
+                  "ring_1-fd"
+                ],
+                "name": "erp_2",
+                "raps_level": "7",
+                "raps_vid": "4089",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "3",
+                    "port": "port1",
+                    "role": "owner"
+                  }
+                ],
+                "sub_ring_of": "ring_1",
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "sub",
+                "virtual_channel": false
+              }
+            ],
+            "name": "ring_2",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "3",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "2",
+            "west": "2"
+          }
+        ],
+        "segment_routing": {
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "1",
+              "2",
+              "3"
+            ]
+          }
+        },
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5162",
+      "status": "ok",
+      "templates": [
+        "configs/RM_1.cfg"
+      ],
+      "type": "5162"
+    },
+    {
+      "device": "RM_2",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "CLASSIFIER-100": [
+            "100"
+          ]
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "ring_1-fd"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "3",
+            "name": "ring_1-ce1-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "1",
+            "name": "ring_1-p0-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "2",
+            "name": "ring_1-p1-fp"
+          }
+        ],
+        "gateway": null,
+        "hostname": "RM_2",
+        "interfaces": [],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 6,
+        "objects": 6,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "3": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 6,
+        "rings": [
+          {
+            "east": "2",
+            "instances": [
+              {
+                "members": [
+                  "ring_1-fd"
+                ],
+                "name": "erp_1",
+                "raps_level": "7",
+                "raps_vid": "4090",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "none"
+                  },
+                  {
+                    "interface": "2",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "major",
+                "virtual_channel": null
+              }
+            ],
+            "name": "ring_1",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "1",
+            "west": "1"
+          }
+        ],
+        "segment_routing": {
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "3",
+              "1",
+              "2"
+            ]
+          }
+        },
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5162",
+      "status": "ok",
+      "templates": [
+        "configs/RM_2.cfg"
+      ],
+      "type": "5162"
+    },
+    {
+      "device": "RM_3",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "CLASSIFIER-100": [
+            "100"
+          ]
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "ring_1-fd"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "3",
+            "name": "ring_1-ce2-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "1",
+            "name": "ring_1-p0-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "2",
+            "name": "ring_1-p1-fp"
+          }
+        ],
+        "gateway": null,
+        "hostname": "RM_3",
+        "interfaces": [],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 5,
+        "objects": 5,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "3": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 5,
+        "rings": [
+          {
+            "east": "2",
+            "instances": [
+              {
+                "members": [
+                  "ring_1-fd"
+                ],
+                "name": "erp_1",
+                "raps_level": "7",
+                "raps_vid": "4090",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "none"
+                  },
+                  {
+                    "interface": "2",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "major",
+                "virtual_channel": null
+              }
+            ],
+            "name": "ring_1",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "1",
+            "west": "1"
+          }
+        ],
+        "segment_routing": {
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "3",
+              "1",
+              "2"
+            ]
+          }
+        },
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5162",
+      "status": "ok",
+      "templates": [
+        "configs/RM_3.cfg"
+      ],
+      "type": "5162"
+    },
+    {
+      "device": "RM_4",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "CLASSIFIER-100": [
+            "100"
+          ]
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "ring_1-fd"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "1",
+            "name": "ring_1-p0-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "2",
+            "name": "ring_1-p1-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "3",
+            "name": "ring_1-p2-fp"
+          }
+        ],
+        "gateway": null,
+        "hostname": "RM_4",
+        "interfaces": [],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 5,
+        "objects": 5,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "3": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 5,
+        "rings": [
+          {
+            "east": "2",
+            "instances": [
+              {
+                "members": [
+                  "ring_1-fd"
+                ],
+                "name": "erp_1",
+                "raps_level": "7",
+                "raps_vid": "4090",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "none"
+                  },
+                  {
+                    "interface": "2",
+                    "port": "port1",
+                    "role": "owner"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "major",
+                "virtual_channel": null
+              }
+            ],
+            "name": "ring_1",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "1",
+            "west": "1"
+          },
+          {
+            "east": "1",
+            "instances": [
+              {
+                "members": [
+                  "ring_1-fd"
+                ],
+                "name": "erp_2",
+                "raps_level": "7",
+                "raps_vid": "4089",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "3",
+                    "port": "port0",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": "ring_1",
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "sub",
+                "virtual_channel": false
+              }
+            ],
+            "name": "ring_2",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "3",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "2",
+            "west": "3"
+          }
+        ],
+        "segment_routing": {
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "1",
+              "2",
+              "3"
+            ]
+          }
+        },
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5162",
+      "status": "ok",
+      "templates": [
+        "configs/RM_4.cfg"
+      ],
+      "type": "5162"
+    },
+    {
+      "device": "RS_1",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "CLASSIFIER-100": [
+            "100"
+          ]
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "ring_1-fd"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "3",
+            "name": "ring_1-ce3-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "1",
+            "name": "ring_1-p0-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "2",
+            "name": "ring_1-p1-fp"
+          }
+        ],
+        "gateway": null,
+        "hostname": "RS_1",
+        "interfaces": [],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 5,
+        "objects": 5,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "3": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 5,
+        "rings": [
+          {
+            "east": "2",
+            "instances": [
+              {
+                "members": [
+                  "ring_1-fd"
+                ],
+                "name": "erp_2",
+                "raps_level": "7",
+                "raps_vid": "4089",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "neighbor"
+                  },
+                  {
+                    "interface": "2",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "sub",
+                "virtual_channel": false
+              }
+            ],
+            "name": "ring_2",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "2",
+            "west": "1"
+          }
+        ],
+        "segment_routing": {
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "3",
+              "1",
+              "2"
+            ]
+          }
+        },
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5162",
+      "status": "ok",
+      "templates": [
+        "configs/RS_1.cfg"
+      ],
+      "type": "5162"
+    },
+    {
+      "device": "RS_2",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "CLASSIFIER-100": [
+            "100"
+          ]
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "ring_1-fd"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "1",
+            "name": "ring_1-p0-fp"
+          },
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "ring_1-fd",
+            "logical_port": "2",
+            "name": "ring_1-p1-fp"
+          }
+        ],
+        "gateway": null,
+        "hostname": "RS_2",
+        "interfaces": [],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 6,
+        "objects": 6,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "ring",
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 6,
+        "rings": [
+          {
+            "east": "2",
+            "instances": [
+              {
+                "members": [
+                  "ring_1-fd"
+                ],
+                "name": "erp_2",
+                "raps_level": "7",
+                "raps_vid": "4089",
+                "revertive": null,
+                "rpl": [
+                  {
+                    "interface": "1",
+                    "port": "port0",
+                    "role": "none"
+                  },
+                  {
+                    "interface": "2",
+                    "port": "port1",
+                    "role": "none"
+                  }
+                ],
+                "sub_ring_of": null,
+                "termination": null,
+                "timers": {
+                  "guard": null,
+                  "hold_off": null,
+                  "wtr": "1"
+                },
+                "type": "sub",
+                "virtual_channel": false
+              }
+            ],
+            "name": "ring_2",
+            "ports": [
+              {
+                "hold_off": null,
+                "interface": "1",
+                "name": "port0"
+              },
+              {
+                "hold_off": null,
+                "interface": "2",
+                "name": "port1"
+              }
+            ],
+            "ring_id": "2",
+            "west": "1"
+          }
+        ],
+        "segment_routing": {
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "1",
+              "2"
+            ]
+          }
+        },
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5162",
+      "status": "ok",
+      "templates": [
+        "configs/RS_2.cfg"
+      ],
+      "type": "5162"
+    },
+    {
+      "device": "CE_1",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "CLASSIFIER-100": [
+            "100"
+          ]
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "CE_1-RM_2-FD"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "CE_1-RM_2-FD",
+            "logical_port": "1",
+            "name": "CE_1-RM_2-FP"
+          }
+        ],
+        "gateway": null,
+        "hostname": "CE_1",
+        "interfaces": [
+          {
+            "description": null,
+            "fd": "CE_1-RM_2-FD",
+            "ip": "172.16.100.1/24",
+            "ipv4": [
+              "172.16.100.1/24"
+            ],
+            "ipv6": [],
+            "kind": "ip",
+            "mtu": "1500",
+            "name": "CE_1-RM_2-if",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 5,
+        "objects": 5,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 5,
+        "rings": [],
+        "segment_routing": {
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "1"
+            ]
+          }
+        },
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5162",
+      "status": "ok",
+      "templates": [
+        "configs/CE_1.cfg"
+      ],
+      "type": "5162"
+    },
+    {
+      "device": "CE_2",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "CLASSIFIER-100": [
+            "100"
+          ]
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "CE_2-RM_3-FD"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "CE_2-RM_3-FD",
+            "logical_port": "1",
+            "name": "CE_2-RM_3-FP"
+          }
+        ],
+        "gateway": null,
+        "hostname": "CE_2",
+        "interfaces": [
+          {
+            "description": null,
+            "fd": "CE_2-RM_3-FD",
+            "ip": "172.16.100.2/24",
+            "ipv4": [
+              "172.16.100.2/24"
+            ],
+            "ipv6": [],
+            "kind": "ip",
+            "mtu": "1500",
+            "name": "CE_2-RM_3-if",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 5,
+        "objects": 5,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 5,
+        "rings": [],
+        "segment_routing": {
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "1"
+            ]
+          }
+        },
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5162",
+      "status": "ok",
+      "templates": [
+        "configs/CE_2.cfg"
+      ],
+      "type": "5162"
+    },
+    {
+      "device": "CE_3",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "CLASSIFIER-100": [
+            "100"
+          ]
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "CE_3-RS_1-FD"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "CLASSIFIER-100"
+            ],
+            "fd": "CE_3-RS_1-FD",
+            "logical_port": "1",
+            "name": "CE_3-RS_1-FP"
+          }
+        ],
+        "gateway": null,
+        "hostname": "CE_3",
+        "interfaces": [
+          {
+            "description": null,
+            "fd": "CE_3-RS_1-FD",
+            "ip": "172.16.100.3/24",
+            "ipv4": [
+              "172.16.100.3/24"
+            ],
+            "ipv6": [],
+            "kind": "ip",
+            "mtu": "1500",
+            "name": "CE_3-RS_1-if",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [],
+          "interfaces": []
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 5,
+        "objects": 5,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": [
+              "100"
+            ]
+          }
+        },
+        "pseudowires": [],
+        "recognised": 5,
+        "rings": [],
+        "segment_routing": {
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [],
+          "segment_lists": {},
+          "srgb": [],
+          "srv6": {
+            "locators": []
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {
+          "100": {
+            "ports": [
+              "1"
+            ]
+          }
+        },
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5162",
+      "status": "ok",
+      "templates": [
+        "configs/CE_3.cfg"
+      ],
+      "type": "5162"
+    }
+  ],
+  "generator": {
+    "name": "saos-network-facts",
+    "translator": "translator 4.2.1 (recorded)",
+    "version": "0.13.1"
+  },
+  "hosts": [],
+  "links": [
+    {
+      "a": {
+        "device": "RM_1",
+        "port": "2"
+      },
+      "b": {
+        "device": "RM_2",
+        "port": "1"
+      }
+    },
+    {
+      "a": {
+        "device": "RM_2",
+        "port": "2"
+      },
+      "b": {
+        "device": "RM_3",
+        "port": "1"
+      }
+    },
+    {
+      "a": {
+        "device": "RM_3",
+        "port": "2"
+      },
+      "b": {
+        "device": "RM_4",
+        "port": "1"
+      }
+    },
+    {
+      "a": {
+        "device": "RM_4",
+        "port": "2"
+      },
+      "b": {
+        "device": "RM_1",
+        "port": "1"
+      }
+    },
+    {
+      "a": {
+        "device": "RM_1",
+        "port": "3"
+      },
+      "b": {
+        "device": "RS_1",
+        "port": "1"
+      }
+    },
+    {
+      "a": {
+        "device": "RS_1",
+        "port": "2"
+      },
+      "b": {
+        "device": "RS_2",
+        "port": "1"
+      }
+    },
+    {
+      "a": {
+        "device": "RS_2",
+        "port": "2"
+      },
+      "b": {
+        "device": "RM_4",
+        "port": "3"
+      }
+    },
+    {
+      "a": {
+        "device": "CE_1",
+        "port": "1"
+      },
+      "b": {
+        "device": "RM_2",
+        "port": "3"
+      }
+    },
+    {
+      "a": {
+        "device": "CE_2",
+        "port": "1"
+      },
+      "b": {
+        "device": "RM_3",
+        "port": "3"
+      }
+    },
+    {
+      "a": {
+        "device": "CE_3",
+        "port": "1"
+      },
+      "b": {
+        "device": "RS_1",
+        "port": "3"
+      }
+    }
+  ],
+  "schema_version": "1.8.0"
+}
