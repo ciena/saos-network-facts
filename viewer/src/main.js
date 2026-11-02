@@ -4,17 +4,20 @@
 // topology, builds the network and shows it as stacked layers, with the
 // overview / device / service panels, walks and failure replays. Routes:
 // #device=NAME, #service=ID, #topology (panels hidden); anything else is the overview.
+// View properties (viewprops.js) come from the lab's view file, ?view= and the URL; the page
+// applies their layers and exposes the whole resolved view as window.netfactsView.
 
 import exampleFacts from '../../examples/adaptive-sr-cfm/facts.json?raw';
 import { buildNetwork, ccmWalk, evpnWalk, hostSources, hostTargets, hostWalk, isisFloodWalk, locatorTargets, ospfFloodAreas, ospfFloodWalk, failureModes, replayFailure, srv6PingWalk, tpTunnelWalk, vpnRouteChoices, vpnUpdateWalk, vpwsWalk } from './engine/index.js';
 import { importFacts } from './import/facts.js';
-import { labChoices, labParams, loadFromParams, loadLab } from './labs.js';
+import { labChoices, labParams, loadFromParams, loadLab, loadView } from './labs.js';
 import { renderDevice, renderOverview, renderService } from './panels.js';
 import { Animator, DWELL_MS, TRAVEL_MS } from './view/animator.js';
 import { LAYERS, LayerView, hex, presentLayers } from './view/layers.js';
 import { labelOptions } from './view/labels.js';
 import { markStep, renderImportReport, renderStep, renderStepList } from './view/panel.js';
 import { createScene } from './view/scene.js';
+import { layerVisibility, pageView } from './viewprops.js';
 import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
@@ -27,12 +30,31 @@ const layers = new LayerView(scene);
 const animator = new Animator(scene, layers);
 
 // present: the layers the loaded facts have content for, decided from the network with no failure.
-const state = { imp: null, net: null, present: null, failures: [], walk: null, step: 0, playing: false, speed: 1, elapsed: 0, replay: null };
+const state = { imp: null, net: null, present: null, failures: [], walk: null, step: 0, playing: false, speed: 1, elapsed: 0, replay: null, view: null };
 
 // ---- loading ---------------------------------------------------------------
 
+// The view file the page's ?view= names, for what is not a lab of the index (the example, a visitor's file).
+let urlView = { viewText: null, viewError: null };
+
+// Resolves the view for what is shown, exposes it and applies its layers (each present layer's toggle).
+function applyView({ viewText, viewError }) {
+  const { view, warnings } = pageView(viewText, viewError, location.search);
+  state.view = view;
+  window.netfactsView = { view, warnings };
+  for (const w of warnings) console.warn(`view properties: ${w}`);
+  const shown = layerVisibility(view);
+  for (const id of layers.present) {
+    const on = shown[id] !== false;
+    layers.setVisible(id, on);
+    const input = document.querySelector(`#layer-toggles input[data-layer="${id}"]`);
+    if (input) input.checked = on;
+  }
+}
+
 // shown: what the lab menu names ({ lab: id }, { example: true } or { file: name }; see labs.js labChoices).
-function load(text, name, positions = null, shown = { file: name }) {
+// view: { viewText, viewError } of the view file for it (labs.js loadView).
+function load(text, name, positions = null, shown = { file: name }, view = urlView) {
   let imp;
   try {
     imp = importFacts(text, { name: name ?? undefined, positions });
@@ -49,6 +71,7 @@ function load(text, name, positions = null, shown = { file: name }) {
   state.replay = null;
   setWalk(null);
   rebuild();
+  applyView(view);
   fitCamera();
   renderImportReport($('tab-import'), imp.report);
   fillSelects();
@@ -463,7 +486,7 @@ function frame(now) {
 let labIndex = null;
 
 function loadLabResult(lab) {
-  return load(lab.factsText, lab.title, lab.positions, { lab: lab.id });
+  return load(lab.factsText, lab.title, lab.positions, { lab: lab.id }, lab);
 }
 
 function fillLabSelect() {
@@ -479,7 +502,7 @@ $('lab-select').addEventListener('change', async (e) => {
   const lab = labIndex?.labs.find((l) => l.id === e.target.value);
   if (!lab) return;
   try {
-    if (loadLabResult(await loadLab(fetch, lab))) {
+    if (loadLabResult(await loadLab(fetch, lab, urlViewUrl ? urlView : null))) {
       const q = new URLSearchParams(location.search);
       q.set('lab', lab.id);
       history.replaceState(null, '', `${location.pathname}?${q}`);
@@ -489,10 +512,15 @@ $('lab-select').addEventListener('change', async (e) => {
   }
 });
 
+let urlViewUrl = null;
+
 async function start() {
   let found = null;
+  const params = labParams(location.search);
+  urlViewUrl = params.view ? new URL(params.view, location.href).href : null;
+  urlView = await loadView(fetch, urlViewUrl);
   try {
-    found = await loadFromParams(labParams(location.search), { base: location.href, fetch });
+    found = await loadFromParams(params, { base: location.href, fetch, loadedView: urlView });
   } catch (err) {
     load(exampleFacts, EXAMPLE_NAME, null, { example: true });
     showError(`${err.message}; showing the example`);

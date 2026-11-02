@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { fetchLabIndex, labChoices, labParams, loadFromParams } from '../src/labs.js';
+import { fetchLabIndex, labChoices, labParams, loadFromParams, loadLab, loadView } from '../src/labs.js';
 import { LABS, labFiles } from '../labs.config.js';
 
 const BASE = 'https://example.test/site/index.html';
@@ -20,9 +20,9 @@ function stub(files) {
 
 describe('the page URL', () => {
   test('parameters', () => {
-    expect(labParams('?facts=a.json&positions=p.json')).toEqual({ facts: 'a.json', positions: 'p.json', labs: null, lab: null });
-    expect(labParams('?labs=labs.json&lab=x')).toMatchObject({ labs: 'labs.json', lab: 'x' });
-    expect(labParams('')).toEqual({ facts: null, positions: null, labs: null, lab: null });
+    expect(labParams('?facts=a.json&positions=p.json')).toEqual({ facts: 'a.json', positions: 'p.json', labs: null, lab: null, view: null });
+    expect(labParams('?labs=labs.json&lab=x&view=v.json')).toMatchObject({ labs: 'labs.json', lab: 'x', view: 'v.json' });
+    expect(labParams('')).toEqual({ facts: null, positions: null, labs: null, lab: null, view: null });
   });
 
   test('no facts and no lab: the default lab of labs/index.json beside the page when the site stages one', async () => {
@@ -63,6 +63,40 @@ describe('the page URL', () => {
     const out = await loadFromParams(labParams('?labs=labs/index.json'), { base: BASE, fetch: fetchFn });
     expect(out.index.labs.map((l) => [l.id, l.title])).toEqual([['a', 'A'], ['b', 'b']]);
     expect(out.lab).toMatchObject({ id: 'b', factsText: 'B', positions: { PE1: [0, 0] } });
+  });
+
+  test('view properties: the lab index "view" entry, replaced by ?view=; a missing view is not fatal', async () => {
+    const index = { labs: [{ id: 'a', facts: 'a/facts.json', view: 'a/view.json' }, { id: 'b', facts: 'b/facts.json' }] };
+    const { fetchFn } = stub({
+      'https://example.test/site/labs/index.json': index,
+      'https://example.test/site/labs/a/facts.json': 'A',
+      'https://example.test/site/labs/a/view.json': '{"camera":"top"}',
+      'https://example.test/site/labs/b/facts.json': 'B',
+      'https://example.test/site/mine.view.json': '{"camera":"iso"}',
+    });
+    const own = await loadFromParams(labParams('?lab=a'), { base: BASE, fetch: fetchFn });
+    expect(own.index.labs[0].view).toBe('https://example.test/site/labs/a/view.json');
+    expect(own.lab).toMatchObject({ factsText: 'A', viewText: '{"camera":"top"}', viewError: null });
+    expect(own.view).toBeNull();
+    const given = await loadFromParams(labParams('?lab=a&view=mine.view.json'), { base: BASE, fetch: fetchFn });
+    expect(given.view).toBe('https://example.test/site/mine.view.json');
+    expect(given.lab.viewText).toBe('{"camera":"iso"}');
+    const none = await loadFromParams(labParams('?lab=b'), { base: BASE, fetch: fetchFn });
+    expect(none.lab).toMatchObject({ viewText: null, viewError: null });
+    const missing = await loadFromParams(labParams('?facts=labs/b/facts.json&view=gone.json'), { base: BASE, fetch: fetchFn });
+    expect(missing.lab.factsText).toBe('B');
+    expect(missing.lab.viewError).toMatch(/gone\.json: HTTP 404; view properties left at their defaults/);
+  });
+
+  test('?view= is fetched once: a view the page already loaded is passed in, not fetched again', async () => {
+    const { fetchFn, calls } = stub({ 'https://example.test/site/a.json': 'A', 'https://example.test/site/v.json': '{"camera":"top"}' });
+    const loadedView = await loadView(fetchFn, 'https://example.test/site/v.json');
+    const out = await loadFromParams(labParams('?facts=a.json&view=v.json'), { base: BASE, fetch: fetchFn, loadedView });
+    expect(out.lab.viewText).toBe('{"camera":"top"}');
+    expect(calls.filter((u) => u.endsWith('/v.json'))).toHaveLength(1);
+    const again = await loadLab(fetchFn, { id: 'a', facts: 'https://example.test/site/a.json', view: 'https://example.test/site/other.json' }, loadedView);
+    expect(again.viewText).toBe('{"camera":"top"}');
+    expect(calls.filter((u) => u.endsWith('/v.json') || u.endsWith('/other.json'))).toHaveLength(1);
   });
 
   test('?lab= alone uses labs/index.json beside the page', async () => {

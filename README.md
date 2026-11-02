@@ -371,6 +371,7 @@ private GitHub Pages included. Put your facts files beside it and point the page
 | `index.html?labs=labs/index.json` | the default lab of a lab index, with a picker for the others |
 | `index.html?labs=labs/index.json&lab=core` | lab `core` of that index |
 | `index.html?lab=core` | lab `core` of `labs/index.json` beside the page |
+| `index.html?lab=core&view=card.view.json` | the same with those [view properties](#view-properties) (also as URL parameters: `&preset=card-frames`) |
 | `index.html` | the default lab of `labs/index.json` beside the page when the site stages one, else the bundled example; *Load your facts.json* still opens a local file |
 
 A lab index lists facts files (URLs relative to the index). Its default lab, the one `?labs=` and a
@@ -380,7 +381,7 @@ bare `index.html` open, is the lab marked `"default": true`, else the one the in
 ```json
 {
   "labs": [
-    {"id": "core", "title": "Core lab", "facts": "core/facts.json", "positions": "core/positions.json", "default": true},
+    {"id": "core", "title": "Core lab", "facts": "core/facts.json", "positions": "core/positions.json", "view": "core/view.json", "default": true},
     {"id": "metro", "title": "Metro ring", "facts": "metro/facts.json"}
   ]
 }
@@ -407,6 +408,64 @@ In CI, for example a GitHub Pages workflow:
 
 Then link to `.../index.html` (it opens the index's default lab) or `.../index.html?lab=<id>`. The
 page fetches the facts from the same site, so they stay as private as the site that serves them.
+
+## View properties
+
+A view file says what to show of a facts file, so a site or a lab card never computes a layout or
+draws a diagram itself: which layers, the 2D frames a card rotates through (one per layer), the 3D
+snapshot, the layout and the camera. Its schema is
+[`view-v1.schema.json`](src/saos_network_facts/schema/view-v1.schema.json) (`view_version` 1.0),
+the defaults and presets are in [`view-presets-v1.json`](src/saos_network_facts/schema/view-presets-v1.json).
+Every property is optional:
+
+```json
+{
+  "view_version": "1.0",
+  "preset": "card-frames",
+  "layers": ["physical", "ring", "igp", "mpls", "pw", "cfm"],
+  "frames": {"rule": "list", "list": ["igp", "ring", "pw", "cfm"], "start": "signature", "period_s": 5},
+  "snapshot": {"variant": "exploded"},
+  "layout": {"algorithm": "hints", "hints": {"PE1": [0, 0], "P1": [1, 0]}, "aspect": "card", "max_columns": 4},
+  "plain": true,
+  "camera": "fit"
+}
+```
+
+| Property | Values (default first) |
+|---|---|
+| `preset` | `card-frames` (rotating 2D frames for a lab card), `lab-snapshot` (the exploded 3D snapshot, full screen, iso camera), `protocol-stack` (every layer as a stacked plane) |
+| `layers` | the layers that may be shown: `physical`, `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
+| `frames.rule` | `auto` (one frame per shown layer with content, in the order above), `list` (the layers of `frames.list`, in that order) |
+| `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport), `first`, or a layer |
+| `frames.period_s` | `4`: seconds per frame, a hint (a consumer may pause offscreen or for reduced motion) |
+| `snapshot.variant` | `exploded`, `stacked` |
+| `layout.algorithm` | `auto`, `force`, `hints` (`layout.hints`: device name to `[x, y]`, y down, as a positions file) |
+| `layout.aspect` | `free`, `card` (wrap at `layout.max_columns`, default 6, so text stays readable on a card), `wide` |
+| `plain` | `true`: devices without facts drawn as plain boxes with their name |
+| `camera` | `fit`, `top`, `iso` |
+| `title` | `null` (named after the lab) |
+
+A view is resolved by merging, lowest first: the defaults, the preset, the view file, then URL
+parameters. Objects merge property by property, lists replace, `layout.hints` add device by device. An
+unknown property or a bad value is reported and ignored (the lower value stays), never fatal.
+
+The viewer reads the view of a lab from the lab index (`"view": "core/view.json"`, relative to the
+index), or from `?view=<url>` (which replaces it), then these URL parameters: `preset`, `title`,
+`layers` and `frames` (comma-separated; `frames` sets the rule to `list`), `start`, `period`, `variant`,
+`layout`, `aspect`, `columns`, `plain` (`1` / `0`), `camera`; for example
+`index.html?lab=core&preset=card-frames&frames=igp,ring`. Today the 3D page applies `layers` (the
+layer toggles start from it) and exposes the whole resolved view, with its warnings, as
+`window.netfactsView`; the frames, snapshot, layout and camera properties are for the renderers that
+read them. From JavaScript:
+
+```ts
+import { resolveView, viewFrames } from "@ciena/saos-network-facts";
+
+const { view, warnings } = resolveView(viewFileJson, location.search);   // both optional
+viewFrames(view, ["physical", "igp", "pw"]);   // { frames: ["physical", "igp", "pw"], start: "pw" }
+```
+
+In Python, `saos_network_facts.schema.view_errors(view)` validates a view file.
 
 ## Reading facts from JavaScript / TypeScript
 

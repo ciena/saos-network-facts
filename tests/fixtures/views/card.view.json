@@ -1,0 +1,6 @@
+{
+  "view_version": "1.0",
+  "preset": "card-frames",
+  "frames": {"rule": "list", "list": ["igp", "ring", "pw", "cfm"], "start": "signature", "period_s": 5},
+  "layout": {"max_columns": 3}
+}

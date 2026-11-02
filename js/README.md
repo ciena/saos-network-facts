@@ -11,6 +11,8 @@ import { parseFacts, devicesByName, interfacesOnPort, isRouted, loopbacks, bgpPe
   from "@ciena/saos-network-facts";                          // anywhere: no Node APIs
 import type { FactsFile, DeviceFacts } from "@ciena/saos-network-facts";
 import schema from "@ciena/saos-network-facts/schema" with { type: "json" };
+import { resolveView, viewFrames, viewFromParams, LAYER_IDS, VIEW_DEFAULTS, VIEW_PRESETS } from "@ciena/saos-network-facts";
+import viewSchema from "@ciena/saos-network-facts/view-schema" with { type: "json" };
 ```
 
 - `parseFacts(jsonOrValue)` / `readFacts(file)`: a schema 1.x file; a pre-schema bare list of device
@@ -42,4 +44,11 @@ import schema from "@ciena/saos-network-facts/schema" with { type: "json" };
   port each interface is cabled to, `ignored_commands`; empty for older files);
   `hostGateway(host, "ipv4" | "ipv6")`: its default gateway in that family, or null.
 
-Types and `schema/` are generated from the Python package's schema (`npm run generate`).
+- `resolveView(view?, urlParams?)`: view properties (view schema 1.x, see the main README) merged from
+  the defaults, the preset, the view file (JSON value or text) and URL parameters (a query string,
+  `URLSearchParams` or an object), as `{ view, warnings }`: every property set; unknown properties and
+  bad values are listed in `warnings` and ignored, never thrown. `viewFromParams(params)`: the partial
+  view the URL parameters ask for. `viewFrames(view, presentLayers)`: the frames a card shows and the
+  one to start on.
+
+Types, `schema/` and the view presets are generated from the Python package's schemas (`npm run generate`).

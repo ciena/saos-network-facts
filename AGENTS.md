@@ -13,8 +13,9 @@ facts file. Python extractor + CLI in `src/saos_network_facts/`, npm reader in `
 | `src/saos_network_facts/saos10.py` | walker over the SAOS 10 translator's pivot JSON |
 | `src/saos_network_facts/translator.py` | MCP-over-HTTP client for `convert_cli` / `convert_xml`, local-checkout backend; `DEFAULT_TRANSLATOR_URL` |
 | `src/saos_network_facts/extract.py` | inputs (configs, clab, platform map) -> devices -> records, file merging, status |
-| `src/saos_network_facts/schema/facts-v1.schema.json` | **the** schema (single source) |
-| `js/` | npm package: schema copy, generated types (`src/generated/facts.ts`), reader (`src/index.ts`, `src/node.ts`) |
+| `src/saos_network_facts/schema/facts-v1.schema.json` | **the** facts schema (single source) |
+| `src/saos_network_facts/schema/view-v1.schema.json`, `view-presets-v1.json` | the view properties schema, its defaults and presets (single source; resolved by `js/src/view.ts`) |
+| `js/` | npm package: schema copies, generated types (`src/generated/`), reader (`src/index.ts`, `src/node.ts`), view resolver (`src/view.ts`) |
 | `viewer/` | the 3D viewer site (Vite + three.js): importer `src/import/facts.js`, URL loading `src/labs.js`, engine `src/engine/` |
 | `tests/fixtures/` | synthetic labs, recorded translator replies, expected facts files |
 | `examples/adaptive-sr-cfm/` | the published example: rendered lab configs, platform map, facts.json, SOURCE.md |

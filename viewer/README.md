@@ -31,7 +31,8 @@ Node 22.18 or later.
 |---|---|
 | `src/import/facts.js` | facts file -> engine topology, and the import report |
 | `src/import/layout.js` | node positions: a layout of the links, or authored positions scaled into the scene |
-| `src/labs.js` | facts by URL: `?facts=`, `?positions=`, `?labs=`, `?lab=` and the lab index |
+| `src/labs.js` | facts by URL: `?facts=`, `?positions=`, `?labs=`, `?lab=`, `?view=` and the lab index |
+| `src/viewprops.js` | view properties: the resolved view (lab view file, `?view=`, URL parameters), the layers it shows |
 | `labs.config.js` | the labs the build stages as `labs/index.json` (vite plugin; the dev server serves them too) |
 | `src/engine/` | the network model: IS-IS, OSPF, SR-MPLS and SR policies, MPLS-TP, SRv6 / Flex-Algo, BGP and L3VPN (VRFs, hosts), VPWS, EVPN, CFM, G.8032, LAG, walks, failure replay |
 | `src/view/` | the three.js layers, the walk animation and the engine's per-node tables |
