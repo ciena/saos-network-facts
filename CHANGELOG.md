@@ -17,6 +17,32 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-02
+
+### Added
+
+- **npm reader: `layoutFacts(model, layout?)`, the layout computed from the facts** — where the devices go,
+  for a view's `layout`, so every renderer (the 3D page now, the 2D frames and the snapshot to come) shares
+  one picture and no consumer authors one. `algorithm` auto: the core (the IGP routers, else the G.8032
+  ring, else the longest cycle, with a plain box in its path) as a two-row ladder on the ring or the core's
+  longest cycle, at the rotation and split that keep the other core links short and uncrossed and the
+  devices facing customers at the row ends (columns by hops when the core has no cycle); CEs, hosts and
+  plain boxes (`drawnNodes` / `drawnLinks`) hung outward. `aspect` card keeps it within `max_columns` columns: a ring too long for the
+  ladder runs round a rectangle, a chain wraps into bands, outer devices hang above and below. `hints`
+  are used only when they place every device (else reported and ignored); `force` is the force-directed
+  layout the page had (`forceLayout`). Deterministic: the same devices and links in any order give the
+  same positions. Runs in Node and the browser (no dependencies).
+
+### Changed
+
+- **Viewer: the 3D page lays labs out with `layoutFacts`** — by default, instead of the force-directed
+  layout, following the view's `layout` (`?layout=force` or a view file brings the old layout back; a
+  positions file that places every device still wins). The Import tab says which layout placed the
+  devices and the core it chose; `window.netfactsView.layout` carries the result. The view schema's
+  descriptions of `layout` say what the properties now do (view 1.0, no change to what validates).
+  Plain boxes and their links take part in the layout (a line system between two routers sits in the
+  core). The expected fixture files only gain the new version.
+
 ## [0.13.1] - 2026-11-02
 
 ### Fixed
@@ -52,7 +78,6 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 - **Fixtures** — a new clab lab `labs/plain-box` (the sr-l2 PEs with a line system of kind `generic_vm`
   between them; no new translator calls), a test fixture only (not in the site's lab menu). The other expected
   files only gain the new version.
-
 ## [0.12.0] - 2026-11-02
 
 ### Added

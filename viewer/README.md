@@ -30,7 +30,7 @@ Node 22.18 or later.
 | Path | |
 |---|---|
 | `src/import/facts.js` | facts file -> engine topology, and the import report |
-| `src/import/layout.js` | node positions: a layout of the links, or authored positions scaled into the scene |
+| `src/import/layout.js` | node positions: the library's layout of the facts (`layoutFacts`, the view's `layout`), or authored positions, scaled into the scene |
 | `src/labs.js` | facts by URL: `?facts=`, `?positions=`, `?labs=`, `?lab=`, `?view=` and the lab index |
 | `src/viewprops.js` | view properties: the resolved view (lab view file, `?view=`, URL parameters), the layers it shows |
 | `labs.config.js` | the labs the build stages as `labs/index.json` (vite plugin; the dev server serves them too) |
@@ -50,7 +50,7 @@ pseudowire or an EVPN instance, has a VRF other than a management VRF, or faces 
 routers, whatever their name, a BGP route reflector shown as P / RR); IS-IS
 metrics (each end's wide, else narrow, metric at the level the view runs; 10 where not configured)
 and OSPF costs where not configured; CFM level and CCM interval when not configured;
-positions unless authored. MPLS-TP tunnels are stitched from each node's segment (ingress, then
+positions unless authored (the library's layout: the core as a ladder, the rest hung outward). MPLS-TP tunnels are stitched from each node's segment (ingress, then
 the neighbour on the forward next hop with the matching label, to the egress). Signalled PW labels
 and LFIBs are computed by the engine from the RFCs; static PW and tunnel labels are the configured ones.
 

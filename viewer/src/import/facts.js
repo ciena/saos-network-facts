@@ -41,7 +41,7 @@ import { CCM_INTERVALS_MS } from '../engine/cfm.js';
 import { hostPrefix, ip6ToBig, isV6, networkOf } from '../engine/ip.js';
 import { BACKBONE, normArea } from '../engine/ospf.js';
 import { rfcVendor } from '../engine/vendor.js';
-import { layoutNodes, scalePositions } from './layout.js';
+import { placeLayout, scalePositions } from './layout.js';
 
 const DEFAULT_METRIC = 10;
 
@@ -1112,27 +1112,32 @@ function buildServices(pseudowires, megs) {
   }));
 }
 
-// Node positions: the authored ones when they place every device (see layout.js
-// scalePositions), else a force-directed layout of the links. Plain boxes take part in the computed
-// layout; authored positions that leave one out put it beside the devices it is cabled to.
-function placeNodes(nodes, links, positions, report, plain = { nodes: [], links: [] }) {
+// Node positions: the authored ones when they place every device (see layout.js scalePositions),
+// else the library's layout of the view's `layout` (js/src/layout.ts layoutFacts), plain boxes and
+// their links included (a plain box between two core devices is core). Authored positions that
+// leave out only plain boxes put them beside the devices they are cabled to.
+// -> { pos: scene positions by id, layout: the library's result, or null for a positions file }
+function placeNodes(nodes, links, rings, positions, layout, report, plain = { nodes: [], links: [] }) {
   const ids = nodes.map((n) => n.id);
   const plainIds = plain.nodes.map((n) => n.id);
   if (positions) {
     const all = scalePositions([...ids, ...plainIds], positions);
     if (!all.missing.length) {
       report.add('physical', 'authored', 'positions', 'from the positions file');
-      return all.pos;
+      return { pos: all.pos, layout: null };
     }
     const { pos, missing } = scalePositions(ids, positions);
     if (!missing.length) {
       report.add('physical', 'authored', 'positions', `from the positions file; ${all.missing.join(', ')} (plain) beside the devices cabled to them`);
-      return { ...pos, ...placePlain(plain, pos) };
+      return { pos: { ...pos, ...placePlain(plain, pos) }, layout: null };
     }
     report.warn(`positions: no position for ${missing.join(', ')}; the layout is computed instead`);
   }
-  report.add('physical', 'derived', 'positions', 'the facts carry no layout: a force-directed layout of the links');
-  return layoutNodes([...ids, ...plainIds], [...links, ...plain.links].map((l) => [l.a.node, l.b.node]));
+  const { pos, result } = placeLayout({ nodes: [...nodes, ...plain.nodes], links: [...links, ...plain.links], rings }, layout);
+  for (const w of result.warnings) report.warn(w);
+  if (result.method === 'hints') report.add('physical', 'authored', 'positions', 'from the view\'s layout hints');
+  else report.add('physical', 'derived', 'positions', `the facts carry no layout: ${result.description}${result.core.length ? ` (core: ${result.core.join(', ')})` : ''}`);
+  return { pos, layout: result };
 }
 
 // A plain box the positions file leaves out: a little off the middle of the devices it is cabled to;
@@ -1187,10 +1192,11 @@ function plainLinks(file, plain, nodes, report) {
   return links;
 }
 
-// facts file (JSON text or value) -> { topology, file, devices, services, labelMode, report }
-// `positions`: optional authored node positions (layout.js scalePositions). `plain` (the view
-// property, default true): devices without facts as plain boxes (topology.plain), false leaves them out.
-export function importFacts(input, { name, positions, plain: showPlain = true } = {}) {
+// facts file (JSON text or value) -> { topology, file, devices, services, labelMode, layout, report }
+// `positions`: optional authored node positions (layout.js scalePositions); `layout`: a view's layout
+// properties (algorithm, hints, aspect, max_columns), default auto. `plain` (the view property,
+// default true): devices without facts as plain boxes (topology.plain), false leaves them out.
+export function importFacts(input, { name, positions, layout, plain: showPlain = true } = {}) {
   const file = parseFacts(input);
   const devices = devicesByName(file);
   const report = new Report();
@@ -1242,8 +1248,8 @@ export function importFacts(input, { name, positions, plain: showPlain = true } 
     report.add('ospf', noRid.length ? 'default' : 'facts', 'router ids', noRid.length ? `${noRid.join(', ')}: no router id configured, the loopback is used` : 'ospf instance router-id');
   }
 
-  const placed = placeNodes(nodes, links, positions, report, plain);
-  for (const n of [...nodes, ...plain.nodes]) n.pos = placed[n.id];
+  const placed = placeNodes(nodes, links, rings, positions, layout, report, plain);
+  for (const n of [...nodes, ...plain.nodes]) n.pos = placed.pos[n.id];
 
   const recipe = file.devices.find((r) => r.recipe)?.recipe;
   // Labels: SR-MPLS with an SRGB; static only when MPLS-TP tunnels carry every pseudowire; else LDP.
@@ -1275,6 +1281,7 @@ export function importFacts(input, { name, positions, plain: showPlain = true } 
     devices,
     services: buildServices(pseudowires, megs),
     labelMode,
+    layout: placed.layout,
     report: { topology, gaps: report.gaps, warnings: report.warnings },
   };
 }

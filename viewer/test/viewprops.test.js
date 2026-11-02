@@ -25,9 +25,10 @@ describe('view properties on the page', () => {
   });
 
   test('plain boxes by default; plain false (view file or ?plain=0) leaves them out', () => {
-    expect(importOptions(pageView(null, null, '').view)).toEqual({ plain: true });
-    expect(importOptions(pageView('{"plain":false}', null, '').view)).toEqual({ plain: false });
-    expect(importOptions(pageView(null, null, '?plain=0').view)).toEqual({ plain: false });
-    expect(importOptions(pageView('{"plain":false}', null, '?plain=1').view)).toEqual({ plain: true });
+    expect(importOptions(pageView(null, null, '').view)).toMatchObject({ plain: true });
+    expect(importOptions(pageView('{"plain":false}', null, '').view)).toMatchObject({ plain: false });
+    expect(importOptions(pageView(null, null, '?plain=0').view)).toMatchObject({ plain: false });
+    expect(importOptions(pageView('{"plain":false}', null, '?plain=1').view)).toMatchObject({ plain: true });
+    expect(importOptions(pageView(null, null, '?aspect=card&columns=3').view).layout).toEqual({ algorithm: 'auto', hints: {}, aspect: 'card', max_columns: 3 });
   });
 });
