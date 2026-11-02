@@ -23,6 +23,21 @@ const minDistance = (positions) => {
   for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) min = Math.min(min, Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y));
   return min;
 };
+// Links that run through a device (not at their ends).
+const through = (model, positions) => {
+  const out = [];
+  for (const l of model.links) {
+    const [a, b] = [l.a.node, l.b.node];
+    const p = positions[a], q = positions[b];
+    for (const [id, r] of Object.entries(positions)) {
+      if (id === a || id === b) continue;
+      const dx = q.x - p.x, dy = q.y - p.y, len = dx * dx + dy * dy;
+      const t = len ? Math.max(0, Math.min(1, ((r.x - p.x) * dx + (r.y - p.y) * dy) / len)) : 0;
+      if (Math.hypot(r.x - p.x - t * dx, r.y - p.y - t * dy) < 0.15 && t > 0.02 && t < 0.98) out.push(`${a}-${b} through ${id}`);
+    }
+  }
+  return out;
+};
 const spanX = (positions) => Math.max(...Object.values(positions).map((p) => p.x)) - Math.min(...Object.values(positions).map((p) => p.x));
 // What the page lays out: every drawn device and link (plain boxes included) and the rings.
 const modelOf = (topo) => ({ nodes: drawnNodes(topo), links: drawnLinks(topo), rings: topo.rings });
@@ -45,11 +60,12 @@ describe('layout of every fixture lab and the example', () => {
         }
       });
 
-      test('no two devices overlap', () => {
+      test('no two devices overlap, and no link runs through a device', () => {
         for (const [view, layout] of Object.entries(views)) {
           const { positions } = layoutFacts(topo, layout);
           expect(Object.keys(positions).sort(), view).toEqual(topo.nodes.map((n) => n.id).sort());
           if (topo.nodes.length > 1) expect(minDistance(positions), view).toBeGreaterThanOrEqual(0.5);
+          expect(through(topo, positions), view).toEqual([]);
         }
         const scene = topo.nodes.map((n) => n.pos);
         for (let i = 0; i < scene.length; i++) for (let j = i + 1; j < scene.length; j++) expect(Math.hypot(scene[i].x - scene[j].x, scene[i].z - scene[j].z)).toBeGreaterThan(2);

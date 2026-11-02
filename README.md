@@ -442,7 +442,7 @@ Every property is optional:
 | `frames.period_s` | `4`: seconds per frame, a hint (a consumer may pause offscreen or for reduced motion) |
 | `snapshot.variant` | `exploded`, `stacked` |
 | `layout.algorithm` | `auto` (computed from the facts, below), `force` (force-directed), `hints` |
-| `layout.hints` | `{}`: device name to `[x, y]`, y down, as a positions file; used only when they place every device (with `auto` or `hints`) |
+| `layout.hints` | `{}`: device name to `[x, y]`, y down, as a positions file; used when they place every device (with `auto` or `hints`): a hint for `LS` places `LS-O-1`, `LS-T-1`… when there is no device `LS`, and plain boxes without a hint go beside their neighbours |
 | `layout.aspect` | `free`, `card` (at most `layout.max_columns` columns, default 6, so text stays readable on a card), `wide` (as `free`) |
 | `plain` | `true`: devices without facts drawn as plain boxes with their name |
 | `camera` | `fit`, `top`, `iso` |
@@ -466,16 +466,21 @@ The layout (`algorithm` `auto`) is computed from the facts, deterministically (t
 same positions), and shared by every renderer:
 
 1. **The core**: the IGP routers (P and PE); in a lab without one, the G.8032 ring members; else the
-   devices on the longest cycle. A plain box between two core devices is core too.
+   devices on the longest cycle; else (a chain or a tree) the devices that link others. A plain box
+   between two core devices is core too, and so is a second cycle linked to the core (such as MPLS-TP
+   nodes without an IGP on a ring of their own).
 2. **A ladder**: the ring (else the core's longest cycle) as a racetrack of two rows, at the rotation
    and split that keep the other core links short and uncrossed and put the devices facing customers at
    the row ends; core devices off it sit between the rows. A core without a cycle is laid out in
    columns by hops.
 3. **Everything else** (CEs, hosts, plain boxes) hangs off its core neighbour, outward: sideways off a
-   row end, else up from the top row and down from the bottom row.
+   row end, else up from the top row and down from the bottom row; a dual-homed device sits between its
+   two neighbours.
+4. **No device on a link**: a spot on a link, or whose own links would run through a device, is never
+   taken; a last pass swaps or moves devices while that removes crossings.
 
 With `aspect` `card`, nothing is wider than `max_columns` columns: a ring too long for the ladder runs
-round a rectangle that wide, a chain wraps into bands, and outer devices hang above and below, so a
+round a rectangle that wide (its rows, sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
 10-device lab stays readable on a ~330 px card (the `card-frames` preset: 4 columns). From JavaScript:
 
 ```ts

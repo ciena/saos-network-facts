@@ -27,9 +27,16 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   ring, else the longest cycle, with a plain box in its path) as a two-row ladder on the ring or the core's
   longest cycle, at the rotation and split that keep the other core links short and uncrossed and the
   devices facing customers at the row ends (columns by hops when the core has no cycle); CEs, hosts and
-  plain boxes (`drawnNodes` / `drawnLinks`) hung outward. `aspect` card keeps it within `max_columns` columns: a ring too long for the
-  ladder runs round a rectangle, a chain wraps into bands, outer devices hang above and below. `hints`
-  are used only when they place every device (else reported and ignored); `force` is the force-directed
+  plain boxes (`drawnNodes` / `drawnLinks`) hung outward. A chain or tree with no router, ring or cycle is
+  laid out in columns by hops from the devices that link others (not a row by name); a second cycle linked
+  to the core joins it (MPLS-TP nodes without an IGP on a ring of their own); a device linked to two placed
+  devices sits between them; no device is put on a link or where its links would run through a device,
+  and a last pass swaps or moves devices while that removes crossings. `aspect` card keeps it within `max_columns` columns: a ring too long for the
+  ladder runs round a rectangle (row lengths, sides and rotation chosen like the ladder's), a chain wraps
+  into bands, outer devices hang above and below. `hints` are used when they place every device: a hint
+  for `NAME` places devices `NAME-*` that have none (a diagram with one box for a line system the facts list
+  shelf by shelf), plain boxes still without one go beside their neighbours; else they are reported and
+  ignored; `force` is the force-directed
   layout the page had (`forceLayout`). Deterministic: the same devices and links in any order give the
   same positions. Runs in Node and the browser (no dependencies).
 

@@ -24,6 +24,38 @@ const spanX = (positions: Record<string, Point>) => {
   const xs = Object.values(positions).map((p) => p.x);
   return Math.max(...xs) - Math.min(...xs);
 };
+const ends = (model: LayoutModel) =>
+  model.links.map((l) => [l.a, l.b].map((e) => (typeof e === "string" ? e : (e.node ?? e.device)!)) as [string, string]);
+// Links that run through a device (not at their ends), and pairs of links that cross.
+const through = (model: LayoutModel, positions: Record<string, Point>) => {
+  const out: string[] = [];
+  for (const [a, b] of ends(model)) {
+    const p = positions[a]!, q = positions[b]!;
+    for (const [id, r] of Object.entries(positions)) {
+      if (id === a || id === b) continue;
+      const dx = q.x - p.x, dy = q.y - p.y, len = dx * dx + dy * dy;
+      const t = len ? Math.max(0, Math.min(1, ((r.x - p.x) * dx + (r.y - p.y) * dy) / len)) : 0;
+      if (Math.hypot(r.x - p.x - t * dx, r.y - p.y - t * dy) < 0.15 && t > 0.02 && t < 0.98) out.push(`${a}-${b} through ${id}`);
+    }
+  }
+  return out;
+};
+const crossings = (model: LayoutModel, positions: Record<string, Point>) => {
+  const e = ends(model);
+  const o = (p: Point, q: Point, r: Point) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+  let n = 0;
+  for (let i = 0; i < e.length; i++) {
+    for (let j = i + 1; j < e.length; j++) {
+      const [a, b] = e[i]!, [c, d] = e[j]!;
+      if (new Set([a, b, c, d]).size < 4) continue;
+      const [p1, p2, p3, p4] = [a, b, c, d].map((id) => positions[id]!) as [Point, Point, Point, Point];
+      if (o(p1, p2, p3) * o(p1, p2, p4) < 0 && o(p3, p4, p1) * o(p3, p4, p2) < 0) n++;
+    }
+  }
+  return n;
+};
+const CARD = { aspect: "card", max_columns: 4 } as const;
+
 // Deterministic shuffle (reverse, then interleave), so the test itself is repeatable.
 const shuffle = <T>(list: T[]): T[] => {
   const r = [...list].reverse();
@@ -149,6 +181,139 @@ test("edge cases: no devices, one device, islands, links to unknown devices", ()
   assert.ok(minDistance(out.positions) >= 0.5);
   assert.ok(spanX(out.positions) <= 1);
   assert.equal(out.positions.LONE1!.y, out.positions.LONE2!.y);
+});
+
+// ---- the rules from laying out a large set of lab topologies -----------------------------------------
+
+test("no router, ring or cycle: the linked devices in columns by hops, not a row by name", () => {
+  // A chain of three switches (no IGP) with a stub on each end and one off the middle.
+  const lab: LayoutModel = {
+    nodes: ["ACC-1", "ACC-2", "AGG", "STUB-1", "STUB-2", "STUB-3"].map((id) => ({ id, role: "ce" })),
+    links: [{ a: "STUB-1", b: "ACC-1" }, { a: "ACC-1", b: "AGG" }, { a: "AGG", b: "ACC-2" }, { a: "ACC-2", b: "STUB-2" }, { a: "AGG", b: "STUB-3" }],
+  };
+  for (const layout of [{}, CARD]) {
+    const out = layoutFacts(lab, layout);
+    assert.equal(out.method, "columns");
+    assert.equal(out.description, "columns by hops (no router, ring or cycle)");
+    assert.deepEqual(out.core, ["ACC-1", "ACC-2", "AGG"]);
+    const p = out.positions;
+    assert.equal(p["ACC-1"]!.y, p.AGG!.y);
+    assert.equal(p.AGG!.y, p["ACC-2"]!.y);
+    assert.ok(Math.abs(p["ACC-1"]!.x - p["ACC-2"]!.x) === 2, "the chain runs across");
+    assert.deepEqual(through(lab, p), []);
+    assert.equal(crossings(lab, p), 0);
+    assert.ok(minDistance(p) >= 0.5);
+  }
+  // Two devices and a link: still columns.
+  assert.equal(layoutFacts({ nodes: [{ id: "A" }, { id: "B" }], links: [{ a: "A", b: "B" }] }).method, "columns");
+  // No link at all: a row.
+  assert.equal(layoutFacts({ nodes: [{ id: "A" }, { id: "B" }], links: [] }).method, "none");
+});
+
+test("a device linked to two placed devices sits between them, off their link", () => {
+  // A CE dual-homed to two PEs of a triangle core, and a second CE behind the first.
+  const lab: LayoutModel = {
+    nodes: [{ id: "P1", role: "p" }, { id: "PE1", role: "pe" }, { id: "PE2", role: "pe" }, { id: "PE3", role: "pe" }, { id: "PE4", role: "pe" }, { id: "CE-1", role: "ce" }, { id: "CE-9", role: "ce" }],
+    links: [
+      { a: "PE1", b: "PE2" }, { a: "PE1", b: "P1" }, { a: "PE2", b: "P1" }, { a: "P1", b: "PE3" }, { a: "P1", b: "PE4" },
+      { a: "CE-1", b: "PE1" }, { a: "CE-1", b: "PE2" }, { a: "CE-9", b: "PE3" },
+    ],
+  };
+  for (const layout of [{}, CARD]) {
+    const p = layoutFacts(lab, layout).positions;
+    const [a, b] = [p.PE1!, p.PE2!];
+    assert.ok(p["CE-1"]!.x >= Math.min(a.x, b.x) - 1e-9 && p["CE-1"]!.x <= Math.max(a.x, b.x) + 1e-9, `CE-1 between its PEs (${JSON.stringify(p)})`);
+    assert.deepEqual(through(lab, p), []);
+    assert.ok(minDistance(p) >= 0.5);
+  }
+});
+
+test("a second cycle linked to the core joins it (routers without an IGP on a ring of their own)", () => {
+  // Four IGP PEs on a square; four MPLS-TP nodes (no IGP, so not P or PE) on a square of their own,
+  // linked to two of the PEs; a CE dual-homed to the far side.
+  const lab = ringLab(4, { roles: "pe" });
+  for (const id of ["T1", "T2", "T3", "T4", "CE"]) lab.nodes.push({ id, role: "ce" });
+  lab.links.push({ a: "T1", b: "T2" }, { a: "T2", b: "T3" }, { a: "T3", b: "T4" }, { a: "T4", b: "T1" }, { a: "R1", b: "T1" }, { a: "R2", b: "T2" }, { a: "CE", b: "T3" }, { a: "CE", b: "T4" });
+  const out = layoutFacts(lab);
+  for (const id of ["T1", "T2", "T3", "T4"]) assert.ok(out.core.includes(id), id);
+  assert.equal(out.method, "ladder");
+  assert.deepEqual(through(lab, out.positions), []);
+  assert.equal(crossings(lab, out.positions), 0);
+  // A host on two routers is not a cycle of its own: it stays outside the core.
+  const hosted = ringLab(4, { roles: "pe" });
+  hosted.nodes.push({ id: "h1", role: "ce", host: true });
+  hosted.links.push({ a: "h1", b: "R1" }, { a: "h1", b: "R2" });
+  assert.ok(!layoutFacts(hosted).core.includes("h1"));
+});
+
+test("aspect card: the rectangle chooses its split, and an untangling pass removes crossings", () => {
+  // Four core switches fully meshed, a chain of four between two of them on each side (its ends
+  // linked to the other pair too), and a box on two of the core switches on each side: a 14-device
+  // cycle with many rungs (no IGP: the longest cycle is the core).
+  const nodes = ["C1", "C2", "C3", "C4", "E1", "E2", "E3", "E4", "W1", "W2", "W3", "W4", "X1", "X2"].map((id) => ({ id, role: "ce" }));
+  const pairs: Array<[string, string]> = [
+    ["C1", "C2"], ["C1", "C3"], ["C1", "C4"], ["C2", "C3"], ["C2", "C4"], ["C3", "C4"],
+    ["C1", "E1"], ["E1", "E2"], ["E2", "E3"], ["E3", "E4"], ["E4", "C2"], ["E1", "C3"], ["E4", "C4"],
+    ["C3", "W1"], ["W1", "W2"], ["W2", "W3"], ["W3", "W4"], ["W4", "C4"], ["W1", "C1"], ["W4", "C2"],
+    ["X1", "C1"], ["X1", "C3"], ["X2", "C2"], ["X2", "C4"],
+  ];
+  const lab: LayoutModel = { nodes, links: pairs.map(([a, b]) => ({ a, b })) };
+  const card = layoutFacts(lab, CARD);
+  assert.equal(card.method, "rectangle");
+  assert.ok(spanX(card.positions) <= 3 + 1e-9);
+  assert.ok(minDistance(card.positions) >= 0.5);
+  assert.deepEqual(through(lab, card.positions), []);
+  assert.ok(crossings(lab, card.positions) <= 5, `card crossings ${crossings(lab, card.positions)}`);
+  // A 10-device ring with two rungs fits a 4-column card without a crossing.
+  const ring = ringLab(10, { roles: "pe", ces: [1, 6] });
+  ring.links.push({ a: "R2", b: "R9" }, { a: "R4", b: "R7" });
+  const r = layoutFacts(ring, CARD);
+  assert.equal(crossings(ring, r.positions), 0);
+  assert.deepEqual(through(ring, r.positions), []);
+});
+
+test("no device lands on a link: hung, dual-homed and off-cycle devices avoid every placed link", () => {
+  const labs: LayoutModel[] = [];
+  for (const n of [4, 6, 8, 10, 12]) {
+    const lab = ringLab(n, { roles: "pe", ces: [1, 2, Math.ceil(n / 2)] });
+    lab.nodes.push({ id: "MID", role: "p" }, { id: "DUAL", role: "ce" }, { id: "HOST", role: "ce", host: true });
+    lab.links.push({ a: "MID", b: "R1" }, { a: "MID", b: `R${Math.ceil(n / 2) + 1}` }, { a: "DUAL", b: "R2" }, { a: "DUAL", b: "R3" }, { a: "HOST", b: "CE1" });
+    labs.push(lab);
+  }
+  for (const lab of labs) {
+    for (const layout of [{}, CARD, { aspect: "card", max_columns: 3 } as const]) {
+      const p = layoutFacts(lab, layout).positions;
+      assert.deepEqual(through(lab, p), [], `${lab.nodes.length} devices, ${JSON.stringify(layout)}`);
+      assert.ok(minDistance(p) >= 0.5);
+      if (layout !== CARD && "aspect" in layout) assert.ok(spanX(p) <= 2 + 1e-9);
+    }
+  }
+});
+
+test("hints: a hint for NAME places devices NAME-*, and plain boxes without a hint go beside their neighbours", () => {
+  // A diagram with one box for a line system the facts list shelf by shelf (LS-O-1, LS-T-1), and a
+  // plain box the diagram does not show.
+  const lab: LayoutModel = {
+    nodes: [{ id: "PE1", role: "pe" }, { id: "PE2", role: "pe" }, { id: "LS-O-1", plain: true }, { id: "LS-T-1", plain: true }, { id: "PATCH", plain: true }],
+    links: [{ a: "PE1", b: "LS-O-1" }, { a: "LS-O-1", b: "LS-T-1" }, { a: "LS-T-1", b: "PE2" }, { a: "PE2", b: "PATCH" }],
+  };
+  const hints = { PE1: [0, 0], LS: [200, 0], PE2: [400, 0] } as Record<string, [number, number]>;
+  const out = layoutFacts(lab, { hints });
+  assert.equal(out.method, "hints");
+  assert.deepEqual(out.warnings, []);
+  assert.equal(out.description, "the hints, scaled (LS-O-1, LS-T-1 at LS; PATCH beside their neighbours)");
+  const p = out.positions;
+  assert.ok(minDistance(p) >= 0.5);
+  assert.ok(p.PE1!.x < p["LS-O-1"]!.x && p["LS-T-1"]!.x < p.PE2!.x, "the shelves sit where the diagram has LS");
+  assert.ok(Math.hypot(p.PATCH!.x - p.PE2!.x, p.PATCH!.y - p.PE2!.y) < 1.5, "PATCH beside PE2");
+  // The same with a device of the facts (not a plain box) missing: the computed layout, with a warning.
+  const routers = { ...lab, nodes: [...lab.nodes, { id: "PE3", role: "pe" }], links: [...lab.links, { a: "PE3", b: "PE2" }] };
+  const partial = layoutFacts(routers, { hints });
+  assert.notEqual(partial.method, "hints");
+  assert.deepEqual(partial.warnings, ["layout hints place 4 of 6 devices (none for PATCH, PE3): the computed layout is used"]);
+  // A hint for a name that is itself a device covers only that device.
+  const own = layoutFacts({ nodes: [{ id: "LS" }, { id: "LS-1", role: "pe" }], links: [] }, { hints: { LS: [0, 0] } });
+  assert.notEqual(own.method, "hints");
 });
 
 test("longestCycle: the longest simple cycle from its smallest name", () => {
