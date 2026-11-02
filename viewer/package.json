@@ -1,10 +1,6 @@
 {
   "name": "saos-network-facts-viewer",
-<<<<<<< HEAD
-  "version": "0.13.1",
-=======
   "version": "0.14.0",
->>>>>>> 3bc403f (Layout computed from the facts: layoutFacts, the 3D page's default (0.14.0))
   "private": true,
   "description": "3D view of a saos-network-facts facts file: physical, IS-IS, SR policy, BGP, pseudowire and CFM layers over one topology.",
   "license": "Apache-2.0",

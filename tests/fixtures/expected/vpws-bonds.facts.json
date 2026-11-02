@@ -277,7 +277,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.13.1"
+    "version": "0.14.0"
   },
   "hosts": [
     {
