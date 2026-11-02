@@ -17,6 +17,47 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-02
+
+### Added
+
+- **Schema 1.9.0: sites, line systems, link labels and notes** — what no configuration says and a drawing
+  needs, written by the caller (from its own inventory) in a new `extract --extra FILE` (YAML or JSON:
+  `devices: {NAME: {type, role, site}}`, `links: [{a, b, kind, label}]`, `notes: [{text, device, layer}]`)
+  and carried into the facts as given; the library reads no inventory. New optional fields (1.8 files stay
+  valid): `devices[].site` and `role`, `hosts[].site`, `links[].kind` (`ethernet`, `optical`, `lag`) and
+  `label`, and a top-level `notes[]` (`{text, device?, layer?}`: in the facts rather than the view because
+  they describe one lab, while a view is a presentation many labs share). A name no other input knows is a
+  device record with its type and role and no facts (`status` `skipped`): a line-system member; a link on
+  the same two ports as a topology link gives it its kind and label; a typo (an unknown name or key) is an
+  error before anything is extracted. npm reader: `sites(file)`, `notes(file, { layer, device })`.
+- **Viewer, frames and snapshot draw them** — optical spans as a blue double line (the 3D page: a blue
+  tube) with their label, staggered on parallel spans, the port pills kept where they fit; line-system
+  members as solid blue boxes tagged with their role (ROADM, AMP, OT) and no "plain box" warning; a dashed
+  frame round each site's devices (strong on the physical frame, faint on the others; on the snapshot's
+  physical plane; on the 3D page's physical plane); notes in yellow on their layer (physical when the
+  drawing has no such layer): beside their device with a leader line on a frame, numbered on the snapshot
+  with the text in the plane's corner, above the device on the 3D page; free notes along the bottom edge.
+  The Device and Overview panels name a member by its role and show its site and spans.
+- **View schema 1.2: the `optical` layer, under physical** — with line-system members or optical spans, the
+  3D page, the frames and the snapshot have an optical plane / frame below the physical one: the members,
+  the spans with their labels and the routers at their ends (their risers start there). The physical layer
+  keeps the routers and the links between them, and a routed link whose two ports are cabled by optical
+  spans says it rides the line system (`over ch 25`); the other layers leave the line system out. A note
+  without a layer goes with its device (optical for a member). A view whose `layers` leave `optical` out
+  draws the line system on the physical layer. `LAYER_IDS` starts with `optical` (the defaults list it);
+  older views stay valid. Labs without a line system draw as before (their snapshots change only in the
+  embedded riser script, which now starts a riser on the lowest plane its device is on).
+- **Layout: a chain of plain boxes between two routers is core** — an optical line system (a ROADM,
+  amplifiers, a ROADM) between two PEs now joins the ladder with them instead of hanging in loose columns
+  (a single plain box between two core devices already did). Layouts of labs without such a chain are
+  unchanged.
+- **Fixture `line-system`** — the sr-l2 PEs with their core link over an optical line system given by
+  `labs/line-system/extra.yaml` (three members, five spans, two sites, two notes; synthetic): golden facts,
+  golden frames and snapshot, checked headless in Chromium and Firefox. It is in the site's lab menu, the
+  first published lab with plain boxes (the rule that kept them out of the menu is dropped: a feature the
+  library has is demoed).
+
 ## [0.17.1] - 2026-11-02
 
 ### Fixed

@@ -34,6 +34,11 @@ export const LABS = [
     title: 'L3VPN with Linux hosts and a management VRF (fixture, links from --clab)',
     source: '../tests/fixtures/expected/l3vpn-hosts.facts.json',
   },
+  {
+    id: 'line-system',
+    title: 'Optical line system, sites and notes (fixture, plain boxes from --extra)',
+    source: '../tests/fixtures/expected/line-system.facts.json',
+  },
 ];
 
 // The files to stage: labs/index.json and one facts.json per lab, as { path: text }.

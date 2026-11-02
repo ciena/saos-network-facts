@@ -12,13 +12,14 @@
 //   <img src="frames.svg">        the start frame (the view's frames.start, by default the signature layer)
 // A page that inlines the SVG can show one group at a time itself (a card that rotates).
 
-import { deviceDetail } from './model.js';
+import { deviceDetail, equipmentTag, layerModel, noteLayerOf, wrapNote } from './model.js';
 
 const C = {
   ink: '#1d2430', mute: '#5b6675', ghost: '#c3cad3', ghostInk: '#8a94a3',
   p: '#1f5fa8', pe: '#c8202f', ce: '#4b7f52', l2: '#6a5acd', host: '#3d7f8f', plain: '#8a94a3',
   link: '#69768a', ring: '#d29a1e', subRing: '#4f9fe8', rpl: '#f0883e', igp: '#2e9e5b',
   mpls: '#b7791f', srv6: '#e8590c', pw: '#d63384', cfm: '#1a9fae', bgp: '#7d4cc2', vrf: '#5b5fc7', evpn: '#a65fd6',
+  optical: '#3b5bdb', site: '#7a8696', note: '#fff6d5', noteEdge: '#d9a400',
 };
 const ROLE_TAG = { p: 'P', pe: 'PE', ce: 'CE', l2: 'L2', host: 'H', plain: '?' };
 const ALGO = ['#e8590c', '#1c7ed6', '#2f9e44', '#c2255c'];
@@ -30,9 +31,15 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export function frameTitle(id, m) {
   const igpName = m.igp === 'ospf' ? 'OSPF' : 'IS-IS';
   switch (id) {
+    case 'optical': {
+      const members = m.nodes.filter((n) => n.member).length;
+      const spans = m.links.filter((l) => l.medium === 'optical').length;
+      return `Optical · ${plural(members, 'line-system member')}, ${plural(spans, 'span')}${m.sites.length ? ` · ${plural(m.sites.length, 'site')}` : ''}`;
+    }
     case 'physical': {
       const oses = [...new Set(m.nodes.map((n) => n.os).filter(Boolean))];
-      return `Physical · ${plural(m.nodes.length, 'device')}${oses.length === 1 ? ` (${oses[0]})` : ''}, ${plural(m.links.length, 'link')}`;
+      const optical = m.links.filter((l) => l.medium === 'optical').length;
+      return `Physical · ${plural(m.nodes.length, 'device')}${oses.length === 1 ? ` (${oses[0]})` : ''}, ${plural(m.links.length, 'link')}${optical ? ` (${optical} optical)` : ''}${m.sites.length ? ` · ${plural(m.sites.length, 'site')}` : ''}`;
     }
     case 'ring':
       return `G.8032 · ${m.rings.map((r) => `${r.name}${r.vid != null ? ` (VID ${r.vid})` : ''}`).join(', ')}`;
@@ -73,15 +80,21 @@ export function renderFrames(m, positions, { frames, start }) {
   // font units so three label lines fit between rows.
   const f = Math.round(13 * Math.max(1, ((maxX - minX) * 160 + 300) / 760));
   const U = Math.max(160, f * 9.4), V = f * 7.6;
-  const mx = f * 5.5, myTop = f * 7.4, myBot = f * 6.6;
-  const titles = Object.fromEntries(frames.map((id) => [id, frameTitle(id, m)]));
+  // A site frame's name sits on its top edge, above the device labels: a line more at the top.
+  const mx = f * 5.5, myTop = f * (m.sites.length ? 8.6 : 7.4), myBot = f * 6.6;
+  // An optical frame takes the line system off the others (render/model.js layerModel).
+  const split = frames.includes('optical');
+  const titles = Object.fromEntries(frames.map((id) => [id, frameTitle(id, layerModel(m, id, split))]));
   // Wide enough for the longest title, so a small lab keeps its titles whole.
   const W = Math.ceil(Math.max((maxX - minX) * U + 2 * mx, Math.max(...Object.values(titles).map((t) => t.length)) * f * 1.15 * 0.6 + f * 2.4));
-  const H = Math.ceil((maxY - minY) * V + myTop + myBot);
+  // Free notes (no device) sit along the bottom edge: room for the frame with the most of them.
+  const freeLines = Math.max(0, ...frames.map((id) => notesOn(m, id, frames).filter((x) => !x.device).reduce((k, x) => k + wrapNote(x.text, 60).length, 0)));
+  const notesH = freeLines ? freeLines * f * 1.0 + f * 1.4 : 0;
+  const H = Math.ceil((maxY - minY) * V + myTop + myBot + notesH);
   const ox = (W - ((maxX - minX) * U + 2 * mx)) / 2;
   const at = (id) => ({ x: r1(ox + mx + (P[id].x - minX) * U), y: r1(myTop + (P[id].y - minY) * V) });
   const nodes = new Map(m.nodes.map((n) => [n.id, n]));
-  const ctx = { model: m, at, f, nodes, W, H };
+  const ctx = { model: m, full: m, at, f, nodes, W, H, frames, notesH };
   const order = start && frames.includes(start) ? [...frames.filter((x) => x !== start), start] : frames;
 
   const out = [];
@@ -90,7 +103,8 @@ export function renderFrames(m, positions, { frames, start }) {
   out.push('<style>.frame{display:none}.frame:target{display:inline}.frame:last-of-type{display:inline}.frame:target~.frame:last-of-type{display:none}</style>');
   out.push(`<rect width="${W}" height="${H}" fill="#fff"/>`);
   for (const id of order) {
-    const g = draw(id, ctx);
+    const lm = layerModel(m, id, split);
+    const g = draw(id, { ...ctx, model: lm, nodes: new Map(lm.nodes.map((n) => [n.id, n])) });
     g.push(`<rect width="${W}" height="${r1(f * 2.5)}" fill="#fff" fill-opacity="0.92"/><text x="${r1(f * 1.1)}" y="${r1(f * 1.7)}" font-size="${r1(f * 1.15)}" font-weight="700" fill="${id === 'physical' ? C.ink : C[id] ?? C.ink}">${esc(titles[id])}</text>`);
     out.push(`<g class="frame" id="f-${id}" data-title="${esc(titles[id])}">${g.join('')}</g>`);
   }
@@ -99,9 +113,9 @@ export function renderFrames(m, positions, { frames, start }) {
 }
 
 // A label block, first line bold; anchored centre-top at (x, y) or above, kept off earlier blocks.
-function block(ctx, reg, x, y, lines, { color = C.ink, anchor = 'middle', up = false } = {}) {
+function block(ctx, reg, x, y, lines, { color = C.ink, anchor = 'middle', up = false, fill = '#fff', stroke = null, bold = true, fixed = false } = {}) {
   const { f } = ctx;
-  const sz = (i) => (i === 0 ? f : f * 0.85);
+  const sz = (i) => (i === 0 && bold ? f : f * 0.85);
   const lh = f * 1.15;
   const w = Math.max(...lines.map((l, i) => l.length * sz(i) * 0.58)) + f * 0.6;
   const h = lines.length * lh + f * 0.35;
@@ -112,14 +126,14 @@ function block(ctx, reg, x, y, lines, { color = C.ink, anchor = 'middle', up = f
   const base = up ? y - h : y;
   const hit = (yy) => yy < f * 2.6 || yy + h > ctx.H - 2 || reg.some((b) => x0 < b.x + b.w && b.x < x0 + w && yy < b.y + b.h && b.y < yy + h);
   let y0 = base;
-  for (let i = 1; i < 24 && hit(y0); i++) {
+  for (let i = 1; i < 24 && !fixed && hit(y0); i++) {
     const step = Math.ceil(i / 2) * (h * 0.55) * (i % 2 ? 1 : -1) * (up ? -1 : 1);
     y0 = base + step;
   }
   if (hit(y0)) y0 = base;
   reg.push({ x: x0, y: y0, w, h });
-  return `<rect x="${r1(x0)}" y="${r1(y0)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(f * 0.3)}" fill="#fff" fill-opacity="0.9"/>` +
-    lines.map((l, i) => `<text x="${r1(x0 + w / 2)}" y="${r1(y0 + f * 0.95 + i * lh)}" font-size="${r1(sz(i))}" text-anchor="middle"${i === 0 ? ' font-weight="700"' : ''} fill="${i === 0 ? color : C.mute}">${esc(l)}</text>`).join('');
+  return `<rect x="${r1(x0)}" y="${r1(y0)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(f * 0.3)}" fill="${fill}" fill-opacity="0.9"${stroke ? ` stroke="${stroke}" stroke-width="${r1(f * 0.08)}"` : ''}/>` +
+    lines.map((l, i) => `<text x="${r1(x0 + w / 2)}" y="${r1(y0 + f * 0.95 + i * lh)}" font-size="${r1(sz(i))}" text-anchor="middle"${i === 0 && bold ? ' font-weight="700"' : ''} fill="${i === 0 && bold ? color : bold ? C.mute : C.ink}">${esc(l)}</text>`).join('');
 }
 
 // A device's labels go outward: above it in the top half of the drawing, below it in the bottom half.
@@ -157,7 +171,7 @@ function ghost(ctx, ends, reg, { names = true } = {}) {
   const g = [];
   for (const l of ctx.model.links) {
     const [a, b] = ends.get(l.id);
-    g.push(line(a, b, C.ghost, ctx.f * 0.12, l.plain ? ' stroke-dasharray="5 4"' : ''));
+    g.push(line(a, b, C.ghost, ctx.f * (l.medium === 'optical' ? 0.3 : 0.12), l.plain && l.medium !== 'optical' ? ' stroke-dasharray="5 4"' : ''));
   }
   for (const n of ctx.model.nodes) {
     const p = ctx.at(n.id);
@@ -176,7 +190,7 @@ function draw(id, ctx) {
   const { model, at, f, nodes } = ctx;
   const ends = linkEnds(ctx);
   const reg = [];
-  const g = [];
+  const g = siteFrames(ctx, reg, id === 'physical' || id === 'optical');
   const dot = (p, color, r = f * 0.55) => `<ellipse cx="${p.x}" cy="${p.y}" rx="${r1(r)}" ry="${r1(r * 0.75)}" fill="${color}" stroke="#fff" stroke-width="${r1(f * 0.1)}"/>`;
   const pill = (p, text, color) => {
     const w = String(text).length * f * 0.75 * 0.6 + f * 0.6;
@@ -195,22 +209,50 @@ function draw(id, ctx) {
     return { path: `<path d="M${a.x},${a.y} Q${r1(c.x)},${r1(c.y)} ${b.x},${b.y}" fill="none" stroke="${color}" stroke-width="${r1(f * 0.2)}"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`, apex };
   };
 
-  if (id === 'physical') {
+  // The physical frame, and the optical frame (the line system and the routers at its ends) drawn alike.
+  if (id === 'physical' || id === 'optical') {
     const mixed = new Set(model.nodes.map((n) => n.os).filter(Boolean)).size > 1;
+    const pillW = (text) => String(text).length * f * 0.75 * 0.6 + f * 0.6;
+    const pair = (l) => [l.a.node, l.b.node].sort().join('|');
+    const pairs = new Map();
+    for (const l of model.links) pairs.set(pair(l), [...(pairs.get(pair(l)) ?? []), l.id]);
     for (const l of model.links) {
       const [a, b] = ends.get(l.id);
-      g.push(`<g>${title(`${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.subnet ? `\n${l.subnet}` : ''}`)}${line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '')}${pill(lerp(a, b, 0.24), l.a.port ?? '?', '#9aa4b1')}${pill(lerp(a, b, 0.76), l.b.port ?? '?', '#9aa4b1')}</g>`);
+      // A routed link over the line system says so (`over ch 25`) where it has no label of its own.
+      const caption = l.caption ?? l.over;
+      const tip = `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium ? `\n${l.medium}${l.caption ? `: ${l.caption}` : ''}` : l.caption ? `\n${l.caption}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}`;
+      // An optical span: a fibre, drawn as a blue double line (white core).
+      const body = l.medium === 'optical'
+        ? `${line(a, b, C.optical, f * 0.42, ' stroke-linecap="round"')}${line(a, b, '#fff', f * 0.14, ' stroke-linecap="round"')}`
+        : line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '');
+      // The caption on the link, staggered along parallel links; the port pills only where they fit
+      // between the device and the caption (else the ports are in the hover title only).
+      const sibs = pairs.get(pair(l));
+      const t = 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3;
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const cw = caption ? pillW(caption) : 0;
+      const fits = (port, tp) => !caption || (Math.min(tp, 1 - tp) * len - pillW(port) / 2 > f * 1.4 && Math.abs(t - tp) * len > (cw + pillW(port)) / 2 + 2);
+      const pa = l.a.port ?? '?', pb = l.b.port ?? '?';
+      const ports = fits(pa, 0.24) && fits(pb, 0.76) ? `${pill(lerp(a, b, 0.24), pa, '#9aa4b1')}${pill(lerp(a, b, 0.76), pb, '#9aa4b1')}` : '';
+      const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || !l.caption ? C.optical : '#9aa4b1') : '';
+      g.push(`<g${l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}${ports}${cap}</g>`);
+      if (caption) { const c = lerp(a, b, t); reg.push({ x: c.x - cw / 2, y: c.y - f * 0.55, w: cw, h: f * 1.1 }); }
     }
     for (const n of model.nodes) {
       const p = at(n.id);
-      const col = C[n.role] ?? C.plain;
+      // A line-system member (a box without facts that has an equipment role) is meant to have no
+      // facts: solid, in the optical colour, tagged with its equipment.
+      const eq = n.plain ? equipmentTag(n) : null;
+      const col = eq ? C.optical : C[n.role] ?? C.plain;
       const s = f * (n.rr ? 1.6 : 1.3);
-      g.push(`<g>${title(deviceDetail(n, model))}<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${col}"${n.plain ? ' fill-opacity="0.35" stroke-dasharray="4 3"' : ''} stroke="${n.plain ? C.plain : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.35)}" font-size="${r1(f * 0.8)}" font-weight="700" text-anchor="middle" fill="#fff">${esc((ROLE_TAG[n.role] ?? '') + (n.rr ? '·RR' : ''))}</text></g>`);
+      const tag = eq ?? (ROLE_TAG[n.role] ?? '') + (n.rr ? '·RR' : '');
+      g.push(`<g>${title(deviceDetail(n, model))}<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${col}"${n.plain && !eq ? ' fill-opacity="0.35" stroke-dasharray="4 3"' : ''} stroke="${n.plain && !eq ? C.plain : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.35)}" font-size="${r1(f * (eq && tag.length > 3 ? 0.62 : 0.8))}" font-weight="700" text-anchor="middle" fill="#fff">${esc(tag)}</text></g>`);
       reg.push({ x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s });
     }
     for (const n of model.nodes) {
       const p = at(n.id);
-      g.push(outward(ctx, reg, p, f * 1.0, [n.id, n.plain ? [n.type, 'no facts'].filter(Boolean).join(' · ') : [n.type, mixed ? n.os : null].filter(Boolean).join(' · ')], { color: C[n.role] ?? C.plain }));
+      const sub = n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type, 'no facts']) : [n.type, mixed ? n.os : null];
+      g.push(outward(ctx, reg, p, f * 1.0, [n.id, sub.filter(Boolean).join(' · ')], { color: n.plain && n.equipment ? C.optical : C[n.role] ?? C.plain }));
     }
   }
 
@@ -353,6 +395,62 @@ function draw(id, ctx) {
       }
     });
     for (const id2 of new Set(model.evpn.flatMap((e) => e.members))) g.push(dot(at(id2), C.evpn));
+  }
+  g.push(...drawNotes(id, ctx, reg));
+  return g;
+}
+
+// A note's frame: its layer when the drawing has that frame, else physical.
+function notesOn(m, id, frames) {
+  return m.notes.filter((x) => noteLayerOf(x, m, frames) === id);
+}
+
+// Sites (schema 1.9): a rounded frame round each site's devices and their labels (above a device in
+// the top half, below it in the bottom half, as outward() places them), its name on the top edge,
+// under everything else; strong on the physical frame, faint on the others so they keep their bearings.
+function siteFrames(ctx, reg, strong) {
+  const { f, at, model, H } = ctx;
+  const g = [];
+  for (const site of model.sites) {
+    const ps = site.nodes.map(at);
+    const x0 = Math.min(...ps.map((p) => p.x)) - f * 4.4, x1 = Math.max(...ps.map((p) => p.x)) + f * 4.4;
+    const y0 = Math.min(...ps.map((p) => p.y - (p.y > H * 0.5 ? f * 1.6 : f * 4.6)));
+    const y1 = Math.max(...ps.map((p) => p.y + (p.y > H * 0.5 ? f * 4.4 : f * 1.6)));
+    const nw = site.name.length * f * 0.85 * 0.62 + f * 0.8;
+    g.push(`<g class="site">${title(`site ${site.name}: ${site.nodes.join(', ')}`)}<rect x="${r1(x0)}" y="${r1(y0)}" width="${r1(x1 - x0)}" height="${r1(y1 - y0)}" rx="${r1(f * 0.8)}" fill="${C.site}" fill-opacity="${strong ? 0.06 : 0.03}" stroke="${C.site}" stroke-opacity="${strong ? 0.8 : 0.35}" stroke-width="${r1(f * 0.09)}" stroke-dasharray="${r1(f * 0.6)} ${r1(f * 0.35)}"/><rect x="${r1(x0 + f * 0.7)}" y="${r1(y0 - f * 0.6)}" width="${r1(nw)}" height="${r1(f * 1.2)}" fill="#fff"/><text x="${r1(x0 + f * 1.1)}" y="${r1(y0 + f * 0.3)}" font-size="${r1(f * 0.85)}" font-weight="700" fill="${C.site}"${strong ? '' : ' fill-opacity="0.6"'}>${esc(site.name)}</text></g>`);
+    reg.push({ x: x0 + f * 0.7, y: y0 - f * 0.6, w: nw, h: f * 1.2 });
+  }
+  return g;
+}
+
+// Notes (schema 1.9) on this frame: one on a device in a yellow block beside it with a leader line,
+// the free ones along the bottom edge.
+function drawNotes(id, ctx, reg) {
+  const { f, at, model, frames, H, notesH } = ctx;
+  const g = [];
+  const mine = notesOn(ctx.full, id, frames);
+  for (const x of mine.filter((n) => n.device)) {
+    const p = at(x.device);
+    const lines = wrapNote(x.text, 26);
+    // The first free spot beside it (right, then left; level, a little below, a little above, further
+    // below, further above), else the one that overlaps least.
+    const w = Math.max(...lines.map((l) => l.length * f * 0.85 * 0.58)) + f * 0.6, h = lines.length * f * 1.15 + f * 0.35;
+    const spots = [-h / 2, f * 1.2, -f * 1.2 - h, f * 2.6, -f * 2.6 - h].flatMap((dy) => [f * 2.2, f * 4.4].flatMap((dx) => [[p.x + dx, p.y + dy], [p.x - dx - w, p.y + dy]]));
+    const overlap = ([sx, sy]) => (sx < 2 || sx + w > ctx.W - 2 || sy < f * 2.6 || sy + h > H - notesH ? Infinity
+      : reg.reduce((k, r) => k + Math.max(0, Math.min(sx + w, r.x + r.w) - Math.max(sx, r.x)) * Math.max(0, Math.min(sy + h, r.y + r.h) - Math.max(sy, r.y)), 0));
+    const [sx, sy] = spots.find((q) => overlap(q) === 0) ?? spots.reduce((best, q) => (overlap(q) < overlap(best) ? q : best));
+    const b = block(ctx, reg, sx, sy, lines, { anchor: 'start', fill: C.note, stroke: C.noteEdge, bold: false, fixed: true });
+    const r = reg.at(-1);
+    const q = { x: r1(Math.max(r.x, Math.min(p.x, r.x + r.w))), y: r1(Math.max(r.y, Math.min(p.y, r.y + r.h))) };
+    g.push(`<g class="note">${title(`${x.device}: ${x.text}`)}${line(p, q, C.noteEdge, f * 0.08, ` stroke-dasharray="${r1(f * 0.25)} ${r1(f * 0.2)}"`)}${b}</g>`);
+  }
+  let y = H - notesH + f * 0.6;
+  for (const x of mine.filter((n) => !n.device)) {
+    const lines = wrapNote(x.text, 60);
+    const w = Math.max(...lines.map((l) => l.length)) * f * 0.85 * 0.58 + f * 0.8;
+    const h = lines.length * f * 1.0 + f * 0.4;
+    g.push(`<g class="note">${title(x.text)}<rect x="${r1(f)}" y="${r1(y)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(f * 0.3)}" fill="${C.note}" stroke="${C.noteEdge}" stroke-width="${r1(f * 0.08)}"/>${lines.map((l, i) => `<text x="${r1(f * 1.4)}" y="${r1(y + f * 0.95 + i * f)}" font-size="${r1(f * 0.85)}" fill="${C.ink}">${esc(l)}</text>`).join('')}</g>`);
+    y += h + f * 0.2;
   }
   return g;
 }

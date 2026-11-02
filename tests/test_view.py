@@ -34,7 +34,7 @@ def test_example_views_validate(path):
 @pytest.mark.parametrize("view", [
     {"view_version": "2.0"},
     {"preset": "poster"},
-    {"layers": ["physical", "optical"]},
+    {"layers": ["physical", "lambda"]},
     {"frames": {"start": "middle"}},
     {"frames": {"period_s": 0}},
     {"layout": {"hints": {"PE1": [0]}}},

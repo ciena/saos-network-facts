@@ -31,6 +31,9 @@
 //                point on the instance's forwarding domain
 //   hosts        hosts[] (schema 1.8, Linux hosts from --clab exec lines or --hosts): CE nodes with their
 //                addresses and static routes, linked to a router by subnet like any device, else by links[]
+//   extras       links[].kind / label, devices[].role / site, hosts[].site and notes[] (schema 1.9, the
+//                extractor's --extra file): optical spans, line-system members (plain boxes), sites, notes;
+//                drawn only, no protocol reads them
 //   VRFs         vrf_instances (schema 1.7) joined across devices by name: per PE its RD, route targets per
 //                address family, interfaces, static routes, redistribution, label allocation, SRv6 locators
 //   G.8032       rings[] (schema 1.5) joined across devices by ring id: the links whose two ends are ring ports
@@ -400,6 +403,8 @@ function topologyLinks(file, links, nodes, report) {
   const bridged = links.filter((l) => !l.lag && (elsewhere(l.a, l.b) || elsewhere(l.b, l.a)));
   for (const l of bridged) {
     l.bridged = [l.a, l.b].map((e) => `${e.node} ${e.if} (port ${e.port ?? '?'}, cabled to ${(cabled.get(`${e.node}|${e.port}`) ?? '?').replace('|', ' port ')})`).join(', ');
+    // The ports and what they are cabled to, for annotate(): a link over an optical line system.
+    l.cables = [l.a, l.b].filter((e) => e.port && cabled.has(`${e.node}|${e.port}`)).map((e) => ({ node: e.node, port: e.port, far: cabled.get(`${e.node}|${e.port}`) }));
     for (const e of [l.a, l.b]) delete e.port;
   }
   if (bridged.length) report.add('physical', 'derived', `${bridged.length} subnets over a bridged domain`, `${bridged.map((l) => `${l.id} (${l.subnet}): ${l.bridged}`).join('; ')}: the file's links[] cable those ports to other devices, so the subnet is an L3 adjacency over a bridged domain (a ring VLAN, a service), drawn as a link with no ports; the cables are drawn as L2 links`);
@@ -1168,7 +1173,9 @@ function plainNodes(file, devices, hostNames, report, show) {
   const out = [];
   for (const r of file.devices) {
     if (devices.has(r.device) || hostNames.has(r.device)) continue;
-    report.warn(`${r.device}: ${r.status}${r.reason ? ` (${r.reason})` : ''}; ${show ? 'shown as plain box' : 'not shown'}`);
+    // A record with a role and no configuration (a line-system member from the extra file) is meant to
+    // have no facts: no warning.
+    if (!(r.role && r.status === 'skipped' && !r.templates?.length)) report.warn(`${r.device}: ${r.status}${r.reason ? ` (${r.reason})` : ''}; ${show ? 'shown as plain box' : 'not shown'}`);
     if (show && !out.some((n) => n.id === r.device)) out.push({ id: r.device, role: 'plain', plain: true, type: r.type ?? null, platform: r.platform ?? null, status: r.status, reason: r.reason ?? null });
   }
   return out;
@@ -1190,6 +1197,51 @@ function plainLinks(file, plain, nodes, report) {
   }
   if (plain.length) report.add('physical', 'facts', `${plain.length} plain box${plain.length === 1 ? '' : 'es'}`, `${plain.map((n) => n.id).join(', ')}: devices without facts, drawn as plain boxes with their name and type${links.length ? `, and ${links.length} links to them from the file's links[]` : ''}; no protocol runs on them or over those links`);
   return links;
+}
+
+// What the extractor's extra file adds (schema 1.9), for the drawings only (no protocol reads it):
+// a drawn link joining the same two ports as a links[] entry gets its `kind` as `medium` (`optical`,
+// `ethernet`, `lag`) and its `label` as `caption`; a drawn device or host its `site` and its record's
+// `role` as `equipment` (a line-system member's `roadm`, `amplifier`). -> { sites: [{ name, nodes }],
+// notes: [{ text, device, layer }] }, sites in file order with the drawn devices at each, notes whose
+// device is not drawn kept free.
+function annotate(file, nodes, links, report) {
+  const ends = (a, b) => [`${a.device ?? a.node}|${a.port}`, `${b.device ?? b.node}|${b.port}`].sort().join(' ');
+  const given = new Map((file.links ?? []).filter((l) => l.kind || l.label).map((l) => [ends(l.a, l.b), l]));
+  let marked = 0;
+  for (const l of links) {
+    const g = l.a.port != null && l.b.port != null ? given.get(ends(l.a, l.b)) : null;
+    if (!g) continue;
+    if (g.kind) l.medium = g.kind;
+    if (g.label) l.caption = g.label;
+    marked += 1;
+  }
+  const records = new Map([...file.devices.map((r) => [r.device, r]), ...factsHosts(file).map((h) => [h.name, h])]);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  // A routed link whose two ports are cabled by optical spans (into a line system) rides it: `over`
+  // says so on the physical layer, with the spans' label when both say the same (`ch 25`).
+  const span = new Map((file.links ?? []).filter((l) => l.kind === 'optical').flatMap((l) => [[`${l.a.device}|${l.a.port}`, l], [`${l.b.device}|${l.b.port}`, l]]));
+  for (const l of links) {
+    const spans = (l.cables ?? []).map((c) => span.get(`${c.node}|${c.port}`)).filter(Boolean);
+    if (spans.length !== 2) continue;
+    const labels = [...new Set(spans.map((x) => x.label ?? ''))];
+    l.over = labels.length === 1 && labels[0] ? `over ${labels[0]}` : 'over the line system';
+  }
+  const sites = new Map();
+  for (const n of nodes) {
+    const r = records.get(n.id) ?? {};
+    if (r.role) n.equipment = r.role;
+    if (r.site) {
+      n.site = r.site;
+      sites.set(r.site, [...(sites.get(r.site) ?? []), n.id]);
+    }
+  }
+  const notes = (file.notes ?? []).map((x) => ({ text: x.text, device: byId.has(x.device) ? x.device : null, layer: x.layer ?? null }));
+  const optical = links.filter((l) => l.medium === 'optical').length;
+  if (marked) report.add('physical', 'facts', `${marked} links with a kind or label`, `from the file's links[] (the extractor's extra file)${optical ? `; ${optical} optical spans, drawn apart from the cables` : ''}`);
+  if (sites.size) report.add('physical', 'facts', `${sites.size} sites`, `${[...sites].map(([s, ids]) => `${s}: ${ids.join(', ')}`).join('; ')}; a frame round each site's devices`);
+  if (notes.length) report.add('physical', 'facts', `${notes.length} notes`, `from the file's notes[]: ${notes.filter((x) => x.device).length} on a device, the rest free`);
+  return { sites: [...sites].map(([name, ids]) => ({ name, nodes: ids })), notes };
 }
 
 // facts file (JSON text or value) -> { topology, file, devices, services, labelMode, layout, report }
@@ -1248,6 +1300,7 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
     report.add('ospf', noRid.length ? 'default' : 'facts', 'router ids', noRid.length ? `${noRid.join(', ')}: no router id configured, the loopback is used` : 'ospf instance router-id');
   }
 
+  const extras = annotate(file, [...nodes, ...plain.nodes], [...links, ...plain.links], report);
   const placed = placeNodes(nodes, links, rings, positions, layout, report, plain);
   for (const n of [...nodes, ...plain.nodes]) n.pos = placed.pos[n.id];
 
@@ -1274,6 +1327,8 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
     flexAlgos,
     evpn,
     plain,
+    sites: extras.sites,
+    notes: extras.notes,
   };
   return {
     topology,

@@ -5,7 +5,7 @@ import { test } from "node:test";
 import {
   bgpPeers, ccmIntervalMs, devicesByName, evpnInstances, evpnMembers, FactsFormatError, flexAlgorithms, interfacesOnPort, isisArea, isisAreaId,
   isisMetric, isisSystemId, isRouted, loopbacks, parseFacts, readFacts, ringMembers, ringsOf, srv6Locators, staticRoutes, vrfInstances,
-  vrfMembers, vrfRouteTargets, hosts, hostByName, hostGateway,
+  vrfMembers, vrfRouteTargets, hosts, hostByName, hostGateway, notes, sites,
 } from "../src/node.ts";
 import type { DeviceFacts, Interface } from "../src/generated/facts.ts";
 
@@ -16,6 +16,7 @@ const g8032 = readFacts(path.join(expected, "g8032-two-ring.facts.json"));
 const g8032saos6 = readFacts(path.join(expected, "g8032-saos6.facts.json"));
 const srv6 = readFacts(path.join(expected, "srv6-evpn.facts.json"));
 const l3vpn = readFacts(path.join(expected, "l3vpn-hosts.facts.json"));
+const lineSystem = readFacts(path.join(expected, "line-system.facts.json"));
 
 test("readFacts reads schema 1.x and keeps devices with facts", () => {
   assert.equal(srl2.schema_version.split(".")[0], "1");
@@ -216,4 +217,16 @@ test("hosts, hostByName and hostGateway: Linux hosts from clab exec lines and a 
   assert.equal(hostGateway(hostByName(srv6, "ce-b")!, "ipv4"), "203.0.113.0");
   assert.deepEqual(hosts(mixed), []);
   assert.equal(hostByName(srv6, "nope"), undefined);
+});
+
+test("notes, sites and link kinds: an optical line system from the extra file (schema 1.9)", () => {
+  assert.deepEqual([...sites(lineSystem)], [["east", ["PE1", "ROADM-A"]], ["west", ["PE2", "ROADM-B"]]]);
+  assert.deepEqual(lineSystem.devices.filter((d) => d.role).map((d) => [d.device, d.role, d.status, d.facts]), [
+    ["ROADM-A", "roadm", "skipped", null], ["AMP-1", "amplifier", "skipped", null], ["ROADM-B", "roadm", "skipped", null]]);
+  assert.deepEqual(lineSystem.links!.filter((l) => l.kind === "optical").map((l) => l.label), ["ch 25", "ch 26 · dark", "span 1 · 40 km", "span 2 · 38 km", "ch 25"]);
+  assert.deepEqual(notes(lineSystem, { device: "AMP-1" }).map((n) => n.text), ["in-line amplifier hut, no site of its own"]);
+  assert.equal(notes(lineSystem, { device: null }).length, 1);
+  assert.equal(notes(lineSystem, { layer: "physical" }).length, 2);
+  assert.deepEqual(notes(lineSystem, { layer: "igp" }), []);
+  assert.deepEqual([notes(srl2), [...sites(srl2)]], [[], []]);
 });

@@ -11,14 +11,14 @@ import { VIEW_PRESETS_DATA } from "./generated/view-presets.ts";
 export type * from "./generated/view.ts";
 
 /** The view schema version this reader writes and understands (any 1.x view is read). */
-export const VIEW_VERSION = "1.1";
+export const VIEW_VERSION = "1.2";
 /** The view schema major version this reader understands. */
 export const VIEW_MAJOR = 1;
 
 /** Every layer, in the standard order (planes bottom to top, frames first to last). */
-export const LAYER_IDS: readonly LayerId[] = ["physical", "ring", "igp", "mpls", "srv6", "bgp", "vrf", "pw", "evpn", "cfm"];
+export const LAYER_IDS: readonly LayerId[] = ["optical", "physical", "ring", "igp", "mpls", "srv6", "bgp", "vrf", "pw", "evpn", "cfm"];
 /** The order `frames.start: "signature"` picks from: the lab's services, else its transport, else its IGP. */
-export const SIGNATURE_ORDER: readonly LayerId[] = ["pw", "evpn", "vrf", "mpls", "srv6", "ring", "igp", "bgp", "cfm", "physical"];
+export const SIGNATURE_ORDER: readonly LayerId[] = ["pw", "evpn", "vrf", "mpls", "srv6", "ring", "igp", "bgp", "cfm", "physical", "optical"];
 export const PRESET_NAMES = Object.keys(VIEW_PRESETS_DATA.presets) as PresetName[];
 
 /** A view with every property set: what a consumer reads after `resolveView`. */

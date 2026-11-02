@@ -3,6 +3,7 @@ import json
 import subprocess
 import sys
 
+import pytest
 from recorded import EXPECTED, FIXTURES, RecordedTranslator
 
 from saos_network_facts import SCHEMA_VERSION, __version__, cli
@@ -74,3 +75,19 @@ def test_extract_with_a_hosts_file(tmp_path, capsys, monkeypatch):
     doc = json.loads(out.read_text())
     assert doc["hosts"] == json.loads((EXPECTED / "srv6-evpn.facts.json").read_text())["hosts"]
     assert cli.main(["validate", str(out)]) == 0
+
+
+def test_extract_with_an_extra_file_matches_the_golden_facts(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "load_translator", lambda *a: RecordedTranslator())
+    out = tmp_path / "facts.json"
+    lab = FIXTURES / "labs/line-system"
+    assert cli.main(["extract", "--clab", str(lab / "topo.clab.yml"), "--extra", str(lab / "extra.yaml"),
+                     "--recipe", "line-system", "-o", str(out), "--quiet"]) == 0
+    assert out.read_text() == (EXPECTED / "line-system.facts.json").read_text()
+
+
+def test_a_bad_extra_file_fails_before_any_extraction(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "load_translator", lambda *a: pytest.fail("no translator for a bad extra file"))
+    bad = tmp_path / "extra.yaml"
+    bad.write_text("sites: {east: [PE1]}\n")
+    assert cli.main(["extract", "--clab", str(FIXTURES / "labs/line-system/topo.clab.yml"), "--extra", str(bad)]) == 2

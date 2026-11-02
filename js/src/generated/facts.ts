@@ -23,6 +23,10 @@ export interface FactsFile {
    * Linux hosts of the lab (test hosts, DCN gateways, CEs that are Linux containers): their addresses, routes and the device ports they are cabled to. From the `linux` nodes of a containerlab file given with `--clab` (their `exec` lines) and from a hosts file given with `--hosts`. A host has no device facts; a containerlab host also keeps its `devices[]` record (`status: skipped`). Optional: present (possibly empty) only when the extractor was given a topology or a hosts file; absent in files before schema 1.8. Since schema 1.8.
    */
   hosts?: Host[];
+  /**
+   * Free-text notes about the lab for the drawings (a channel plan, a dark fibre, a maintenance window), anchored to a device or not, in the order given. From an extra file given with `--extra`: the library does not derive them. They are part of the facts, not the view, because they describe this lab (as the line-system members, sites and link labels written beside them do) while a view is a presentation that many labs share. Optional: absent when there are none. Since schema 1.9.
+   */
+  notes?: Note[];
 }
 /**
  * What wrote the file.
@@ -63,6 +67,14 @@ export interface DeviceRecord {
    * The device type as given by the inputs (`5164-10x`, `3930-6x`, a containerlab `type` such as `5164`); null when unknown.
    */
   type: string | null;
+  /**
+   * What the device is in the lab, when the inputs say (`--extra`): free text such as `roadm`, `amplifier`, `terminal` for the members of an optical line system, or `router`. A line-system member is a record with a role and no facts (`extractor` null, `status` `skipped`): it has no configuration here, and links[] with `kind` `optical` connect it. Since schema 1.9.
+   */
+  role?: string;
+  /**
+   * The site the device is at, when the inputs say (`--extra`): a name the drawings group devices by. Since schema 1.9.
+   */
+  site?: string;
   /**
    * SAOS 10 only: the translator platform the files were parsed for (`cn5164`).
    */
@@ -1622,6 +1634,14 @@ export interface FailedTemplate {
 export interface Link {
   a: LinkEnd;
   b: LinkEnd;
+  /**
+   * What the link is, when the inputs say (`--extra`): `ethernet` (a cable or patch between two ports), `optical` (a span through or to a line system: the fibre or wavelength between a router's line port and a line-system member, or between two members), `lag` (one link standing for a LAG's members); other values are kept as given. Absent when unknown (a containerlab link is an ethernet cable but says nothing). Since schema 1.9.
+   */
+  kind?: string;
+  /**
+   * A short label for the link, as the inputs give it (`ch 25 · dark`, `100G ZR+`): drawn with the link. Since schema 1.9.
+   */
+  label?: string;
 }
 /**
  * One end of a physical link. Since schema 1.5.
@@ -1654,6 +1674,10 @@ export interface Host {
    * The containerlab kind (`linux`); null for a host only the hosts file gives without one.
    */
   kind: string | null;
+  /**
+   * The site the host is at, when the inputs say (`--extra`), as `devices[].site`. Since schema 1.9.
+   */
+  site?: string;
   /**
    * Where the host comes from: `clab` (a containerlab node and its `exec` lines), `hosts-file` (`--hosts`), in that order; a hosts-file entry for a containerlab host is merged into it.
    */
@@ -1735,6 +1759,26 @@ export interface HostGateway {
    * The IPv6 default gateway; null when the host has no IPv6 default route.
    */
   ipv6: string | null;
+}
+/**
+ * A free-text note. Since schema 1.9.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "Note".
+ */
+export interface Note {
+  /**
+   * The note, as written (one or two short lines read best).
+   */
+  text: string;
+  /**
+   * The device or host the note is about (`devices[].device` or `hosts[].name`); absent for a note about the lab as a whole.
+   */
+  device?: string;
+  /**
+   * The view layer the note belongs to (`physical`, `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm`, as the view schema names them); absent for the physical layer. A drawing shows a note with its layer.
+   */
+  layer?: string;
 }
 /**
  * SRv6 configuration. Since schema 1.6.

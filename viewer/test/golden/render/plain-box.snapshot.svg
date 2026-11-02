@@ -79,9 +79,12 @@ no facts: no extractor for this device (kind generic_vm)</title><polygon points=
       });
       [].forEach.call(svg.querySelectorAll('line.pillar'), function (p) {
         var ls = (p.getAttribute('data-layers') || '').split(' ');
-        var top = 0;
-        ls.forEach(function (id) { var k = shown.indexOf(id); if (k > top) top = k; });
-        p.setAttribute('y2', +p.getAttribute('y1') - top * gap);
+        if (p._y0 === undefined) p._y0 = +p.getAttribute('y1');
+        var y0 = p._y0, top = 0, bottom = Infinity;
+        ls.forEach(function (id) { var k = shown.indexOf(id); if (k > top) top = k; if (k >= 0 && k < bottom) bottom = k; });
+        if (bottom === Infinity) bottom = 0;
+        p.setAttribute('y1', y0 - bottom * gap);
+        p.setAttribute('y2', y0 - top * gap);
       });
       [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
         var id = c.getAttribute('data-layer');

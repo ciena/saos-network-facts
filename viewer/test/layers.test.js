@@ -24,6 +24,7 @@ describe('every published lab lists only the layers it has', () => {
     'g8032-by-name': ['physical', 'ring'],
     'srv6-evpn': ['physical', 'isis', 'mpls', 'srv6', 'bgp', 'vrf', 'evpn'],
     'l3vpn-hosts': ['physical', 'isis', 'mpls', 'bgp', 'vrf'],
+    'line-system': ['optical', 'physical', 'isis', 'mpls', 'bgp', 'pw'],
   };
   test('the lab index has exactly these labs', () => {
     expect(LABS.map((l) => l.id)).toEqual(Object.keys(expected));

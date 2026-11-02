@@ -57,6 +57,13 @@ documentation ranges) and services are made up.
 - `labs/saos6-unrecognised/`: two devices typed SAOS 6 in `platform-map.yaml`: AGG1 with a host name and a
   loopback (`ok`), AGG2 with only NTP and syslog settings, none of which the extractor reads (`error`:
   nothing recognised, so no facts rather than empty ones).
+- `labs/line-system/`: the sr-l2 PEs (the same two files as `labs/plain-box/`, so the recorded pivots
+  serve them) in a containerlab topology without links, and an `extra.yaml` (the `--extra` input) that a
+  consumer would write from its own inventory: an optical line system ROADM-A - AMP-1 - ROADM-B (no
+  configuration: records with a type and role and no facts), five optical spans with labels (PE1 ports 1
+  and 2 to ROADM-A, `ch 25` and `ch 26 · dark`; the two line spans; ROADM-B to PE2 port 1), sites `east`
+  (PE1, ROADM-A) and `west` (PE2, ROADM-B), and two notes (one on AMP-1, one free). The PEs' routed core
+  link rides the line system: the viewer draws it over the spans.
 - `cases.yaml`: the extraction cases the tests run; `expected/`: their facts files.
 - `pivots.json`: the translator's recorded replies for every SAOS 10 file (`scripts/record_pivots.py`),
   all recorded with translator 4.2.1.

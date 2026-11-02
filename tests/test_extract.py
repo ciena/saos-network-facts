@@ -14,7 +14,12 @@ def run_case(name, translator=None):
     clab = CASES[name].get("clab")
     hosts_file = CASES[name].get("hosts")
     hosts = extract.collect_hosts(clab and FIXTURES / clab, hosts_file and FIXTURES / hosts_file, case_devices(name))
-    return extract.document(records, translator, extract.links_from_clab(FIXTURES / clab) if clab else None, hosts)
+    links = extract.links_from_clab(FIXTURES / clab) if clab else None
+    notes = None
+    if CASES[name].get("extra"):
+        extra = extract.load_extra(FIXTURES / CASES[name]["extra"])
+        links, notes = extract.apply_extra(extra, records, links, hosts, CASES[name].get("recipe"))
+    return extract.document(records, translator, links, hosts, notes)
 
 
 @pytest.mark.parametrize("name", sorted(CASES))
@@ -486,3 +491,56 @@ def test_link_commands_parsed():
     assert parsed["parents"] == {"bond0.7": "bond0", "eth5.9": "eth5"}
     assert parsed["members"] == {"bond0": ["eth2", "eth3"]}
     assert parsed["ignored"] == ["ip link add br0 type bridge", "ip link set eth2 up"]
+
+
+def test_line_system_lab_members_spans_sites_and_notes():
+    doc = run_case("line-system")
+    records = {r["device"]: r for r in doc["devices"]}
+    assert [r["device"] for r in doc["devices"]] == ["PE1", "PE2", "ROADM-A", "AMP-1", "ROADM-B"]
+    assert records["AMP-1"] == {"device": "AMP-1", "type": "ila", "role": "amplifier", "extractor": None, "templates": [],
+                                "status": "skipped", "facts": None, "recipe": "line-system",
+                                "reason": "no configuration: given by the extra file (amplifier)"}
+    assert {n: r.get("site") for n, r in records.items()} == {
+        "PE1": "east", "PE2": "west", "ROADM-A": "east", "AMP-1": None, "ROADM-B": "west"}
+    assert records["PE1"]["status"] == "ok" and "role" not in records["PE1"]
+    assert [(link["a"]["device"], link["b"]["device"], link["kind"], link["label"]) for link in doc["links"]][2:4] == [
+        ("ROADM-A", "AMP-1", "optical", "span 1 · 40 km"), ("AMP-1", "ROADM-B", "optical", "span 2 · 38 km")]
+    assert doc["notes"] == [{"text": "in-line amplifier hut, no site of its own", "device": "AMP-1"},
+                            {"text": "PE1-PE2 core link rides ch 25; ch 26 is lit on ROADM-A only"}]
+
+
+def test_extra_file_annotates_topology_links_and_hosts(tmp_path):
+    extra = tmp_path / "extra.json"
+    extra.write_text(json.dumps({
+        "devices": {"H1": {"site": "lab"}, "OLS1": {"site": "lab", "role": "line system"}},
+        "links": [{"a": {"device": "OLS1", "port": "2"}, "b": "PE2:1", "kind": "optical", "label": "ch 1"},
+                  {"endpoints": ["PE1:9", "OLS1:9"], "kind": "ethernet"}],
+        "notes": ["free text", {"text": "on a host", "device": "H1", "layer": "vrf"}]}))
+    records = [{"device": "PE1", "type": "5164"}, {"device": "PE2", "type": "5162"}, {"device": "OLS1", "type": None}]
+    links = [{"a": {"device": "PE1", "port": "1"}, "b": {"device": "OLS1", "port": "1"}},
+             {"a": {"device": "PE2", "port": "1"}, "b": {"device": "OLS1", "port": "2"}}]
+    hosts = [{"name": "H1"}]
+    links, notes = extract.apply_extra(extract.load_extra(extra), records, links, hosts)
+    assert links[1] == {"a": {"device": "PE2", "port": "1"}, "b": {"device": "OLS1", "port": "2"}, "kind": "optical", "label": "ch 1"}
+    assert links[2] == {"a": {"device": "PE1", "port": "9"}, "b": {"device": "OLS1", "port": "9"}, "kind": "ethernet"}
+    assert "kind" not in links[0] and len(records) == 3
+    assert records[2] == {"device": "OLS1", "type": None, "role": "line system", "site": "lab"}
+    assert hosts == [{"name": "H1", "site": "lab"}]
+    assert notes == [{"text": "free text"}, {"text": "on a host", "device": "H1", "layer": "vrf"}]
+    assert extract.apply_extra({"devices": {}, "links": [], "notes": []}, [], None) == (None, None)
+
+
+@pytest.mark.parametrize(("content", "message"), [
+    ({"links": [{"a": "PE1:1", "b": "PE9:1"}]}, "no device or host PE9"),
+    ({"notes": [{"text": "x", "device": "PE9"}]}, "no device or host PE9"),
+    ({"links": [{"a": "PE1:1"}]}, "give a and b"),
+    ({"links": [{"a": "PE1", "b": "PE1:2"}]}, "write DEVICE:PORT"),
+    ({"devices": {"PE1": {"sites": "x"}}}, "unknown key sites"),
+    ({"notes": [{"device": "PE1"}]}, "needs a text"),
+    ({"sites": {}}, "unknown key sites"),
+])
+def test_extra_file_mistakes_are_errors(tmp_path, content, message):
+    extra = tmp_path / "extra.json"
+    extra.write_text(json.dumps(content))
+    with pytest.raises(ValueError, match=message):
+        extract.apply_extra(extract.load_extra(extra), [{"device": "PE1", "type": None}])

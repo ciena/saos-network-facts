@@ -140,6 +140,16 @@ test("the core: IGP routers first, else the G.8032 ring, else the longest cycle;
   assert.equal(c.description, "ladder on the longest cycle");
   assert.deepEqual(c.core, ["LS", "X1", "X2", "X3"]);
   assert.ok(minDistance(c.positions) >= 0.5);
+
+  // A chain of plain boxes between two routers (an optical line system) is core, a box hung off it is not.
+  const ols: LayoutModel = {
+    nodes: [{ id: "PE1", role: "pe" }, { id: "PE2", role: "pe" }, { id: "ROADM-A", plain: true }, { id: "AMP", plain: true }, { id: "ROADM-B", plain: true }, { id: "SPARE", plain: true }],
+    links: [{ a: "PE1", b: "PE2" }, { a: "PE1", b: "ROADM-A" }, { a: "ROADM-A", b: "AMP" }, { a: "AMP", b: "ROADM-B" }, { a: "ROADM-B", b: "PE2" }, { a: "AMP", b: "SPARE" }],
+  };
+  const o = layoutFacts(ols);
+  assert.deepEqual(o.core, ["AMP", "PE1", "PE2", "ROADM-A", "ROADM-B"]);
+  assert.equal(o.method, "ladder");
+  assert.ok(minDistance(o.positions) >= 0.5);
 });
 
 test("hints: used when they place every device, else reported and the computed layout used", () => {
