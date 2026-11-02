@@ -485,8 +485,8 @@ same positions), and shared by every renderer:
 4. **No device on a link**: a spot on a link, or whose own links would run through a device, is never
    taken; a last pass swaps or moves devices while that removes crossings.
 
-With `aspect` `card`, nothing is wider than `max_columns` columns: a ring too long for the ladder runs
-round a rectangle that wide (its rows, sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
+With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns: outer devices hang sideways while there is room, a ring too long for the ladder runs
+round a rectangle that wide (its rows using the full width, its sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
 10-device lab stays readable on a ~330 px card (the `card-frames` preset: 4 columns). From JavaScript:
 
 ```ts

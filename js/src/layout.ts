@@ -22,10 +22,16 @@
 //      links cross none is preferred. A last pass swaps devices, or moves one to a spare spot, while
 //      that removes crossings or links through devices (the cycle's devices stay put).
 //   6. Islands (linked to nothing placed) go in a row underneath.
-// aspect card: at most `max_columns` columns. A ladder too long for that runs round a rectangle that
-// wide instead (its row lengths, sides and rotation chosen like the ladder's), a column layout wraps
-// into bands, and outer devices hang above or below, never sideways, so a 10-device lab stays readable
-// on a small card.
+// aspect card: a landscape card, at most `max_columns` columns and wider than tall where it can be. A
+// ladder too long for that runs round a rectangle that wide instead (its rows use the full width; its
+// sides and rotation chosen like the ladder's); a triangle that is the whole core is a V; a column
+// layout wraps into bands. Outer devices hang sideways off the row ends while everything stays within
+// max_columns (the layout may grow to either side), else above or below; a core device with a single
+// core neighbour (a stub) hangs with them rather than between the rows; spots round a device's
+// neighbours are tried when the band leaves none whose links cross nothing; islands go beside the
+// layout when they fit. The last pass may use the card's whole width, never adds a link through a
+// device, and also counts each row of height and link length a little, so a device moves into a nearby
+// spare spot when that adds no crossing. So a 10-device lab is about 4 columns by 3 rows on a card.
 // Hints ({ NAME: [x, y] }, a diagram's authored positions) are used when they place every device: a
 // device without a hint of its own takes the hint of the name it extends (NAME for NAME-O-1, NAME-T-2:
 // a diagram that draws one box for a line system the facts list shelf by shelf), and plain boxes still
@@ -98,6 +104,8 @@ const CLEAR = 0.55; // closer than this on both axes is taken (grid spots)
 const SPACE = 0.6; // no device nearer than this to another
 const CROSSING = 4; // the cost of two core links crossing, in grid units of link length
 const THROUGH = 6; // the cost of a core link running through a device
+const HEIGHT = 1; // on a card, the cost of a row of height in the last untangling pass
+const LENGTH = 0.4; // on a card, the cost of a grid unit of link length in the last untangling pass
 
 /** Compares device names the way people number them (P2 before P10). */
 export function compareNames(a: string, b: string): number {
@@ -213,7 +221,7 @@ function autoLayout(
   let description: string;
   if (cycle.length >= 3) {
     const on = ring && ordered ? `G.8032 ring ${ring.name ?? ring.id ?? ""}`.trim() : "the longest cycle";
-    const fitted = ladder(cycle, coreAdj, external, pes, card ? maxColumns : Infinity);
+    const fitted = ladder(cycle, coreAdj, external, pes, card ? maxColumns : Infinity, core.size === cycle.length);
     if (fitted) {
       pos = fitted;
       method = "ladder";
@@ -223,8 +231,10 @@ function autoLayout(
       method = "rectangle";
       description = `${on} round a rectangle ${maxColumns} columns wide`;
     }
-    // Core devices off the cycle: between the rows, under their placed neighbours.
-    const rest = sorted(core).filter((id) => !pos.has(id));
+    // Core devices off the cycle: between the rows, under their placed neighbours. On a card, one with a
+    // single core neighbour (a stub) is hung outward with the outer devices instead, so what hangs off it
+    // is not boxed in between the rows.
+    const rest = sorted(core).filter((id) => !pos.has(id) && !(card && coreAdj.get(id)!.size < 2));
     const rows = [...pos.values()].map((p) => p.y);
     const midY = (Math.min(...rows) + Math.max(...rows)) / 2;
     for (let pass = 0; pass < 3 && rest.some((id) => !pos.has(id)); pass++) {
@@ -254,15 +264,20 @@ function autoLayout(
     const ys = [...placedCore.values()].map((p) => p.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
     const midY = (minY + maxY) / 2;
-    const box = bounds(placedCore, maxColumns);
     const coreBox = { minX, maxX, minY, maxY };
-    // Outward from a placed device: off a core row end sideways (not on a card), up from the top
-    // row, down from the bottom row; from an outer device, the way it was hung.
+    // Room beside the layout for x on a card (everything stays within maxColumns columns).
+    const fits = (x: number) => {
+      const b = bounds(pos, maxColumns);
+      return !b || (x >= b.minX - 1e-9 && x <= b.maxX + 1e-9);
+    };
+    // Outward from a placed device: off a core row end sideways (on a card, while that stays within
+    // max_columns, so a card is wider than tall), up from the top row, down from the bottom row; from
+    // an outer device, the way it was hung.
     const outward = (anchor: string): Point => {
       const a = pos.get(anchor)!;
       if (!placedCore.has(anchor)) return a.dir ?? { x: 0, y: 1 };
-      if (!card && a.x === minX && minX !== maxX) return { x: -1, y: 0 };
-      if (!card && a.x === maxX && minX !== maxX) return { x: 1, y: 0 };
+      if (a.x === minX && minX !== maxX && fits(a.x - 0.9)) return { x: -1, y: 0 };
+      if (a.x === maxX && minX !== maxX && fits(a.x + 0.9)) return { x: 1, y: 0 };
       if (a.y === minY && minY !== maxY) return { x: 0, y: -1 };
       if (card && a.y < midY) return { x: 0, y: -1 };
       return { x: 0, y: 1 };
@@ -295,7 +310,9 @@ function autoLayout(
       // On a card, a device hung off the core goes in the band above or below it, not between rows
       // (unless its neighbours face different ways: then it sits between them).
       if (card && anchors.every((x) => placedCore.has(x)) && dir.y) want = { x: want.x, y: dir.y < 0 ? Math.min(want.y, minY - 1) : Math.max(want.y, maxY + 1) };
-      const p = free(pos, edges, want, dir.x ? "y" : "x", box, dir.x || dir.y ? dir : { x: 0, y: 1 }, mine, coreBox);
+      // On a card the band may leave no spot whose links cross nothing: the spots round the device's
+      // neighbours are tried too.
+      const p = free(pos, edges, want, dir.x ? "y" : "x", bounds(pos, maxColumns), dir.x || dir.y ? dir : { x: 0, y: 1 }, mine, coreBox, card ? mine : []);
       pos.set(id, { ...p, dir: dir.x || dir.y ? dir : { x: 0, y: 1 } });
       for (const nb of sorted(adj.get(id)!)) if (!pos.has(nb) && !seen.has(nb)) (seen.add(nb), queue.push(nb));
     }
@@ -303,7 +320,7 @@ function autoLayout(
 
   // Last, the devices off the cycle (or off the core, without one) are untangled among everything placed.
   const fixed = new Set(cycle.length >= 3 ? cycle : core);
-  if (pos.size > fixed.size) pos = untangle(pos, adj, new Set([...pos.keys()].filter((id) => !fixed.has(id))));
+  if (pos.size > fixed.size) pos = untangle(pos, adj, new Set([...pos.keys()].filter((id) => !fixed.has(id))), true, maxColumns);
 
   // Islands: rows underneath (at most maxColumns wide on a card).
   islands(ids, pos, maxColumns);
@@ -313,11 +330,18 @@ function autoLayout(
   return { positions: normalise(positions), method, description, core: sorted(core) };
 }
 
-// Devices linked to nothing placed: rows underneath (at most maxColumns wide).
+// Devices linked to nothing placed: rows underneath (at most maxColumns wide); on a card, a row to the
+// right instead when they fit beside the layout within maxColumns (a card stays wider than tall).
 function islands(ids: string[], pos: Map<string, Point>, maxColumns: number) {
   const left = ids.filter((id) => !pos.has(id));
   if (!left.length) return;
   const xs = [...pos.values()].map((p) => p.x);
+  if (Number.isFinite(maxColumns) && xs.length && Math.max(...xs) - Math.min(...xs) + left.length <= maxColumns - 1 + 1e-9) {
+    const ys = [...pos.values()].map((p) => p.y);
+    const y = Math.round((Math.min(...ys) + Math.max(...ys)) / 2);
+    left.forEach((id, i) => pos.set(id, { x: Math.max(...xs) + 1 + i, y }));
+    return;
+  }
   const x0 = xs.length ? Math.min(...xs) : 0;
   const y0 = pos.size ? Math.max(...[...pos.values()].map((p) => p.y)) + 1.2 : 0;
   const width = Number.isFinite(maxColumns) ? maxColumns : left.length;
@@ -350,11 +374,12 @@ function components(ids: string[], adj: Map<string, Set<string>>): string[][] {
   return out;
 }
 
-// The x range a card allows (maxColumns wide from the core's left edge); unbounded otherwise.
+// The x range a card allows for the next device: anywhere that keeps everything placed within
+// maxColumns columns (so the layout may grow to either side); unbounded otherwise.
 function bounds(pos: Map<string, Point>, maxColumns: number): { minX: number; maxX: number } | null {
   if (!Number.isFinite(maxColumns) || !pos.size) return null;
-  const minX = Math.min(...[...pos.values()].map((p) => p.x));
-  return { minX, maxX: minX + maxColumns - 1 };
+  const xs = [...pos.values()].map((p) => p.x);
+  return { minX: Math.max(...xs) - (maxColumns - 1), maxX: Math.min(...xs) + (maxColumns - 1) };
 }
 
 const NEAR = 0.2; // a device closer than this to a link (not at its ends) is on it
@@ -377,9 +402,9 @@ const segmentsCross = (p1: Point, p2: Point, p3: Point, p4: Point) => {
 // The nearest free spot to `want`, inside `box` when given. A spot is free when no device is within
 // SPACE of it, it is not on a link between placed devices, and its own links (to the placed devices
 // `mine`) run through no device. Nearby spots (a 0.3 grid round `want`, nearest first, a spot inside
-// `inner` (the core's box) counting as further) are tried first with no link of its own crossing a
-// placed one, then allowing crossings; failing both, the first spot without a device stepping along
-// `axis` (GAP apart), line by line outward along `out`.
+// `inner` (the core's box) counting as further; with `around`, the spots round those devices too) are
+// tried first with no link of its own crossing a placed one, then allowing crossings; failing both, the
+// first spot without a device stepping along `axis` (GAP apart), line by line outward along `out`.
 function free(
   pos: Map<string, Point>,
   edges: Array<[string, string]>,
@@ -389,6 +414,7 @@ function free(
   out: Point = { x: 0, y: 1 },
   mine: Point[] = [],
   inner: { minX: number; maxX: number; minY: number; maxY: number } | null = null,
+  around: Point[] = [],
 ): Point {
   const placed = [...pos.values()];
   const links = edges.filter(([a, b]) => pos.has(a) && pos.has(b)).map(([a, b]) => [pos.get(a)!, pos.get(b)!] as const);
@@ -399,11 +425,17 @@ function free(
   const start = box ? { ...want, x: Math.min(Math.max(want.x, box.minX), box.maxX) } : want;
   const within = (p: Point) => !!inner && p.x > inner.minX + 1e-9 && p.x < inner.maxX - 1e-9 && p.y > inner.minY + 1e-9 && p.y < inner.maxY - 1e-9;
   const near: Array<{ p: Point; d: number }> = [];
-  for (let i = -10; i <= 10; i++) {
-    for (let j = -10; j <= 10; j++) {
-      const p = { x: round(start.x + i * 0.3), y: round(start.y + j * 0.3) };
-      const d = Math.hypot(i, j) * 0.3;
-      if (d <= 3 + 1e-9 && inside(p)) near.push({ p, d: d + (within(p) ? 1 : 0) });
+  const seen = new Set<string>();
+  for (const [centre, reach] of [[start, 10], ...around.map((c) => [c, 6] as const)] as Array<readonly [Point, number]>) {
+    for (let i = -reach; i <= reach; i++) {
+      for (let j = -reach; j <= reach; j++) {
+        if (Math.hypot(i, j) > reach + 1e-9) continue;
+        const p = { x: round(centre.x + i * 0.3), y: round(centre.y + j * 0.3) };
+        const key = `${p.x},${p.y}`;
+        if (seen.has(key) || !inside(p)) continue;
+        seen.add(key);
+        near.push({ p, d: Math.hypot(p.x - start.x, p.y - start.y) + (within(p) ? 1 : 0) });
+      }
     }
   }
   near.sort((u, v) => u.d - v.d || u.p.y - v.p.y || u.p.x - v.p.x);
@@ -526,8 +558,23 @@ function chordCost(pos: Map<string, Point>, cycle: string[], chords: Chord[]): n
 // shorter row is scored (chordCost, less a bonus for devices facing customers, or PEs, at the ends);
 // the cheapest wins, the first found on a tie. Only racetracks at most `maxColumns` wide are
 // considered; null when none is.
-function ladder(cycle: string[], adj: Map<string, Set<string>>, external: Set<string>, edgeRole: Set<string>, maxColumns: number): Map<string, Point> | null {
+function ladder(
+  cycle: string[],
+  adj: Map<string, Set<string>>,
+  external: Set<string>,
+  edgeRole: Set<string>,
+  maxColumns: number,
+  whole = false,
+): Map<string, Point> | null {
   const m = cycle.length;
+  // A triangle that is the whole core, on a card: a V (two on top, one below between them), wider than
+  // tall; the device with the fewest outer links below, so the others hang off the top corners sideways.
+  if (m === 3 && whole && Number.isFinite(maxColumns) && maxColumns >= 3) {
+    const outer = (id: string) => (external.has(id) ? 2 : edgeRole.has(id) ? 1 : 0);
+    const low = [...cycle].sort((a, b) => outer(a) - outer(b) || cycle.indexOf(a) - cycle.indexOf(b))[0]!;
+    const [left, right] = cycle.filter((id) => id !== low);
+    return new Map([[left!, { x: 0, y: 0 }], [right!, { x: 2, y: 0 }], [low, { x: 1, y: 1 }]]);
+  }
   const chords = chordsOf(cycle, adj);
   let best: { cost: number; pos: Map<string, Point> } | null = null;
   for (let r = 0; r < m; r++) {
@@ -567,17 +614,19 @@ function ladder(cycle: string[], adj: Map<string, Set<string>>, external: Set<st
 // The cycle round a rectangle at most `width` columns wide (for a card, when a racetrack is too wide):
 // a top row left to right, down the right side, the bottom row right to left, up the left side. Every
 // split (top and bottom row lengths, devices on each side) and rotation is scored by chordCost, plus a
-// little per row so the rectangle stays low; the first cheapest wins. A shorter row spreads to the corners.
+// little per row so the rectangle stays low; the first cheapest wins. Both rows use the card's width
+// (the wider row exactly that, the other at most one less), so a long cycle is a wide, low rectangle,
+// not a tall one two columns wide. A shorter row spreads to the corners.
 function rectangle(cycle: string[], adj: Map<string, Set<string>>, width: number): Map<string, Point> {
   const m = cycle.length;
   const chords = chordsOf(cycle, adj);
   const spread = (n: number, w: number) => Array.from({ length: n }, (_, i) => (n === 1 ? 0 : (i * (w - 1)) / (n - 1)));
   let best: { cost: number; pos: Map<string, Point> } | null = null;
-  const most = Math.max(2, Math.min(width, m - 2));
-  for (let top = 2; top <= most; top++) {
-    for (let bottom = 2; bottom <= most; bottom++) {
+  const most = Math.max(2, Math.min(width, Math.floor(m / 2)));
+  for (let top = Math.max(2, most - 1); top <= most; top++) {
+    for (let bottom = Math.max(2, most - 1); bottom <= most; bottom++) {
       const sides = m - top - bottom;
-      if (sides < 0) continue;
+      if (sides < 0 || Math.max(top, bottom) !== most) continue;
       for (let rightN = Math.floor(sides / 2); rightN <= Math.ceil(sides / 2); rightN++) {
         const leftN = sides - rightN;
         const w = Math.max(top, bottom);
@@ -602,26 +651,53 @@ function rectangle(cycle: string[], adj: Map<string, Set<string>>, width: number
 
 // Untangles placed devices: swaps two of the `movable` ones, or moves one to a spare spot in the
 // layout's box, while that lowers the crossings and links through devices among the links between
-// placed devices (a move that only shortens links is not taken, so the ladder's choices stand).
+// placed devices (with `keepClear`, never adding a link through a device on the way; a move that only
+// shortens links is not taken, so the ladder's choices stand). On a card the spare spots reach as far to
+// either side as max_columns allows.
 // Deterministic: moves are tried in name and grid order, the first improvement taken, until none
 // helps (bounded).
-function untangle(pos: Map<string, Point>, adj: Map<string, Set<string>>, movable: Set<string> = new Set(pos.keys())): Map<string, Point> {
+function untangle(
+  pos: Map<string, Point>,
+  adj: Map<string, Set<string>>,
+  movable: Set<string> = new Set(pos.keys()),
+  keepClear = false,
+  maxColumns = Infinity,
+): Map<string, Point> {
   const ids = [...pos.keys()].sort(compareNames);
   const free = ids.filter((id) => movable.has(id));
   const edges = edgeList(ids, new Map(ids.map((id) => [id, new Set([...adj.get(id)!].filter((x) => pos.has(x)))])));
+  // { cost, through }: the weighted crossings and links through devices, and the links through devices.
   const penalty = (at: Map<string, Point>) => {
-    let n = 0;
-    for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) if (crosses(at, edges[i]!, edges[j]!)) n += CROSSING;
-    for (const [a, b] of edges) for (const id of ids) if (id !== a && id !== b && onLink(at.get(id)!, at.get(a)!, at.get(b)!)) n += THROUGH;
-    return n;
+    let cost = 0;
+    let through = 0;
+    for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) if (crosses(at, edges[i]!, edges[j]!)) cost += CROSSING;
+    for (const [a, b] of edges) for (const id of ids) if (id !== a && id !== b && onLink(at.get(id)!, at.get(a)!, at.get(b)!)) (cost += THROUGH, through++);
+    // On a card, each row of height costs a little (less than a crossing) and so does link length, so a
+    // device moves into a nearby spare spot inside the card when that adds no crossing: the card stays
+    // wider than tall without devices pulled away from their neighbours.
+    if (Number.isFinite(maxColumns)) {
+      const ay = [...at.values()].map((p) => p.y);
+      cost += HEIGHT * (Math.max(...ay) - Math.min(...ay));
+      for (const [a, b] of edges) cost += LENGTH * Math.hypot(at.get(a)!.x - at.get(b)!.x, at.get(a)!.y - at.get(b)!.y);
+    }
+    return { cost, through };
   };
-  let cur = penalty(pos);
+  let { cost: cur, through: curThrough } = penalty(pos);
   if (!cur) return pos;
   const xs = [...pos.values()].map((p) => p.x), ys = [...pos.values()].map((p) => p.y);
-  // Spare spots: a half-step grid aligned with the layout's corner, half a row beyond it above and below.
+  // Spare spots: a half-step grid aligned with the layout's corner, half a row beyond it above and below;
+  // on a card, as far to either side as max_columns allows (a move never makes it wider than that).
   const grid: Point[] = [];
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const box = bounds(pos, maxColumns);
+  const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+  const x0 = box ? Math.min(...xs) - Math.floor((Math.min(...xs) - box.minX) * 2 + 1e-9) / 2 : Math.min(...xs);
+  const x1 = box ? box.maxX : Math.max(...xs);
   for (let y = y0 - 0.5; y <= y1 + 0.5 + 1e-9; y += 0.5) for (let x = x0; x <= x1 + 1e-9; x += 0.5) grid.push({ x: round(x), y: round(y) });
+  const narrow = (at: Map<string, Point>) => {
+    if (!Number.isFinite(maxColumns)) return true;
+    const ax = [...at.values()].map((p) => p.x);
+    return Math.max(...ax) - Math.min(...ax) <= maxColumns - 1 + 1e-9;
+  };
   // Spots `id` could move to: none of the other devices within SPACE.
   const spare = (id: string) => grid.filter((g) => ![...pos].some(([o, p]) => o !== id && Math.hypot(p.x - g.x, p.y - g.y) < SPACE));
   for (let pass = 0; pass < 60 && cur > 0; pass++) {
@@ -635,10 +711,12 @@ function untangle(pos: Map<string, Point>, adj: Map<string, Set<string>>, movabl
     }
     for (const move of moves) {
       const next = move();
-      const cost = penalty(next);
-      if (cost < cur - 1e-9) {
+      // With keepClear, never a move that adds a link through a device, whatever crossings it removes.
+      const { cost, through } = penalty(next);
+      if (cost < cur - 1e-9 && (!keepClear || through <= curThrough) && narrow(next)) {
         for (const [id, p] of next) pos.set(id, p);
         cur = cost;
+        curThrough = through;
         better = true;
         break;
       }

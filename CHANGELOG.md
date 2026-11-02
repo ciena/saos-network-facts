@@ -17,6 +17,25 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-02
+
+### Changed
+
+- **Layout: landscape cards** — the card aspect (`aspect: "card"`, the `card-frames` preset) is for a landscape
+  card image, but half the cards came out taller than wide: a 10-device lab was two columns by six rows, small
+  labs two columns by four (CEs hung in bands above and below the core). A card is now wider than tall where
+  it can be, still within `max_columns` (about 4 columns by 3 rows for a 10-device lab): a cycle too long for
+  a two-row ladder runs round a rectangle whose rows use the full width (it was as narrow as two columns);
+  outer devices hang sideways off the row ends while everything stays within `max_columns` (the layout may
+  grow to either side), else above or below; a triangle that is the whole core is drawn as a V; islands go
+  beside the layout when they fit; and the last untangling pass counts each row of height (and link length)
+  a little, so a device moves into a nearby spare spot when that adds no crossing.
+- **Layout: hung devices avoid the rungs on a card** — devices hung off the core on a card no longer cross
+  the rungs where the wide layout is clean: a core device with a single core neighbour (a stub off an inner
+  router) hangs outward with the CEs instead of between the rows; spots round a device's neighbours are
+  tried when the band above or below leaves none whose links cross nothing; and the last untangling pass may
+  use the card's whole width and never adds a link through a device. Wide layouts are unchanged.
+
 ## [0.15.0] - 2026-11-02
 
 ### Added
