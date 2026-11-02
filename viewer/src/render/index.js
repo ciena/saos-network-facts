@@ -41,7 +41,7 @@ export function frameLayers(model, view) {
 export function frames(facts, view, params, opts) {
   const p = prepare(facts, view, params, opts);
   const { frames: list, start } = frameLayers(p.model, p.view);
-  const out = renderFrames(p.model, p.positions, { frames: list.length ? list : ['physical'], start: start ?? 'physical' });
+  const out = renderFrames(p.model, p.positions, { frames: list.length ? list : ['physical'], start: start ?? 'physical', period: p.view.frames.period_s });
   return { ...out, view: p.view, warnings: p.warnings, model: p.model };
 }
 

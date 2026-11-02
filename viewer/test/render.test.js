@@ -6,7 +6,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { main } from '../bin/saos-network-facts-render.mjs';
+import { labName, main, parseArgs } from '../bin/saos-network-facts-render.mjs';
+import { framePngs, pngName } from '../src/render/png.js';
+import { frameStyle } from '../src/render/frames.js';
 import { frameLayers, frames, prepare, snapshot } from '../src/render/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -23,7 +25,7 @@ const LABS = {
   'line-system': 'tests/fixtures/expected/line-system.facts.json',
 };
 const GOLDEN = resolve(here, 'golden/render');
-const frameIds = (svg) => [...svg.matchAll(/<g class="frame" id="f-([a-z0-9]+)"/g)].map((m) => m[1]);
+const frameIds = (svg) => [...svg.matchAll(/<g class="frame[ a-z0-9]*" id="f-([a-z0-9]+)"/g)].map((m) => m[1]);
 const planeIds = (svg) => [...svg.matchAll(/<g class="layer" data-layer="([a-z0-9]+)"/g)].map((m) => m[1]);
 
 function golden(name, svg) {
@@ -52,9 +54,9 @@ describe('frames', () => {
     const r = frames(read(LABS['adaptive-sr-cfm']));
     expect(r.frames.map((f) => f.id)).toEqual(['physical', 'ring', 'igp', 'bgp', 'pw', 'cfm']);
     expect(r.start).toBe('pw');
-    // the start frame is the last group, so the bare file shows it without :has()
+    // the start frame is the static one (no CSS animation: it shows); a fragment shows that frame instead
     expect(frameIds(r.svg).at(-1)).toBe('pw');
-    expect(r.svg).toContain('.frame:target{display:inline}.frame:last-of-type{display:inline}.frame:target~.frame:last-of-type{display:none}');
+    expect(r.svg).toContain('.frame{visibility:hidden}.frame.start{visibility:visible}:root:has(.frame:target) .frame{visibility:hidden}:root:has(.frame:target) .frame:target{visibility:visible}');
     expect(r.svg).toMatch(/data-title="Services · 3 pseudowires over/);
   });
 
@@ -141,23 +143,23 @@ describe('CLI', () => {
     const files = {}, out = [], err = [];
     return { files, out, err, opts: { read: (f) => (f in files ? files[f] : read(f)), write: (f, d) => (files[f] = d), out: { write: (s) => out.push(s) }, err: { write: (s) => err.push(s) } } };
   };
-  test('writes the frames and the snapshot, reports what it wrote and the view warnings', () => {
+  test('writes the frames and the snapshot, reports what it wrote and the view warnings', async () => {
     const t = io();
     t.files['v.json'] = JSON.stringify({ preset: 'card-frames', colour: 'red' });
-    const code = main([LABS['g8032-two-ring'], '--view', 'v.json', '--frames', 'f.svg', '--snapshot', 's.svg'], t.opts);
+    const code = await main([LABS['g8032-two-ring'], '--view', 'v.json', '--frames', 'f.svg', '--snapshot', 's.svg'], t.opts);
     expect(code).toBe(0);
     expect(frameIds(t.files['f.svg'])).toEqual(['physical', 'ring']);
     expect(planeIds(t.files['s.svg'])).toEqual(['ring', 'physical']);
     expect(t.err.join('')).toMatch(/warning: view: colour: unknown property/);
     expect(t.err.join('')).toMatch(/f.svg: 2 frames \(physical, ring\), start ring/);
   });
-  test('frames to standard output by default; usage errors exit 2', () => {
+  test('frames to standard output by default; usage errors exit 2', async () => {
     const t = io();
-    expect(main([LABS['plain-box']], t.opts)).toBe(0);
+    expect(await main([LABS['plain-box']], t.opts)).toBe(0);
     expect(t.out.join('')).toMatch(/^<svg/);
-    expect(main([], io().opts)).toBe(2);
-    expect(main(['a.json', '--bogus'], io().opts)).toBe(2);
-    expect(main(['missing.json'], { ...io().opts, read: () => { throw new Error('ENOENT'); } })).toBe(1);
+    expect(await main([], io().opts)).toBe(2);
+    expect(await main(['a.json', '--bogus'], io().opts)).toBe(2);
+    expect(await main(['missing.json'], { ...io().opts, read: () => { throw new Error('ENOENT'); } })).toBe(1);
   });
 });
 
@@ -175,5 +177,69 @@ describe('no three.js', () => {
     };
     walk(resolve(here, '../bin/saos-network-facts-render.mjs'));
     expect(seen.size).toBeGreaterThan(10);
+  });
+});
+
+describe('self-rotating frames', () => {
+  const pngSize = (buf) => [buf.readUInt32BE(16), buf.readUInt32BE(20)];
+
+  test('the bare file cycles every frame from the start frame, one period each, by hard cuts', () => {
+    const r = frames(read(LABS['adaptive-sr-cfm']), { preset: 'card-frames' });
+    const ids = r.frames.map((f) => f.id);
+    expect(r.period).toBe(4);
+    expect(r.svg).toContain(`@keyframes nf-rotate{0%{visibility:visible}16.666%,100%{visibility:hidden}}`);
+    expect(r.svg).toContain(`.frame{animation:nf-rotate ${ids.length * 4}s step-end infinite}`);
+    expect(r.svg).toMatch(/<g class="frame r0 start" id="f-pw"/);
+    expect(r.svg).toMatch(/<g class="frame r1" id="f-cfm"/); // the frame after the start frame, then round
+    expect(r.svg).toMatch(/<g class="frame r2" id="f-physical"/);
+    expect(r.svg).toContain('.r1{animation-delay:-20s}');
+    // inside a reduced-motion guard; a fragment, #still or data-rotate="off" stops it
+    expect(r.svg).toMatch(/@media \(prefers-reduced-motion:no-preference\)\{@keyframes/);
+    expect(r.svg).toContain(':root:has(.frame:target) .frame,:root:has(#still:target) .frame,:root[data-rotate="off"] .frame{animation:none}');
+    expect(r.svg).toContain('<rect id="still"');
+  });
+
+  test('the period comes from the view; one frame does not animate', () => {
+    expect(frames(read(LABS['g8032-two-ring']), { frames: { period_s: 6 } }).svg).toContain('.frame{animation:nf-rotate 12s step-end infinite}');
+    const one = frameStyle(['physical'], 'physical');
+    expect(one).not.toContain('@keyframes');
+    expect(one).toContain('.frame.start{visibility:visible}');
+    expect(frames(read(LABS['adaptive-sr-cfm']), { frames: { rule: 'list', list: ['igp'] } }).svg).not.toContain('@keyframes');
+  });
+
+  test('still(id): one frame on its own, no CSS', () => {
+    const r = frames(read(LABS['srv6-evpn']));
+    const s = r.still('igp');
+    expect(s).not.toContain('<style>');
+    expect(s).toContain('id="f-igp"');
+    expect(s).not.toContain('id="f-evpn"');
+    expect(() => r.still('nope')).toThrow(/no frame "nope"/);
+  });
+});
+
+describe('PNG export', () => {
+  const pngSize = (buf) => [buf.readUInt32BE(16), buf.readUInt32BE(20)];
+  test('one PNG per frame and scale, at the frame size times the scale', async () => {
+    const r = frames(read(LABS['g8032-two-ring']), { preset: 'card-frames' });
+    const pngs = await framePngs(r, { scales: [1, 2] });
+    expect(pngs.map((p) => `${p.id}@${p.scale}`)).toEqual(['physical@1', 'physical@2', 'ring@1', 'ring@2']);
+    for (const p of pngs) {
+      expect(p.png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+      expect(pngSize(p.png)).toEqual([r.width * p.scale, r.height * p.scale]);
+      expect(p.png.length).toBeGreaterThan(5000); // drawn, not blank
+    }
+    expect(pngs[0].png.equals(pngs[2].png)).toBe(false);
+    expect(pngName('lab', 'igp', 1)).toBe('lab.igp.png');
+    expect(pngName('lab', 'igp', 2)).toBe('lab.igp@2x.png');
+  });
+
+  test('CLI --png-dir writes <name>.<frame>.png and @2x, named after the facts file (or its folder)', async () => {
+    const files = {}, dirs = [], err = [];
+    const code = await main([LABS['g8032-two-ring'], '--png-dir', 'out', '--scale', '1,2'], { read, write: (f, d) => (files[f] = d), mkdir: (d) => dirs.push(d), out: { write: () => {} }, err: { write: (x) => err.push(x) } });
+    expect(code).toBe(0);
+    expect(dirs).toEqual(['out']);
+    expect(Object.keys(files).sort()).toEqual(['out/g8032-two-ring.physical.png', 'out/g8032-two-ring.physical@2x.png', 'out/g8032-two-ring.ring.png', 'out/g8032-two-ring.ring@2x.png']);
+    expect(labName('examples/adaptive-sr-cfm/facts.json')).toBe('adaptive-sr-cfm');
+    expect(() => parseArgs(['a.json', '--scale', '0'])).toThrow(/--scale/);
   });
 });

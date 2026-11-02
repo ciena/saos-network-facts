@@ -64,7 +64,7 @@ describe('import', () => {
 });
 
 describe('frames and snapshot', () => {
-  const group = (svg, id) => svg.split(/(?=<g class="frame")/).find((g) => g.includes(`id="f-${id}"`));
+  const group = (svg, id) => svg.split(/(?=<g class="frame[ a-z0-9]*")/).find((g) => g.includes(`id="f-${id}"`));
 
   test('the optical frame: the line system (spans with captions, members tagged) and the routers at its ends', () => {
     const r = frames(text, { preset: 'card-frames' });
@@ -104,7 +104,7 @@ describe('frames and snapshot', () => {
 
   test('a note goes on its layer\'s frame, or the physical one when the drawing has no such frame', () => {
     const svg = frames(withNotes([{ text: 'IGP note', device: 'PE1', layer: 'igp' }, { text: 'ring note', layer: 'ring' }])).svg;
-    const groups = svg.split(/(?=<g class="frame")/).slice(1);
+    const groups = svg.split(/(?=<g class="frame[ a-z0-9]*")/).slice(1);
     const frameOf = (t) => groups.filter((g) => g.includes(`>${t}</text>`)).map((g) => g.match(/id="f-([a-z0-9]+)"/)[1]);
     expect(frameOf('IGP note')).toEqual(['igp']);
     expect(frameOf('ring note')).toEqual(['physical']);

@@ -564,9 +564,25 @@ with the same layout as the 3D page:
   transport). Devices stay put from frame to frame; each object carries two or three short labels, each
   frame a title, devices without facts are dashed plain boxes (line-system members solid, with their
   role), optical spans a double line with their label, sites a dashed frame, notes yellow (schema 1.9). Each frame is a group `<g id="f-<layer>">`
-  shown by CSS `:target`, so `<img src="frames.svg#f-igp">` shows one frame without any script, and
-  `<img src="frames.svg">` shows the start frame. A card rotates through them by stacking one `<img>` per
-  frame (or by inlining the SVG and showing one group at a time).
+  shown by CSS `:target`, so `<img src="frames.svg#f-igp">` shows that frame and stays on it, without any
+  script. **The bare file rotates by itself**: CSS inside the SVG (`@keyframes`, no script) shows the start
+  frame, then the next frame every `frames.period_s` seconds (default 4), round, wherever the file is shown
+  on its own: `<img src="frames.svg">`, a CSS `background-image`, the file opened in a browser, and GitHub's
+  file view (which shows an SVG as an image: scripts are stripped there, CSS animations are not). The frames
+  switch by hard cuts, not a crossfade: 20 rotating cards on a page cost about 6% of a core in headless
+  Chromium where a 0.4 s crossfade cost about 37%. A lab with one frame does not move. A viewer that runs
+  no CSS animation shows the start frame. `prefers-reduced-motion: reduce` stops it on the start frame when
+  the file is the document; an `<img>` does not see the page's preference, so serve `frames.svg#still`
+  (the start frame, not moving) for it:
+
+  ```html
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="frames.svg#still">
+    <img src="frames.svg" alt="Lab frames">
+  </picture>
+  ```
+
+  A page that inlines the SVG and rotates the groups itself sets `data-rotate="off"` on the `<svg>`.
 - **`snapshot.svg`**: the 3D view's planes, one per layer, exploded (planes apart, nothing overlaps) or
   `stacked` (`snapshot.variant`): every device straight above itself on each plane, tied by a dotted riser,
   objects with short labels, hover titles with the full properties. Chips at the top switch planes off and
@@ -583,13 +599,29 @@ saos-network-facts-render facts.json --params "preset=card-frames&start=igp" > f
 ```
 
 `--view` takes a view file, `--params` view URL parameters (as the viewer page reads them); warnings
-(properties ignored, hints not used) go to standard error. From JavaScript, the viewer release tgz's
+(properties ignored, hints not used) go to standard error.
+
+**PNG export**, for documents and tools that take no SVG: `--png-dir DIR` writes one PNG per frame,
+`<name>.<frame>.png` and `<name>.<frame>@2x.png` (`--scale 1,2` is the default; `<name>` is the facts
+file's name, or its folder's for a plain `facts.json`):
+
+```bash
+saos-network-facts-render core.facts.json --params preset=card-frames --png-dir png
+# png/core.physical.png  png/core.physical@2x.png  png/core.igp.png  png/core.igp@2x.png ...
+```
+
+The pictures are drawn by [resvg](https://github.com/RazrFalcon/resvg) (`@resvg/resvg-js`, no browser),
+a dependency of the viewer; from the release tgz, install it beside the CLI (`npm install
+@resvg/resvg-js@2.6.2`). Fonts: resvg uses the system's fonts, the first of the frames' families it finds
+(Segoe UI, Roboto, Helvetica, Arial), else DejaVu Sans (most Linux machines and CI runners have it).
+`--font FILE` adds a font file and `--font-family NAME` draws all text in that family, for the same
+pictures on any machine. From JavaScript, the viewer release tgz's
 `render/render.js` (in the release asset only, not on the Pages site) (an ES module with the importer and engine bundled in, no three.js) exports the same:
 
 ```js
 import { frames, snapshot } from './render/render.js';
 
-const card = frames(factsText, { preset: 'card-frames' });   // { svg, frames: [{ id, title }], start, width, height, warnings }
+const card = frames(factsText, { preset: 'card-frames' });   // { svg, frames: [{ id, title }], start, period, width, height, still(id), warnings }
 const full = snapshot(factsText, { preset: 'lab-snapshot' });   // { svg, layers, width, height, warnings }
 ```
 
