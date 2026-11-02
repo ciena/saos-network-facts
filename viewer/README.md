@@ -35,6 +35,7 @@ Node 22.18 or later.
 | `src/labs.js` | facts by URL: `?facts=`, `?positions=`, `?labs=`, `?lab=`, `?view=` and the lab index |
 | `src/render/` | the static renders: `frames.svg` (a 2D frame per layer, CSS `:target`) and `snapshot.svg` (the exploded planes, layer chips), from the importer, the engine and the library layout; no three.js |
 | `bin/saos-network-facts-render.mjs` | the CLI for them (`npm run render -- facts.json --frames f.svg --snapshot s.svg`); `npm run build:render` bundles it and `render.js` into `dist-render/render/`, which the release tgz carries as `render/` (not the Pages site) |
+| `src/render/png.js` | PNG export of the frames (`--png-dir`): each frame's still SVG drawn by `@resvg/resvg-js` at each `--scale`, no browser |
 | `src/viewprops.js` | view properties: the resolved view (lab view file, `?view=`, URL parameters), the planes it draws, the camera pose, the label density |
 | `labs.config.js` | the labs the build stages as `labs/index.json` (vite plugin; the dev server serves them too) |
 | `src/engine/` | the network model: IS-IS, OSPF, SR-MPLS and SR policies, MPLS-TP, SRv6 / Flex-Algo, BGP and L3VPN (VRFs, hosts), VPWS, EVPN, CFM, G.8032, LAG, walks, failure replay |

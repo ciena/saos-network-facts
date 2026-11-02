@@ -5,7 +5,12 @@
 // Kept out of dist/ (the Pages site): scripts/package-release.sh adds render/ to the viewer tgz.
 import { defineConfig } from 'vite';
 
+// render/package.json says the folder is ES modules, so the .js files load as such even when an
+// enclosing package.json (npm init, to install @resvg/resvg-js beside the CLI) says CommonJS.
+const esmFolder = { name: 'esm-folder', generateBundle() { this.emitFile({ type: 'asset', fileName: 'package.json', source: '{\n  "type": "module"\n}\n' }); } };
+
 export default defineConfig({
+  plugins: [esmFolder],
   build: {
     ssr: true,
     outDir: 'dist-render/render',
@@ -17,5 +22,6 @@ export default defineConfig({
       output: { format: 'es', entryFileNames: (c) => (c.name === 'render' ? 'render.js' : '[name].mjs'), chunkFileNames: 'chunks/[name].js' },
     },
   },
-  ssr: { noExternal: true },
+  // resvg is a native module: the PNG export loads it at run time (npm install @resvg/resvg-js beside the CLI).
+  ssr: { noExternal: true, external: ['@resvg/resvg-js'] },
 });

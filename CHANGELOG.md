@@ -17,6 +17,25 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-02
+
+### Added
+
+- **Viewer: `frames.svg` rotates by itself; PNG export** — the frames SVG carries CSS (`@keyframes`, no
+  script) that shows the start frame, then the next frame every `frames.period_s` seconds, round, wherever
+  the file is shown on its own (`<img>`, CSS background, the file in a browser, GitHub's file view). Hard
+  cuts, not a crossfade (20 rotating cards: ~6% of a core against ~37% for a 0.4 s fade, headless Chromium).
+  `#f-<layer>` shows that frame and stops; `#still` shows the start frame without moving, for
+  `<picture><source media="(prefers-reduced-motion: reduce)">` (an `<img>` does not see the page's
+  preference; the file as a document stops by itself); `data-rotate="off"` stops it in a page that inlines
+  the SVG; one frame does not move; a viewer without CSS animation shows the start frame. Checked headless
+  in Chromium and Firefox, as `<img>`, as the document and as a background image, the optical frame
+  included. CLI `--png-dir DIR [--scale 1,2] [--font FILE] [--font-family NAME]` writes
+  `<name>.<frame>.png` and `@2x.png` per frame with `@resvg/resvg-js` (a new viewer dependency, no browser;
+  installed beside the bundled CLI from the release tgz); `frames()` returns `period` and `still(id)`. The
+  bundled `render/` gains a `package.json` (`"type": "module"`) so it loads as ES modules beside any
+  `package.json`.
+
 ## [0.18.0] - 2026-11-02
 
 ### Added

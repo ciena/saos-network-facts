@@ -72,7 +72,7 @@ export function frameTitle(id, m) {
 }
 
 // frames: the layer ids in order (js/src/view.ts viewFrames), start: the one shown by the bare file.
-export function renderFrames(m, positions, { frames, start }) {
+export function renderFrames(m, positions, { frames, start, period = 4 }) {
   const P = positions;
   const xs = Object.values(P).map((p) => p.x), ys = Object.values(P).map((p) => p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -97,19 +97,53 @@ export function renderFrames(m, positions, { frames, start }) {
   const ctx = { model: m, full: m, at, f, nodes, W, H, frames, notesH };
   const order = start && frames.includes(start) ? [...frames.filter((x) => x !== start), start] : frames;
 
-  const out = [];
-  out.push(`<svg xmlns="http://www.w3.org/2000/svg" class="netfacts-frames" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" data-frames="${frames.join(' ')}" data-start="${start ?? ''}">`);
-  out.push(`<title>${esc(m.name)}</title>`);
-  out.push('<style>.frame{display:none}.frame:target{display:inline}.frame:last-of-type{display:inline}.frame:target~.frame:last-of-type{display:none}</style>');
-  out.push(`<rect width="${W}" height="${H}" fill="#fff"/>`);
+  const open = `<svg xmlns="http://www.w3.org/2000/svg" class="netfacts-frames" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" data-frames="${frames.join(' ')}" data-start="${start ?? ''}">`;
+  const head = `<title>${esc(m.name)}</title>`;
+  const background = `<rect id="still" width="${W}" height="${H}" fill="#fff"/>`;
+  const groups = {};
   for (const id of order) {
     const lm = layerModel(m, id, split);
     const g = draw(id, { ...ctx, model: lm, nodes: new Map(lm.nodes.map((n) => [n.id, n])) });
     g.push(`<rect width="${W}" height="${r1(f * 2.5)}" fill="#fff" fill-opacity="0.92"/><text x="${r1(f * 1.1)}" y="${r1(f * 1.7)}" font-size="${r1(f * 1.15)}" font-weight="700" fill="${id === 'physical' ? C.ink : C[id] ?? C.ink}">${esc(titles[id])}</text>`);
-    out.push(`<g class="frame" id="f-${id}" data-title="${esc(titles[id])}">${g.join('')}</g>`);
+    groups[id] = `<g class="frame r${rotIndex(frames, start, id)}${id === start ? ' start' : ''}" id="f-${id}" data-title="${esc(titles[id])}">${g.join('')}</g>`;
   }
-  out.push('</svg>');
-  return { svg: `${out.join('\n')}\n`, frames: frames.map((id) => ({ id, title: titles[id] })), start, width: W, height: H };
+  const svg = [open, head, `<style>${frameStyle(frames, start, { period })}</style>`, background, ...order.map((id) => groups[id]), '</svg>'].join('\n');
+  // One frame on its own, no CSS: for rasterisers that run no animation (png.js).
+  const still = (id) => {
+    if (!groups[id]) throw new Error(`no frame "${id}"`);
+    return [open, head, background, groups[id].replace(' class="frame', ' class="still-frame'), '</svg>\n'].join('\n');
+  };
+  return { svg: `${svg}\n`, frames: frames.map((id) => ({ id, title: titles[id] })), start, period, width: W, height: H, still };
+}
+
+// A frame's place in the rotation: 0 for the start frame, then the frames after it in the list, round.
+export function rotIndex(frames, start, id) {
+  const s = Math.max(0, frames.indexOf(start));
+  return (frames.indexOf(id) - s + frames.length) % frames.length;
+}
+
+// The frames' CSS. Static: the start frame shows (any SVG viewer, CSS animation or not); #f-<layer>
+// shows that frame instead. Moving: when nothing is targeted and motion is welcome, every frame runs
+// one animation of N periods, staggered by a negative delay so the start frame shows at t = 0, then the
+// next frame in the list, and so on round. A targeted frame stops it (:has(:target)), as does
+// prefers-reduced-motion and an inlining page that sets data-rotate="off" on the <svg>. One frame: no
+// animation. A hard cut (visibility, step-end): nothing is redrawn between switches, so 20 cards on a
+// page cost ~6% of a core where a 0.4 s crossfade cost ~37% (headless Chromium, software rendering).
+export function frameStyle(frames, start, { period = 4 } = {}) {
+  const n = frames.length;
+  const css = ['.frame{visibility:hidden}.frame.start{visibility:visible}', ':root:has(.frame:target) .frame{visibility:hidden}:root:has(.frame:target) .frame:target{visibility:visible}'];
+  // #still: the start frame, not moving. An <img> does not see the page's prefers-reduced-motion, so
+  // a page serves frames.svg#still for it: <picture><source media="(prefers-reduced-motion: reduce)"
+  // srcset="frames.svg#still"><img src="frames.svg"></picture>.
+  if (n < 2) return css.join('');
+  const cycle = n * period;
+  // rounded down, so a frame is hidden by the time the next one shows (never two at a boundary)
+  const pct = (t) => `${Math.floor((t / cycle) * 1e5) / 1e3}%`;
+  const keyframes = `@keyframes nf-rotate{0%{visibility:visible}${pct(period)},100%{visibility:hidden}}`;
+  // Classes, not ids, so the stop rules (more specific) win over the animation.
+  const rules = frames.map((_, k) => (k ? `.r${k}{animation-delay:${-(n - k) * period}s}` : ''));
+  css.push(`@media (prefers-reduced-motion:no-preference){${keyframes}.frame{animation:nf-rotate ${cycle}s step-end infinite}${rules.join('')}:root:has(.frame:target) .frame,:root:has(#still:target) .frame,:root[data-rotate="off"] .frame{animation:none}}`);
+  return css.join('');
 }
 
 // A label block, first line bold; anchored centre-top at (x, y) or above, kept off earlier blocks.

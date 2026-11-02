@@ -1,6 +1,6 @@
 {
   "name": "saos-network-facts-viewer",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "private": true,
   "description": "3D view of a saos-network-facts facts file: physical, IS-IS, SR policy, BGP, pseudowire and CFM layers over one topology.",
   "license": "Apache-2.0",
@@ -17,6 +17,7 @@
     "render": "node bin/saos-network-facts-render.mjs"
   },
   "dependencies": {
+    "@resvg/resvg-js": "2.6.2",
     "three": "^0.169.0",
     "yaml": "^2.5.0"
   },
