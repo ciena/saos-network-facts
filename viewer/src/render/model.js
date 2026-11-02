@@ -61,6 +61,8 @@ export function renderModel(imp, net) {
       locators: (locators.get(n.id) ?? []).map((l) => l.prefix),
       site: n.site ?? null,
       equipment: n.equipment ?? null,
+      // A line-system member: a box without facts with an equipment role (schema 1.9 devices[].role).
+      member: !!(n.plain && n.equipment),
     };
   });
   // A lab with no IGP router: its devices are L2 switches, not CEs.
@@ -86,6 +88,7 @@ export function renderModel(imp, net) {
     plain: !!l.plain,
     medium: l.medium ?? null,
     caption: l.caption ?? null,
+    over: l.over ?? null,
   }));
 
   const pws = (net.vpws?.pseudowires ?? []).map((pw) => {
@@ -125,6 +128,7 @@ export function renderModel(imp, net) {
 // The view layers (js/src/view.ts LAYER_IDS) this lab has something to draw on.
 export function presentLayers(m) {
   const has = {
+    optical: m.nodes.some((n) => n.member) || m.links.some((l) => l.medium === 'optical'),
     physical: true,
     ring: m.rings.length > 0,
     igp: m.links.some((l) => l.adj),
@@ -158,6 +162,38 @@ export function wrapNote(text, width = 34, max = 3) {
   if (cur) lines.push(cur);
   if (lines.length > max) { lines.length = max; lines[max - 1] = `${lines[max - 1].slice(0, width - 1)}…`; }
   return lines;
+}
+
+// The part of the model a layer draws. With an optical layer (`split`: the drawing has one), line-system
+// members and the links to them, and the optical spans, are on it, with the routers at their ends; the
+// other layers leave the members and their links out (a link between two routers stays, an optical one
+// too). Without one, every layer has everything, as before.
+export function layerModel(m, id, split) {
+  if (!split) return m;
+  const members = new Set(m.nodes.filter((n) => n.member).map((n) => n.id));
+  const toMember = (l) => members.has(l.a.node) || members.has(l.b.node);
+  if (id === 'optical') {
+    const links = m.links.filter((l) => toMember(l) || l.medium === 'optical');
+    const ends = new Set(links.flatMap((l) => [l.a.node, l.b.node]));
+    const nodes = m.nodes.filter((n) => n.member || ends.has(n.id));
+    return { ...m, nodes, links, sites: sitesOf(m, nodes) };
+  }
+  const nodes = m.nodes.filter((n) => !n.member);
+  return { ...m, nodes, links: m.links.filter((l) => !toMember(l)), sites: sitesOf(m, nodes) };
+}
+
+const sitesOf = (m, nodes) => {
+  const ids = new Set(nodes.map((n) => n.id));
+  return m.sites.map((s) => ({ ...s, nodes: s.nodes.filter((x) => ids.has(x)) })).filter((s) => s.nodes.length);
+};
+
+// The layer a note goes on (schema 1.9 notes[].layer), among the drawing's `layers`: its own when the
+// drawing has it; without one, optical for a note on a line-system member when the drawing has an
+// optical layer; else physical.
+export function noteLayerOf(note, m, layers) {
+  if (note.layer && layers.includes(note.layer)) return note.layer;
+  if (!note.layer && layers.includes('optical') && m.nodes.some((n) => n.id === note.device && n.member)) return 'optical';
+  return 'physical';
 }
 
 // The full properties of a device, one per line: the hover title on every object of it.

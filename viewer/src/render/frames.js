@@ -12,7 +12,7 @@
 //   <img src="frames.svg">        the start frame (the view's frames.start, by default the signature layer)
 // A page that inlines the SVG can show one group at a time itself (a card that rotates).
 
-import { deviceDetail, equipmentTag, wrapNote } from './model.js';
+import { deviceDetail, equipmentTag, layerModel, noteLayerOf, wrapNote } from './model.js';
 
 const C = {
   ink: '#1d2430', mute: '#5b6675', ghost: '#c3cad3', ghostInk: '#8a94a3',
@@ -31,6 +31,11 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export function frameTitle(id, m) {
   const igpName = m.igp === 'ospf' ? 'OSPF' : 'IS-IS';
   switch (id) {
+    case 'optical': {
+      const members = m.nodes.filter((n) => n.member).length;
+      const spans = m.links.filter((l) => l.medium === 'optical').length;
+      return `Optical · ${plural(members, 'line-system member')}, ${plural(spans, 'span')}${m.sites.length ? ` · ${plural(m.sites.length, 'site')}` : ''}`;
+    }
     case 'physical': {
       const oses = [...new Set(m.nodes.map((n) => n.os).filter(Boolean))];
       const optical = m.links.filter((l) => l.medium === 'optical').length;
@@ -77,7 +82,9 @@ export function renderFrames(m, positions, { frames, start }) {
   const U = Math.max(160, f * 9.4), V = f * 7.6;
   // A site frame's name sits on its top edge, above the device labels: a line more at the top.
   const mx = f * 5.5, myTop = f * (m.sites.length ? 8.6 : 7.4), myBot = f * 6.6;
-  const titles = Object.fromEntries(frames.map((id) => [id, frameTitle(id, m)]));
+  // An optical frame takes the line system off the others (render/model.js layerModel).
+  const split = frames.includes('optical');
+  const titles = Object.fromEntries(frames.map((id) => [id, frameTitle(id, layerModel(m, id, split))]));
   // Wide enough for the longest title, so a small lab keeps its titles whole.
   const W = Math.ceil(Math.max((maxX - minX) * U + 2 * mx, Math.max(...Object.values(titles).map((t) => t.length)) * f * 1.15 * 0.6 + f * 2.4));
   // Free notes (no device) sit along the bottom edge: room for the frame with the most of them.
@@ -87,7 +94,7 @@ export function renderFrames(m, positions, { frames, start }) {
   const ox = (W - ((maxX - minX) * U + 2 * mx)) / 2;
   const at = (id) => ({ x: r1(ox + mx + (P[id].x - minX) * U), y: r1(myTop + (P[id].y - minY) * V) });
   const nodes = new Map(m.nodes.map((n) => [n.id, n]));
-  const ctx = { model: m, at, f, nodes, W, H, frames, notesH };
+  const ctx = { model: m, full: m, at, f, nodes, W, H, frames, notesH };
   const order = start && frames.includes(start) ? [...frames.filter((x) => x !== start), start] : frames;
 
   const out = [];
@@ -96,7 +103,8 @@ export function renderFrames(m, positions, { frames, start }) {
   out.push('<style>.frame{display:none}.frame:target{display:inline}.frame:last-of-type{display:inline}.frame:target~.frame:last-of-type{display:none}</style>');
   out.push(`<rect width="${W}" height="${H}" fill="#fff"/>`);
   for (const id of order) {
-    const g = draw(id, ctx);
+    const lm = layerModel(m, id, split);
+    const g = draw(id, { ...ctx, model: lm, nodes: new Map(lm.nodes.map((n) => [n.id, n])) });
     g.push(`<rect width="${W}" height="${r1(f * 2.5)}" fill="#fff" fill-opacity="0.92"/><text x="${r1(f * 1.1)}" y="${r1(f * 1.7)}" font-size="${r1(f * 1.15)}" font-weight="700" fill="${id === 'physical' ? C.ink : C[id] ?? C.ink}">${esc(titles[id])}</text>`);
     out.push(`<g class="frame" id="f-${id}" data-title="${esc(titles[id])}">${g.join('')}</g>`);
   }
@@ -182,7 +190,7 @@ function draw(id, ctx) {
   const { model, at, f, nodes } = ctx;
   const ends = linkEnds(ctx);
   const reg = [];
-  const g = siteFrames(ctx, reg, id === 'physical');
+  const g = siteFrames(ctx, reg, id === 'physical' || id === 'optical');
   const dot = (p, color, r = f * 0.55) => `<ellipse cx="${p.x}" cy="${p.y}" rx="${r1(r)}" ry="${r1(r * 0.75)}" fill="${color}" stroke="#fff" stroke-width="${r1(f * 0.1)}"/>`;
   const pill = (p, text, color) => {
     const w = String(text).length * f * 0.75 * 0.6 + f * 0.6;
@@ -201,7 +209,8 @@ function draw(id, ctx) {
     return { path: `<path d="M${a.x},${a.y} Q${r1(c.x)},${r1(c.y)} ${b.x},${b.y}" fill="none" stroke="${color}" stroke-width="${r1(f * 0.2)}"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`, apex };
   };
 
-  if (id === 'physical') {
+  // The physical frame, and the optical frame (the line system and the routers at its ends) drawn alike.
+  if (id === 'physical' || id === 'optical') {
     const mixed = new Set(model.nodes.map((n) => n.os).filter(Boolean)).size > 1;
     const pillW = (text) => String(text).length * f * 0.75 * 0.6 + f * 0.6;
     const pair = (l) => [l.a.node, l.b.node].sort().join('|');
@@ -209,7 +218,9 @@ function draw(id, ctx) {
     for (const l of model.links) pairs.set(pair(l), [...(pairs.get(pair(l)) ?? []), l.id]);
     for (const l of model.links) {
       const [a, b] = ends.get(l.id);
-      const tip = `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium ? `\n${l.medium}${l.caption ? `: ${l.caption}` : ''}` : l.caption ? `\n${l.caption}` : ''}${l.subnet ? `\n${l.subnet}` : ''}`;
+      // A routed link over the line system says so (`over ch 25`) where it has no label of its own.
+      const caption = l.caption ?? l.over;
+      const tip = `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium ? `\n${l.medium}${l.caption ? `: ${l.caption}` : ''}` : l.caption ? `\n${l.caption}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}`;
       // An optical span: a fibre, drawn as a blue double line (white core).
       const body = l.medium === 'optical'
         ? `${line(a, b, C.optical, f * 0.42, ' stroke-linecap="round"')}${line(a, b, '#fff', f * 0.14, ' stroke-linecap="round"')}`
@@ -219,13 +230,13 @@ function draw(id, ctx) {
       const sibs = pairs.get(pair(l));
       const t = 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3;
       const len = Math.hypot(b.x - a.x, b.y - a.y);
-      const cw = l.caption ? pillW(l.caption) : 0;
-      const fits = (port, tp) => !l.caption || (Math.min(tp, 1 - tp) * len - pillW(port) / 2 > f * 1.4 && Math.abs(t - tp) * len > (cw + pillW(port)) / 2 + 2);
+      const cw = caption ? pillW(caption) : 0;
+      const fits = (port, tp) => !caption || (Math.min(tp, 1 - tp) * len - pillW(port) / 2 > f * 1.4 && Math.abs(t - tp) * len > (cw + pillW(port)) / 2 + 2);
       const pa = l.a.port ?? '?', pb = l.b.port ?? '?';
       const ports = fits(pa, 0.24) && fits(pb, 0.76) ? `${pill(lerp(a, b, 0.24), pa, '#9aa4b1')}${pill(lerp(a, b, 0.76), pb, '#9aa4b1')}` : '';
-      const cap = l.caption ? pill(lerp(a, b, t), l.caption, l.medium === 'optical' ? C.optical : '#9aa4b1') : '';
+      const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || !l.caption ? C.optical : '#9aa4b1') : '';
       g.push(`<g${l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}${ports}${cap}</g>`);
-      if (l.caption) { const c = lerp(a, b, t); reg.push({ x: c.x - cw / 2, y: c.y - f * 0.55, w: cw, h: f * 1.1 }); }
+      if (caption) { const c = lerp(a, b, t); reg.push({ x: c.x - cw / 2, y: c.y - f * 0.55, w: cw, h: f * 1.1 }); }
     }
     for (const n of model.nodes) {
       const p = at(n.id);
@@ -391,7 +402,7 @@ function draw(id, ctx) {
 
 // A note's frame: its layer when the drawing has that frame, else physical.
 function notesOn(m, id, frames) {
-  return m.notes.filter((x) => (frames.includes(x.layer) ? x.layer : 'physical') === id);
+  return m.notes.filter((x) => noteLayerOf(x, m, frames) === id);
 }
 
 // Sites (schema 1.9): a rounded frame round each site's devices and their labels (above a device in
@@ -417,7 +428,7 @@ function siteFrames(ctx, reg, strong) {
 function drawNotes(id, ctx, reg) {
   const { f, at, model, frames, H, notesH } = ctx;
   const g = [];
-  const mine = notesOn(model, id, frames);
+  const mine = notesOn(ctx.full, id, frames);
   for (const x of mine.filter((n) => n.device)) {
     const p = at(x.device);
     const lines = wrapNote(x.text, 26);

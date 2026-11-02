@@ -31,14 +31,14 @@ describe('import', () => {
     const optical = drawnLinks(imp.topology).filter((l) => l.medium === 'optical').map((l) => [l.a.node, l.b.node, l.caption]);
     expect(optical).toEqual([['PE1', 'ROADM-A', 'ch 25'], ['PE1', 'ROADM-A', 'ch 26 · dark'], ['ROADM-A', 'AMP-1', 'span 1 · 40 km'], ['AMP-1', 'ROADM-B', 'span 2 · 38 km'], ['ROADM-B', 'PE2', 'ch 25']]);
     const core = imp.topology.links.find((l) => l.id === 'PE1-PE2');
-    expect([core.kind, core.medium, buildNetwork(imp.topology).igp.adjacencies.find((a) => a.link === 'PE1-PE2')?.state]).toEqual(['core', undefined, 'Up']);
+    expect([core.kind, core.medium, core.over, buildNetwork(imp.topology).igp.adjacencies.find((a) => a.link === 'PE1-PE2')?.state]).toEqual(['core', undefined, 'over ch 25', 'Up']);
   });
 
   test('sites, notes, and the layout puts the line system on the core ladder', () => {
     expect(imp.topology.sites).toEqual([{ name: 'east', nodes: ['PE1', 'ROADM-A'] }, { name: 'west', nodes: ['PE2', 'ROADM-B'] }]);
     expect(imp.topology.notes).toEqual([
-      { text: 'in-line amplifier hut, no site of its own', device: 'AMP-1', layer: 'physical' },
-      { text: 'PE1-PE2 core link rides ch 25; ch 26 is lit on ROADM-A only', device: null, layer: 'physical' },
+      { text: 'in-line amplifier hut, no site of its own', device: 'AMP-1', layer: null },
+      { text: 'PE1-PE2 core link rides ch 25; ch 26 is lit on ROADM-A only', device: null, layer: null },
     ]);
     expect(imp.layout.method).toBe('ladder');
     expect(imp.layout.core).toEqual(['AMP-1', 'PE1', 'PE2', 'ROADM-A', 'ROADM-B']);
@@ -64,19 +64,42 @@ describe('import', () => {
 });
 
 describe('frames and snapshot', () => {
-  test('the physical frame: optical spans with captions, members tagged, site frames, notes', () => {
-    const svg = frames(text, { preset: 'card-frames' }).svg;
-    const physical = svg.split(/(?=<g class="frame")/).find((g) => g.includes('id="f-physical"'));
-    expect(physical.match(/class="link-optical"/g)).toHaveLength(5);
-    for (const caption of ['ch 25', 'ch 26 · dark', 'span 1 · 40 km', 'span 2 · 38 km']) expect(physical).toContain(`>${caption}</text>`);
-    expect(physical).toContain('>ROADM</text>');
-    expect(physical).toContain('>AMP</text>');
+  const group = (svg, id) => svg.split(/(?=<g class="frame")/).find((g) => g.includes(`id="f-${id}"`));
+
+  test('the optical frame: the line system (spans with captions, members tagged) and the routers at its ends', () => {
+    const r = frames(text, { preset: 'card-frames' });
+    expect(r.frames.map((x) => x.id)).toEqual(['optical', 'physical', 'igp', 'bgp', 'pw']);
+    const optical = group(r.svg, 'optical');
+    expect(optical.match(/class="link-optical"/g)).toHaveLength(5);
+    for (const caption of ['ch 25', 'ch 26 · dark', 'span 1 · 40 km', 'span 2 · 38 km']) expect(optical).toContain(`>${caption}</text>`);
+    for (const tag of ['ROADM', 'AMP', 'PE·RR', 'PE']) expect(optical).toContain(`>${tag}</text>`);
+    expect(optical.match(/<g class="site">/g)).toHaveLength(2);
+    // the note on AMP-1 (no layer of its own) goes with AMP-1, on the optical frame
+    expect(optical).toContain('>in-line amplifier hut, no</text>');
+    expect(r.svg).toMatch(/data-title="Optical · 3 line-system members, 5 spans · 2 sites"/);
+  });
+
+  test('the physical frame: the routers and the routed link over the line system; sites; the free note', () => {
+    const r = frames(text, { preset: 'card-frames' });
+    const physical = group(r.svg, 'physical');
+    expect(physical).not.toContain('link-optical');
+    expect(physical).not.toContain('>ROADM</text>');
+    expect(physical).toContain('>over ch 25</text>');
     expect(physical.match(/<g class="site">/g)).toHaveLength(2);
+    expect(physical.match(/<g class="note">/g)).toHaveLength(1);
+    expect(r.svg).toMatch(/data-title="Physical · 2 devices \(SAOS 10\), 1 link · 2 sites"/);
+    // the other frames leave the line system out too; notes only on their own frame
+    expect(group(r.svg, 'igp')).not.toContain('ROADM-A');
+    expect(r.svg.match(/<g class="note">/g)).toHaveLength(2);
+  });
+
+  test('a view without the optical layer draws the line system on the physical frame', () => {
+    const r = frames(text, { layers: ['physical', 'igp', 'bgp', 'pw'] });
+    expect(r.frames.map((x) => x.id)).toEqual(['physical', 'igp', 'bgp', 'pw']);
+    const physical = group(r.svg, 'physical');
+    expect(physical.match(/class="link-optical"/g)).toHaveLength(5);
     expect(physical.match(/<g class="note">/g)).toHaveLength(2);
-    expect(svg).toMatch(/data-title="Physical · 5 devices \(SAOS 10\), 6 links \(5 optical\) · 2 sites"/);
-    // sites on every frame (faint), notes only on their own
-    expect(svg.match(/<g class="site">/g).length).toBe(2 * svg.match(/<g class="frame"/g).length);
-    expect(svg.match(/<g class="note">/g)).toHaveLength(2);
+    expect(r.svg).toMatch(/data-title="Physical · 5 devices \(SAOS 10\), 6 links \(5 optical\) · 2 sites"/);
   });
 
   test('a note goes on its layer\'s frame, or the physical one when the drawing has no such frame', () => {
@@ -87,14 +110,20 @@ describe('frames and snapshot', () => {
     expect(frameOf('ring note')).toEqual(['physical']);
   });
 
-  test('the snapshot: spans, members, sites on the physical plane; notes numbered on their plane', () => {
-    const svg = snapshot(text).svg;
-    const physical = svg.split(/(?=<g class="layer")/).find((g) => g.includes('data-layer="physical"'));
-    expect(physical.match(/class="link-optical"/g)).toHaveLength(5);
-    expect(physical.match(/<g class="site">/g)).toHaveLength(2);
-    expect(physical).toContain('class="note-marker"');
-    expect(physical).toContain('>1 · AMP-1</text>');
-    expect(physical).toContain('>AMP-1  AMP</text>');
+  test('the snapshot: the optical plane under physical, with the line system and its note; physical with the link over it', () => {
+    const r = snapshot(text);
+    expect(r.layers).toEqual(['optical', 'physical', 'igp', 'mpls', 'bgp', 'pw']);
+    const plane = (id) => r.svg.split(/(?=<g class="layer")/).find((g) => g.includes(`data-layer="${id}"`));
+    expect(plane('optical').match(/class="link-optical"/g)).toHaveLength(5);
+    expect(plane('optical').match(/<g class="site">/g)).toHaveLength(2);
+    expect(plane('optical')).toContain('class="note-marker"');
+    expect(plane('optical')).toContain('>1 · AMP-1</text>');
+    expect(plane('optical')).toContain('>AMP-1  AMP</text>');
+    expect(plane('physical')).not.toContain('link-optical');
+    expect(plane('physical')).toContain('>over ch 25</text>');
+    // members have no riser; the PEs rise from the optical plane
+    expect(r.svg).not.toMatch(/class="pillar" data-layers="optical"/);
+    expect(r.svg.match(/class="pillar" data-layers="physical optical/g)).toHaveLength(2);
   });
 });
 
@@ -109,6 +138,8 @@ describe('helpers', () => {
   test('3D page: a note\'s layer (igp is the page\'s isis) and a site\'s outline', () => {
     expect(noteLayer({ layer: 'igp' }, ['physical', 'isis'])).toBe('isis');
     expect(noteLayer({ layer: 'ring' }, ['physical', 'isis'])).toBe('physical');
+    const ls = { plain: { nodes: [{ id: 'AMP', equipment: 'amplifier' }] } };
+    expect([noteLayer({ device: 'AMP' }, ['optical', 'physical'], ls), noteLayer({ device: 'AMP' }, ['physical'], ls), noteLayer({ device: 'AMP', layer: 'physical' }, ['optical', 'physical'], ls)]).toEqual(['optical', 'physical', 'physical']);
     const topo = { nodes: [{ id: 'A', pos: { x: 0, z: 0 } }], plain: { nodes: [{ id: 'B', pos: { x: 10, z: 4 } }] } };
     expect(siteRect(topo, { nodes: ['A', 'B'] }, 2)).toEqual({ x0: -2, x1: 12, z0: -2, z1: 6 });
     expect(siteRect(topo, { nodes: ['C'] })).toBeNull();

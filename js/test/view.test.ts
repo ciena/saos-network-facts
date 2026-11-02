@@ -63,7 +63,7 @@ test("nested objects merge by property; lists replace; hints add device by devic
 
 test("unknown properties and bad values are reported, not fatal; the lower value stays", () => {
   const { view, warnings } = resolveView(
-    { view_version: "1.3", device_info: ["role"], camera: "orbit", layers: ["physical", "optical", "igp"], frames: { start: "middle", speed: 2 }, layout: { max_columns: 0, hints: { PE1: [1] } } },
+    { view_version: "1.3", device_info: ["role"], camera: "orbit", layers: ["physical", "lambda", "igp"], frames: { start: "middle", speed: 2 }, layout: { max_columns: 0, hints: { PE1: [1] } } },
     "?preset=poster&plain=maybe&facts=lab.json",
   );
   assert.equal(view.camera, "fit");
@@ -77,8 +77,8 @@ test("unknown properties and bad values are reported, not fatal; the lower value
     'URL: preset: "poster" is not one of card-frames, lab-snapshot, protocol-stack',
     "view: device_info: unknown property, ignored",
     'view: camera: "orbit" is not one of fit, top, iso',
-    'view: layers: unknown layer "optical"',
-    'view: frames.start: "middle" is not one of signature, first, physical, ring, igp, mpls, srv6, bgp, vrf, pw, evpn, cfm',
+    'view: layers: unknown layer "lambda"',
+    'view: frames.start: "middle" is not one of signature, first, optical, physical, ring, igp, mpls, srv6, bgp, vrf, pw, evpn, cfm',
     "view: frames.speed: unknown property, ignored",
     "view: layout.max_columns: expected a whole number from 1",
     "view: layout.hints.PE1: expected [x, y]",
@@ -147,4 +147,14 @@ test("the defaults and presets are not changed by resolving", () => {
   view.layers.push("cfm");
   view.layout.hints.P1 = [1, 1];
   assert.equal(JSON.stringify([VIEW_DEFAULTS, VIEW_PRESETS]), before);
+});
+
+test("the optical layer (view 1.2): first, under physical; a frame when the facts have a line system, never the signature", () => {
+  assert.equal(LAYER_IDS[0], "optical");
+  const { view } = resolveView(undefined);
+  assert.deepEqual(viewFrames(view, ["optical", "physical", "igp", "pw"]), { frames: ["optical", "physical", "igp", "pw"], start: "pw" });
+  assert.deepEqual(viewFrames(view, ["optical", "physical"]), { frames: ["optical", "physical"], start: "physical" });
+  // a 1.1 view listing its layers leaves it out, and still validates
+  const old = resolveView({ view_version: "1.1", layers: ["physical", "igp"] });
+  assert.deepEqual([old.warnings, viewFrames(old.view, ["optical", "physical", "igp"]).frames], [[], ["physical", "igp"]]);
 });

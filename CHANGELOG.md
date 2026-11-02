@@ -39,6 +39,15 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   drawing has no such layer): beside their device with a leader line on a frame, numbered on the snapshot
   with the text in the plane's corner, above the device on the 3D page; free notes along the bottom edge.
   The Device and Overview panels name a member by its role and show its site and spans.
+- **View schema 1.2: the `optical` layer, under physical** — with line-system members or optical spans, the
+  3D page, the frames and the snapshot have an optical plane / frame below the physical one: the members,
+  the spans with their labels and the routers at their ends (their risers start there). The physical layer
+  keeps the routers and the links between them, and a routed link whose two ports are cabled by optical
+  spans says it rides the line system (`over ch 25`); the other layers leave the line system out. A note
+  without a layer goes with its device (optical for a member). A view whose `layers` leave `optical` out
+  draws the line system on the physical layer. `LAYER_IDS` starts with `optical` (the defaults list it);
+  older views stay valid. Labs without a line system draw as before (their snapshots change only in the
+  embedded riser script, which now starts a riser on the lowest plane its device is on).
 - **Layout: a chain of plain boxes between two routers is core** — an optical line system (a ROADM,
   amplifiers, a ROADM) between two PEs now joins the ladder with them instead of hanging in loose columns
   (a single plain box between two core devices already did). Layouts of labs without such a chain are

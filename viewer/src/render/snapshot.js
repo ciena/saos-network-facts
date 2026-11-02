@@ -12,7 +12,7 @@
 //   stacked   planes overlapping like the 3D page's camera: compact
 
 import { LAYER_IDS } from '../../../js/src/index.ts';
-import { deviceDetail, equipmentTag, presentLayers, wrapNote } from './model.js';
+import { deviceDetail, equipmentTag, layerModel, noteLayerOf, presentLayers, wrapNote } from './model.js';
 
 const C = {
   ink: '#1d2430', mute: '#5b6675', bg: '#ffffff',
@@ -21,7 +21,7 @@ const C = {
   pw: '#d63384', evpn: '#a65fd6', cfm: '#1a9fae', rpl: '#f0883e', subRing: '#4f9fe8',
   optical: '#3b5bdb', site: '#7a8696', note: '#fff6d5', noteEdge: '#d9a400',
 };
-const LAYER_NAME = { physical: 'Physical', ring: 'G.8032 rings', igp: 'IGP', mpls: 'MPLS (SR policies / TP)', srv6: 'SRv6', bgp: 'BGP', vrf: 'L3VPN', pw: 'Pseudowires', evpn: 'EVPN', cfm: 'CFM' };
+const LAYER_NAME = { optical: 'Optical line system', physical: 'Physical', ring: 'G.8032 rings', igp: 'IGP', mpls: 'MPLS (SR policies / TP)', srv6: 'SRv6', bgp: 'BGP', vrf: 'L3VPN', pw: 'Pseudowires', evpn: 'EVPN', cfm: 'CFM' };
 const ALGO = ['#e8590c', '#1c7ed6', '#2f9e44', '#c2255c'];
 const CAMERAS = {
   exploded: { U: 230, V: 170, kx: 0.62, ky: 0.42, gapFactor: 1.0, gapPad: 46 },
@@ -63,8 +63,13 @@ export function renderSnapshot(model, positions, { variant = 'exploded', layers:
   out.push(`<rect class="bg" x="0" y="-4000" width="${W}" height="${H + 8000}" fill="${C.bg}"/>`);
 
   // Risers: one per device from the physical plane up to the highest plane it is on.
-  const onLayer = new Map(model.nodes.map((nd) => [nd.id, new Set(['physical'])]));
+  // With an optical plane, line-system members are on it alone (no riser) and the routers at the ends of
+  // its spans rise from it.
+  const split = layers.includes('optical');
+  const optical = layerModel(model, 'optical', split);
+  const onLayer = new Map(model.nodes.filter((nd) => !(split && nd.member)).map((nd) => [nd.id, new Set(['physical'])]));
   const mark = (id, l) => onLayer.get(id)?.add(l);
+  if (split) for (const nd of optical.nodes) mark(nd.id, 'optical');
   for (const r of model.rings) for (const id of r.nodes) mark(id, 'ring');
   for (const l of model.links) if (l.adj) (mark(l.a.node, 'igp'), mark(l.b.node, 'igp'));
   for (const t of [...model.policies, ...model.tunnels]) for (const id of [t.a, t.b, ...(t.path ?? [])]) if (id) mark(id, 'mpls');
@@ -76,6 +81,7 @@ export function renderSnapshot(model, positions, { variant = 'exploded', layers:
   for (const m of model.megs) (mark(m.a, 'cfm'), mark(m.b, 'cfm'));
   out.push('<g class="pillars">');
   for (const nd of model.nodes) {
+    if (!onLayer.has(nd.id)) continue;
     const p = at(nd.id);
     out.push(`<line class="pillar" data-layers="${[...onLayer.get(nd.id)].filter((l) => layers.includes(l)).join(' ')}" x1="${p.x}" y1="${p.y}" x2="${p.x}" y2="${p.y}" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>`);
   }
@@ -92,7 +98,7 @@ export function renderSnapshot(model, positions, { variant = 'exploded', layers:
     g.push(`<text x="${fl.x + 8}" y="${fl.y - 8}" font-size="12" font-weight="700" fill="${col}">${esc(LAYER_NAME[id])}</text>`);
     const sub = planeCaption(id, model);
     if (sub) g.push(`<text x="${fl.x + 8}" y="${fl.y + 14}" font-size="10.5" fill="${C.mute}">${esc(sub)}</text>`);
-    g.push(...layerObjects(id, model, at, S, cam, { uv, layers, planeU, planeV }));
+    g.push(...layerObjects(id, layerModel(model, id, split), at, S, cam, { uv, layers, planeU, planeV, full: model }));
     groups.push(`<g class="layer" data-layer="${id}" transform="translate(0,${-k * gap})">${g.join('')}</g>`);
   });
   out.push(...groups.reverse());
@@ -120,6 +126,10 @@ function planeCaption(id, model) {
     return `${model.igp === 'ospf' ? 'OSPF' : 'IS-IS'} area ${model.areas.join(', ')} ${lvl}${model.srgb ? ` · SRGB ${model.srgb.base}–${model.srgb.base + model.srgb.size - 1}` : ''} · labels ${model.labelMode.toUpperCase()}`;
   }
   if (id === 'igp') return model.igp === 'ospf' ? 'OSPF' : 'IS-IS';
+  if (id === 'optical') {
+    const members = model.nodes.filter((n) => n.member).length;
+    return `${members} line-system member${members === 1 ? '' : 's'} · ${model.links.filter((l) => l.medium === 'optical').length} optical spans`;
+  }
   if (id === 'bgp') {
     const asn = model.nodes.find((n) => n.asn)?.asn;
     return asn ? `AS ${asn}` : '';
@@ -148,7 +158,7 @@ function block(reg, x, y, lines, { anchor = 'start', color = C.ink, bg = true, f
   return out.join('');
 }
 
-function layerObjects(id, model, at, S, cam, { uv, layers, planeU, planeV }) {
+function layerObjects(id, model, at, S, cam, { uv, layers, planeU, planeV, full }) {
   const g = [];
   const reg = [];
   const nodes = new Map(model.nodes.map((n) => [n.id, n]));
@@ -165,7 +175,8 @@ function layerObjects(id, model, at, S, cam, { uv, layers, planeU, planeV }) {
   };
   const title = (t) => `<title>${esc(t)}</title>`;
 
-  if (id === 'physical') {
+  // The physical plane, and the optical plane (the line system and the routers at its ends) drawn alike.
+  if (id === 'physical' || id === 'optical') {
     // Sites (schema 1.9): a dashed outline on the plane round each site's devices, its name at the front.
     for (const site of model.sites) {
       const q = site.nodes.map(uv);
@@ -187,10 +198,12 @@ function layerObjects(id, model, at, S, cam, { uv, layers, planeU, planeV }) {
       const nx = (-(b0.y - a0.y) / d) * off, ny = ((b0.x - a0.x) / d) * off;
       const a = { x: r1(a0.x + nx), y: r1(a0.y + ny) }, b = { x: r1(b0.x + nx), y: r1(b0.y + ny) };
       const optical = l.medium === 'optical';
-      const tip = `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium || l.caption ? `\n${[l.medium, l.caption].filter(Boolean).join(': ')}` : ''}${l.subnet ? `\n${l.subnet}` : ''}${l.plain && !optical ? '\ncabled (links[]), no facts on one end' : ''}`;
+      // A routed link over the line system says so (`over ch 25`) where it has no label of its own.
+      const caption = l.caption ?? l.over;
+      const tip = `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium || l.caption ? `\n${[l.medium, l.caption].filter(Boolean).join(': ')}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}${l.plain && !optical ? '\ncabled (links[]), no facts on one end' : ''}`;
       // An optical span: a blue double line (white core), its caption in the middle.
       const body = optical ? `${line(a, b, C.optical, 5, ' stroke-linecap="round"')}${line(a, b, '#fff', 1.6, ' stroke-linecap="round"')}` : line(a, b, l.plain ? C.plain : '#69768a', 2, l.plain ? ' stroke-dasharray="5 4"' : '');
-      g.push(`<g${l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}${pill(lerp(a, b, 0.2), l.a.port ?? '?', '#9aa4b1')}${pill(lerp(a, b, 0.8), l.b.port ?? '?', '#9aa4b1')}${l.caption ? pill(lerp(a, b, 0.5), l.caption, optical ? C.optical : '#9aa4b1') : ''}</g>`);
+      g.push(`<g${l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}${pill(lerp(a, b, 0.2), l.a.port ?? '?', '#9aa4b1')}${pill(lerp(a, b, 0.8), l.b.port ?? '?', '#9aa4b1')}${caption ? pill(lerp(a, b, 0.5), caption, optical || !l.caption ? C.optical : '#9aa4b1') : ''}</g>`);
     }
     for (const nd of model.nodes) {
       const p = at(nd.id);
@@ -359,7 +372,7 @@ function layerObjects(id, model, at, S, cam, { uv, layers, planeU, planeV }) {
   }
   // Notes (schema 1.9) on their layer's plane (physical when the snapshot has no such plane), in the
   // plane's front right corner: one on a device numbered, with the number in a yellow marker by the device.
-  const mine = model.notes.filter((x) => (layers.includes(x.layer) ? x.layer : 'physical') === id);
+  const mine = full.notes.filter((x) => noteLayerOf(x, full, layers) === id);
   const corner = S(planeU, planeV);
   let k = 0;
   for (const x of mine) {
@@ -401,9 +414,12 @@ const SWITCH_SCRIPT = `
       });
       [].forEach.call(svg.querySelectorAll('line.pillar'), function (p) {
         var ls = (p.getAttribute('data-layers') || '').split(' ');
-        var top = 0;
-        ls.forEach(function (id) { var k = shown.indexOf(id); if (k > top) top = k; });
-        p.setAttribute('y2', +p.getAttribute('y1') - top * gap);
+        if (p._y0 === undefined) p._y0 = +p.getAttribute('y1');
+        var y0 = p._y0, top = 0, bottom = Infinity;
+        ls.forEach(function (id) { var k = shown.indexOf(id); if (k > top) top = k; if (k >= 0 && k < bottom) bottom = k; });
+        if (bottom === Infinity) bottom = 0;
+        p.setAttribute('y1', y0 - bottom * gap);
+        p.setAttribute('y2', y0 - top * gap);
       });
       [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
         var id = c.getAttribute('data-layer');

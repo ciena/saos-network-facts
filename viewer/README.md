@@ -69,7 +69,12 @@ engine never sees them and computes exactly what it would without them; `drawnNo
 What the extractor's `--extra` file adds (schema 1.9) is drawn, never simulated: a drawn link whose two
 ports match a `links[]` entry gets its `kind` as `medium` and its `label` as `caption` (an optical span is a
 blue tube with its label); a plain box whose record has a `role` (a line-system member: `roadm`,
-`amplifier`) is a solid blue box with no warning, its `role` as `equipment`; devices and hosts get their
+`amplifier`) is a solid blue box with no warning, its `role` as `equipment`. With such members or
+optical spans the page has an `optical` layer under the physical one (`LAYERS`; physical moves up one gap,
+so physical-plane code places things at `layerY('physical')`, not 0): the members, the spans and links to
+them, and a disc for each router at a span's end, whose pillar starts there; the physical plane leaves them
+out, and a routed link whose ports are cabled by optical spans carries `over` (`over ch 25`) as its label.
+A view without `optical` keeps everything on the physical plane; devices and hosts get their
 `site`, and `topology.sites` (`[{ name, nodes }]`) is a dashed outline round each site's devices on the
 physical plane; `topology.notes` (`[{ text, device, layer }]`) are yellow labels on their layer (physical
 when the page does not show it), above their device or at the plane's corner. The frames and the snapshot

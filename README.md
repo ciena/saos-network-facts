@@ -320,10 +320,16 @@ notes:                        # free text, on a device or not, on a view layer (
   labels written beside them, so they live in the facts; a view is a presentation that many labs share.
 - A link end or note on a name no input knows, or an unknown key, is an error before anything is extracted.
 
-Drawn: optical spans as a blue double line with their label, line-system members as solid blue boxes
-tagged with their role (ROADM, AMP, OT), a dashed frame round each site's devices, notes in yellow beside
-their device (the snapshot numbers them and lists them in the plane's corner) or along the edge. The layout
-puts a chain of plain boxes between two routers (a ROADM, amplifiers, a ROADM) on the core with them.
+Drawn on their own layer, `optical` (view schema 1.2), under the physical one: the line-system members
+as solid blue boxes tagged with their role (ROADM, AMP, OT), the optical spans as a blue double line with
+their label, and the routers at the spans' ends, whose risers start there. The physical layer then keeps
+the routers and the links between them; a routed link whose two ports are cabled by optical spans says it
+rides the line system (`over ch 25`, the spans' label when both say the same). A view without `optical` in
+its `layers` draws the line system on the physical layer instead. Sites are a dashed frame round their
+devices (on both layers); notes are yellow, beside their device (the snapshot numbers them and lists them
+in the plane's corner) or along the edge, on the note's `layer`, else with their device (a note on a
+line-system member is on the optical layer), else on physical. The layout puts a chain of plain boxes
+between two routers (a ROADM, amplifiers, a ROADM) on the core with them.
 
 ### Rings
 
@@ -458,13 +464,13 @@ page fetches the facts from the same site, so they stay as private as the site t
 A view file says what to show of a facts file, so a site or a lab card never computes a layout or
 draws a diagram itself: which layers, the 2D frames a card rotates through (one per layer), the 3D
 snapshot, the layout, the camera and the label density. Its schema is
-[`view-v1.schema.json`](src/saos_network_facts/schema/view-v1.schema.json) (`view_version` 1.1),
+[`view-v1.schema.json`](src/saos_network_facts/schema/view-v1.schema.json) (`view_version` 1.2),
 the defaults and presets are in [`view-presets-v1.json`](src/saos_network_facts/schema/view-presets-v1.json).
 Every property is optional:
 
 ```json
 {
-  "view_version": "1.1",
+  "view_version": "1.2",
   "preset": "card-frames",
   "layers": ["physical", "ring", "igp", "mpls", "pw", "cfm"],
   "frames": {"rule": "list", "list": ["igp", "ring", "pw", "cfm"], "start": "signature", "period_s": 5},
@@ -479,7 +485,7 @@ Every property is optional:
 | Property | Values (default first) |
 |---|---|
 | `preset` | `card-frames` (rotating 2D frames for a lab card), `lab-snapshot` (the exploded 3D snapshot, full screen, iso camera, compact labels), `protocol-stack` (every layer as a stacked plane) |
-| `layers` | the layers that may be shown: `physical`, `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
+| `layers` | the layers that may be shown: `optical` (since 1.2: the optical line system, under physical; without it the line system is drawn on physical), `physical`, `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
 | `frames.rule` | `auto` (one frame per shown layer with content, in the order above), `list` (the layers of `frames.list`, in that order) |
 | `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport), `first`, or a layer |
 | `frames.period_s` | `4`: seconds per frame, a hint (a consumer may pause offscreen or for reduced motion) |
@@ -548,7 +554,8 @@ In Python, `saos_network_facts.schema.view_errors(view)` validates a view file.
 For a lab card or a page without WebGL, the viewer renders a facts file and a view to two SVG files,
 with the same layout as the 3D page:
 
-- **`frames.svg`**: one flat frame per layer the lab has content for: physical; G.8032 rings over the
+- **`frames.svg`**: one flat frame per layer the lab has content for: the optical line system (members,
+  spans, the routers at their ends); physical; G.8032 rings over the
   physical links; the IGP (metrics, loopbacks, prefix SIDs); SR policies and MPLS-TP tunnels over the IGP
   (only when there is no pseudowire frame, which shows the transport already); SRv6 locators and
   Flex-Algo; BGP (sessions, route reflector, sessions not established); L3VPN VRFs; pseudowires over the

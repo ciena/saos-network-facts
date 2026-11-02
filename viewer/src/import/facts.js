@@ -403,6 +403,8 @@ function topologyLinks(file, links, nodes, report) {
   const bridged = links.filter((l) => !l.lag && (elsewhere(l.a, l.b) || elsewhere(l.b, l.a)));
   for (const l of bridged) {
     l.bridged = [l.a, l.b].map((e) => `${e.node} ${e.if} (port ${e.port ?? '?'}, cabled to ${(cabled.get(`${e.node}|${e.port}`) ?? '?').replace('|', ' port ')})`).join(', ');
+    // The ports and what they are cabled to, for annotate(): a link over an optical line system.
+    l.cables = [l.a, l.b].filter((e) => e.port && cabled.has(`${e.node}|${e.port}`)).map((e) => ({ node: e.node, port: e.port, far: cabled.get(`${e.node}|${e.port}`) }));
     for (const e of [l.a, l.b]) delete e.port;
   }
   if (bridged.length) report.add('physical', 'derived', `${bridged.length} subnets over a bridged domain`, `${bridged.map((l) => `${l.id} (${l.subnet}): ${l.bridged}`).join('; ')}: the file's links[] cable those ports to other devices, so the subnet is an L3 adjacency over a bridged domain (a ring VLAN, a service), drawn as a link with no ports; the cables are drawn as L2 links`);
@@ -1216,6 +1218,15 @@ function annotate(file, nodes, links, report) {
   }
   const records = new Map([...file.devices.map((r) => [r.device, r]), ...factsHosts(file).map((h) => [h.name, h])]);
   const byId = new Map(nodes.map((n) => [n.id, n]));
+  // A routed link whose two ports are cabled by optical spans (into a line system) rides it: `over`
+  // says so on the physical layer, with the spans' label when both say the same (`ch 25`).
+  const span = new Map((file.links ?? []).filter((l) => l.kind === 'optical').flatMap((l) => [[`${l.a.device}|${l.a.port}`, l], [`${l.b.device}|${l.b.port}`, l]]));
+  for (const l of links) {
+    const spans = (l.cables ?? []).map((c) => span.get(`${c.node}|${c.port}`)).filter(Boolean);
+    if (spans.length !== 2) continue;
+    const labels = [...new Set(spans.map((x) => x.label ?? ''))];
+    l.over = labels.length === 1 && labels[0] ? `over ${labels[0]}` : 'over the line system';
+  }
   const sites = new Map();
   for (const n of nodes) {
     const r = records.get(n.id) ?? {};
@@ -1225,7 +1236,7 @@ function annotate(file, nodes, links, report) {
       sites.set(r.site, [...(sites.get(r.site) ?? []), n.id]);
     }
   }
-  const notes = (file.notes ?? []).map((x) => ({ text: x.text, device: byId.has(x.device) ? x.device : null, layer: x.layer ?? 'physical' }));
+  const notes = (file.notes ?? []).map((x) => ({ text: x.text, device: byId.has(x.device) ? x.device : null, layer: x.layer ?? null }));
   const optical = links.filter((l) => l.medium === 'optical').length;
   if (marked) report.add('physical', 'facts', `${marked} links with a kind or label`, `from the file's links[] (the extractor's extra file)${optical ? `; ${optical} optical spans, drawn apart from the cables` : ''}`);
   if (sites.size) report.add('physical', 'facts', `${sites.size} sites`, `${[...sites].map(([s, ids]) => `${s}: ${ids.join(', ')}`).join('; ')}; a frame round each site's devices`);

@@ -6,9 +6,10 @@ import type { PresetName, ViewFile } from "./view.ts";
 /** The built-in view defaults (every property set) and the named presets. */
 export const VIEW_PRESETS_DATA: { defaults: ViewFile; presets: Record<PresetName, ViewFile> } = {
   "defaults": {
-    "view_version": "1.1",
+    "view_version": "1.2",
     "title": null,
     "layers": [
+      "optical",
       "physical",
       "ring",
       "igp",
