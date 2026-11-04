@@ -71,8 +71,11 @@ describe('layout of every fixture lab and the example', () => {
         for (let i = 0; i < scene.length; i++) for (let j = i + 1; j < scene.length; j++) expect(Math.hypot(scene[i].x - scene[j].x, scene[i].z - scene[j].z)).toBeGreaterThan(2);
       });
 
-      test('a card respects max_columns, and the card-frames card is at least as wide as tall', () => {
-        for (const max of [4, 3, 2]) expect(spanX(layoutFacts(topo, { aspect: 'card', max_columns: max }).positions)).toBeLessThanOrEqual(max - 1 + 1e-9);
+      test('a card respects max_columns (role tiers one column more), and the card-frames card is at least as wide as tall', () => {
+        for (const max of [4, 3, 2]) {
+          const out = layoutFacts(topo, { aspect: 'card', max_columns: max });
+          expect(spanX(out.positions)).toBeLessThanOrEqual(max - 1 + (out.method === 'tiers' ? 1 : 0) + 1e-9);
+        }
         const card = Object.values(layoutFacts(topo, resolveView({ preset: 'card-frames' }).view.layout).positions);
         const [w, h] = [card.map((p) => p.x), card.map((p) => p.y)].map((v) => Math.max(...v) - Math.min(...v) + 1);
         expect(w).toBeGreaterThanOrEqual(h);

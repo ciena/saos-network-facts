@@ -533,7 +533,27 @@ same positions), and shared by every renderer:
 4. **No device on a link**: a spot on a link, or whose own links would run through a device, is never
    taken; a last pass swaps or moves devices while that removes crossings.
 
-With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns: outer devices hang sideways while there is room, a ring too long for the ladder runs
+That ladder is one of the candidates the layout scores; the others follow the network roles or the
+lab's shape:
+
+- **Tiers**: the roles as columns, `CE | PE | P | PE | CE` left to right (PE: a router with a service,
+  P: only IGP and MPLS, CE: no IGP; devices without facts by what they are linked to). The two poles
+  are the devices (or the PE pair a CE is dual-homed to) furthest apart; within a column devices are
+  ordered to cross as few links as possible (Sugiyama: barycentre sweeps, then swapping neighbours),
+  the routers of one IGP area (else one G.8032 ring) kept together, and rows are set so links run
+  straight; a PE pair and its dual-homed CE come out mirrored. Without both roles the same runs by hops.
+- **Radial**: one hub linked to most of the lab in the middle, its spokes round it.
+- **Stress** (stress majorisation): link lengths as even as can be, for a mesh no tiering fits.
+
+The **score** counts link crossings, links through devices, devices too close, port badges that would
+find no room at full size on their link (laid out as the card frames draw them), how even the link
+lengths are, and the fit (`max_columns` wide, three rows tall, wider than tall, compact). The lowest
+wins, with two adjustments: in a lab with both P and PE routers, a candidate that follows the roles
+(every P between the outer PEs, no CE between them) counts 2 less, and a candidate that is not the
+ladder (radial and stress always) must beat the ladder by 3. `layoutFacts` returns every candidate
+with its score (`candidates`, the chosen one first) so a page can show why.
+
+With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns (role tiers that follow the roles one more: `CE | PE | P | PE | CE` is five): outer devices hang sideways while there is room, a ring too long for the ladder runs
 round a rectangle that wide (its rows using the full width, its sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
 10-device lab stays readable on a ~330 px card (the `card-frames` preset: 4 columns). From JavaScript:
 
@@ -542,9 +562,9 @@ import { layoutFacts, resolveView, viewFrames } from "@ciena/saos-network-facts"
 
 const { view, warnings } = resolveView(viewFileJson, location.search);   // both optional
 viewFrames(view, ["physical", "igp", "pw"]);   // { frames: ["physical", "igp", "pw"], start: "pw" }
-// { nodes: [{ id, role?, plain? }], links: [{ a, b }], rings?: [{ nodes, links? }] }: the viewer
-// importer's topology is one
-const { positions, method } = layoutFacts(model, view.layout);   // positions: { PE1: { x, y }, ... }, grid units, y down
+// { nodes: [{ id, role?, plain?, host?, group? }], links: [{ a, b }], rings?: [{ nodes, links? }] }: the
+// viewer importer's topology is one (group: the IGP area)
+const { positions, method, candidates } = layoutFacts(model, view.layout);   // positions: { PE1: { x, y }, ... }, grid units, y down
 ```
 
 In Python, `saos_network_facts.schema.view_errors(view)` validates a view file.

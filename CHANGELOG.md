@@ -17,6 +17,31 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-04
+
+### Added
+
+- **Layout: the card follows the network roles; candidates scored, the best per lab** — `layoutFacts`
+  (algorithm auto) now scores candidates and takes the best. Tiers put the roles in columns, CE | PE | P | PE | CE
+  left to right (PE: a router with a service, P: only IGP and MPLS, CE: no IGP; devices without facts by
+  what they are linked to). The poles are the devices (or the PE pair a CE is dual-homed to) furthest apart.
+  Devices in a column are ordered to cross as few links as possible (Sugiyama: barycentre sweeps, then
+  swapping neighbours), with the routers of one IGP area (else one G.8032 ring) kept together. Rows are
+  set so links run straight and evenly spaced, so a PE pair and its dual-homed CE come out mirrored.
+  Radial takes a hub lab; stress (stress majorisation) takes a mesh that fits no tiering; the ladder stays
+  a candidate. The score counts crossings, links through devices, crowding, port badges that would find
+  no room at full size on their link (laid out as the card frames draw them, fitted to the renderer on 196
+  labs), link-length evenness and fit (`max_columns` wide, three rows, landscape, compact). A layout that
+  follows the roles counts 2 less, and a candidate other than the ladder must beat it by 3. On a card,
+  role tiers may take one column more than `max_columns` (CE | PE | P | PE | CE is five). `LayoutResult`
+  gains `candidates` (each with its positions and score, the chosen one first) and the methods `tiers`,
+  `radial` and `stress`; `LayoutNode` gains `group` (the IGP area), which the viewer's importer now sets.
+  Hints (an authored layout) and algorithm force are unchanged. Measured on 196 published CAL lab cards:
+  50 change; port badges moved off their natural spot 310 -> 190, dropped to the hover title 22 -> 11
+  (labs with any 90 -> 59); link-length spread (coefficient of variation) 0.163 -> 0.110; crossings
+  unchanged (15) and no lab worse; labs with P and PE routers drawn by role 1 -> 10 of 19. Render goldens
+  of five fixture labs regenerated (ospf-tp, srv6-ospf, srv6-evpn and l3vpn-hosts now PE | P | PE).
+
 ## [0.20.0] - 2026-11-02
 
 ### Fixed

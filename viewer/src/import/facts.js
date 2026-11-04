@@ -1122,7 +1122,7 @@ function buildServices(pseudowires, megs) {
 // their links included (a plain box between two core devices is core). Authored positions that
 // leave out only plain boxes put them beside the devices they are cabled to.
 // -> { pos: scene positions by id, layout: the library's result, or null for a positions file }
-function placeNodes(nodes, links, rings, positions, layout, report, plain = { nodes: [], links: [] }) {
+function placeNodes(nodes, links, rings, positions, layout, report, plain = { nodes: [], links: [] }, areas = new Map()) {
   const ids = nodes.map((n) => n.id);
   const plainIds = plain.nodes.map((n) => n.id);
   if (positions) {
@@ -1138,7 +1138,8 @@ function placeNodes(nodes, links, rings, positions, layout, report, plain = { no
     }
     report.warn(`positions: no position for ${missing.join(', ')}; the layout is computed instead`);
   }
-  const { pos, result } = placeLayout({ nodes: [...nodes, ...plain.nodes], links: [...links, ...plain.links], rings }, layout);
+  const grouped = nodes.map((n) => (areas.get(n.id) ? { ...n, group: areas.get(n.id) } : n));
+  const { pos, result } = placeLayout({ nodes: [...grouped, ...plain.nodes], links: [...links, ...plain.links], rings }, layout);
   for (const w of result.warnings) report.warn(w);
   if (result.method === 'hints') report.add('physical', 'authored', 'positions', 'from the view\'s layout hints');
   else report.add('physical', 'derived', 'positions', `the facts carry no layout: ${result.description}${result.core.length ? ` (core: ${result.core.join(', ')})` : ''}`);
@@ -1301,7 +1302,9 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
   }
 
   const extras = annotate(file, [...nodes, ...plain.nodes], [...links, ...plain.links], report);
-  const placed = placeNodes(nodes, links, rings, positions, layout, report, plain);
+  // The IGP area of each router, so the layout keeps the routers of one area together.
+  const areaOf = (n) => (n.role === 'ce' ? null : igp === 'isis' ? (devices.get(n.id)?.isis?.instances?.[0] ? isisArea(devices.get(n.id).isis.instances[0]) : null) : n.loopbackArea ?? null);
+  const placed = placeNodes(nodes, links, rings, positions, layout, report, plain, new Map(nodes.map((n) => [n.id, areaOf(n)])));
   for (const n of [...nodes, ...plain.nodes]) n.pos = placed.pos[n.id];
 
   const recipe = file.devices.find((r) => r.recipe)?.recipe;

@@ -137,7 +137,8 @@ test("the core: IGP routers first, else the G.8032 ring, else the longest cycle;
     links: [{ a: "X1", b: "X2" }, { a: "X2", b: "X3" }, { a: "X3", b: "X1" }, { a: "X1", b: "LS" }, { a: "LS", b: "X3" }, { a: "X3", b: "X4" }, { a: "X4", b: "BOX" }],
   };
   const c = layoutFacts(cyc);
-  assert.equal(c.description, "ladder on the longest cycle");
+  // (the ladder on that cycle is a candidate; the score may pick another)
+  assert.ok(c.candidates!.some((x) => x.description === "ladder on the longest cycle"));
   assert.deepEqual(c.core, ["LS", "X1", "X2", "X3"]);
   assert.ok(minDistance(c.positions) >= 0.5);
 
@@ -203,13 +204,16 @@ test("no router, ring or cycle: the linked devices in columns by hops, not a row
   };
   for (const layout of [{}, CARD]) {
     const out = layoutFacts(lab, layout);
-    assert.equal(out.method, "columns");
-    assert.equal(out.description, "columns by hops (no router, ring or cycle)");
+    assert.ok(out.candidates!.some((c) => c.description === "columns by hops (no router, ring or cycle)"));
     assert.deepEqual(out.core, ["ACC-1", "ACC-2", "AGG"]);
     const p = out.positions;
-    assert.equal(p["ACC-1"]!.y, p.AGG!.y);
-    assert.equal(p.AGG!.y, p["ACC-2"]!.y);
-    assert.ok(Math.abs(p["ACC-1"]!.x - p["ACC-2"]!.x) === 2, "the chain runs across");
+    // the chain runs across, in link order (the score may bend it a little: stress on a narrow card)
+    assert.ok(p["ACC-1"]!.x < p.AGG!.x && p.AGG!.x < p["ACC-2"]!.x, `${out.method} ${JSON.stringify(p)}`);
+    if (out.method !== "stress") {
+      assert.equal(p["ACC-1"]!.y, p.AGG!.y);
+      assert.equal(p.AGG!.y, p["ACC-2"]!.y);
+      assert.ok(Math.abs(p["ACC-1"]!.x - p["ACC-2"]!.x) === 2);
+    }
     assert.deepEqual(through(lab, p), []);
     assert.equal(crossings(lab, p), 0);
     assert.ok(minDistance(p) >= 0.5);
@@ -232,7 +236,9 @@ test("a device linked to two placed devices sits between them, off their link", 
   for (const layout of [{}, CARD]) {
     const p = layoutFacts(lab, layout).positions;
     const [a, b] = [p.PE1!, p.PE2!];
-    assert.ok(p["CE-1"]!.x >= Math.min(a.x, b.x) - 1e-9 && p["CE-1"]!.x <= Math.max(a.x, b.x) + 1e-9, `CE-1 between its PEs (${JSON.stringify(p)})`);
+    // between them along their link, or beside it half way (a dual-homed CE outward of its PE pair)
+    const along = (k: "x" | "y") => p["CE-1"]![k] >= Math.min(a[k], b[k]) - 1e-9 && p["CE-1"]![k] <= Math.max(a[k], b[k]) + 1e-9;
+    assert.ok(along("x") || along("y"), `CE-1 between its PEs (${JSON.stringify(p)})`);
     assert.deepEqual(through(lab, p), []);
     assert.ok(minDistance(p) >= 0.5);
   }

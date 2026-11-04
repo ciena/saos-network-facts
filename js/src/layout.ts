@@ -3,7 +3,9 @@
 // layout shared by the 3D page, the 2D frames and the snapshot. Deterministic: the same devices and
 // links give the same positions, whatever order they come in. Pure functions, no Node or DOM APIs.
 //
-// algorithm auto (the default):
+// algorithm auto (the default) scores candidates and takes the best (chooseLayout below): the ladder
+// described here, and tiers (the network roles as columns, CE | PE | P | PE | CE), radial (a hub lab)
+// and stress (stress majorisation), in layout-shapes.ts. The ladder:
 //   1. The core: the IGP routers (P and PE); in a lab without an IGP router, the G.8032 ring members;
 //      else the devices on the longest cycle; else (a chain or a tree) the devices that link others.
 //      A plain box between two core devices (a line system or a third-party router in the path) is
@@ -43,6 +45,7 @@
 // sit at fractions). A renderer scales them to its own frame.
 
 import type { Layout } from "./generated/view.ts";
+import { clearLinks, radial, scoreLayout, stress, tierRole, tiers, type LayoutScore, type ShapeGraph } from "./layout-shapes.ts";
 
 /** A device to place. `role` as the 3D importer gives it: p and pe are the IGP routers. */
 export interface LayoutNode {
@@ -52,6 +55,8 @@ export interface LayoutNode {
   plain?: boolean;
   /** A Linux host: never part of the core. */
   host?: boolean;
+  /** The IGP area the device is in: the tiers keep the devices of one area together. */
+  group?: string | null;
 }
 
 /** A link end: a device name, or an object naming it (`node` as the importer, `device` as a facts file's links[]). */
@@ -87,14 +92,16 @@ export interface Point {
 export interface LayoutResult {
   /** Device name to position, in grid units (x right, y down). */
   positions: Record<string, Point>;
-  /** What placed the devices: hints, force, ladder, rectangle, columns or none. */
-  method: "hints" | "force" | "ladder" | "rectangle" | "columns" | "none";
+  /** What placed the devices: hints, force, ladder, rectangle, columns, tiers, radial, stress or none. */
+  method: "hints" | "force" | "ladder" | "rectangle" | "columns" | "tiers" | "radial" | "stress" | "none";
   /** The same, said for a person (which ring or cycle the ladder runs on). */
   description: string;
   /** The core devices, sorted (auto only). */
   core: string[];
   /** Hints that could not be used, and why. */
   warnings: string[];
+  /** The candidates algorithm auto scored, the chosen one first (auto only). */
+  candidates?: Array<{ method: LayoutResult["method"]; description: string; positions: Record<string, Point> } & LayoutScore>;
 }
 
 const CYCLE_SEARCH_LIMIT = 200000;
@@ -156,7 +163,93 @@ export function layoutFacts(model: LayoutModel, layout: Layout | null = {}): Lay
 
   const card = opts.aspect === "card";
   const maxColumns = Math.max(1, Math.floor(opts.max_columns ?? 6));
-  return { ...autoLayout(model, ids, adj, linkEnds, card ? maxColumns : Infinity), warnings };
+  return { ...chooseLayout(model, ids, adj, linkEnds, card ? maxColumns : Infinity), warnings };
+}
+
+// ---- the candidates and the choice ---------------------------------------------------------------
+
+// Every candidate that fits the lab, scored (layout-shapes.ts scoreLayout); the lowest score wins, after
+// two adjustments. In a lab with routers in both roles (P and PE), a candidate whose picture follows
+// them (every P between the leftmost and the rightmost PE, no CE between them) counts ROLE_BONUS less.
+// Any other candidate, and radial or stress always (they are for labs no tiering fits), must beat the
+// ladder (the layout before the candidates, tuned on many labs) by MARGIN. On a card, a candidate wider
+// than max_columns is not taken, except one that follows the roles, which may take one column more
+// (CE | PE | P | PE | CE is five). On a tie the earlier candidate wins: the ladder (or rectangle or
+// columns), tiers (the roles as columns), radial, stress.
+const ROLE_BONUS = 2;
+const MARGIN = 3;
+
+function chooseLayout(
+  model: LayoutModel,
+  ids: string[],
+  adj: Map<string, Set<string>>,
+  linkEnds: Map<string, [string, string]>,
+  maxColumns: number,
+): Omit<LayoutResult, "warnings"> {
+  const legacy = autoLayout(model, ids, adj, linkEnds, maxColumns);
+  const edges = edgeList(ids, adj);
+  if (!edges.length) return legacy;
+  // Every link (parallel links too: each has port badges of its own), as sorted pairs in name order.
+  const known = new Set(ids);
+  const links = model.links
+    .map((l) => [endName(l.a), endName(l.b)].sort((x, y) => compareNames(x ?? "", y ?? "")) as [string, string])
+    .filter(([a, b]) => a && b && a !== b && known.has(a) && known.has(b))
+    .sort((p, q) => compareNames(p[0], q[0]) || compareNames(p[1], q[1]));
+  const node = new Map(model.nodes.map((n) => [n.id, n]));
+  // Groups the tiers keep together: IGP areas, else G.8032 rings.
+  const groups = new Map<string, string>();
+  for (const id of ids) if (node.get(id)?.group) groups.set(id, `area ${node.get(id)!.group}`);
+  if (new Set(groups.values()).size < 2) {
+    groups.clear();
+    const rings = [...(model.rings ?? [])].sort((p, q) => compareNames(String(p.name ?? p.id ?? ""), String(q.name ?? q.id ?? "")));
+    for (const r of rings) for (const m of r.nodes) {
+      const id = typeof m === "string" ? m : m.node;
+      if (adj.has(id) && !groups.has(id)) groups.set(id, `ring ${r.name ?? r.id ?? ""}`);
+    }
+  }
+  const g: ShapeGraph = { ids, adj, node, groups };
+  const roles = new Set(ids.map((id) => tierRole(node.get(id))));
+  const both = roles.has("p") && roles.has("pe");
+  const finish = (pos: Map<string, Point> | null) => {
+    if (!pos) return null;
+    clearLinks(pos, edges);
+    islands(ids, pos, maxColumns);
+    const positions: Record<string, Point> = {};
+    for (const id of ids) positions[id] = { x: round(pos.get(id)!.x), y: round(pos.get(id)!.y) };
+    return normalise(positions);
+  };
+  const tierText = both ? "tiers by role: CE | PE | P | PE | CE" : roles.has("p") || roles.has("pe") ? "tiers by role and hops" : "tiers by hops (no IGP router)";
+  const list: Array<{ method: LayoutResult["method"]; description: string; positions: Record<string, Point> | null; bonus: number }> = [
+    { method: legacy.method, description: legacy.description, positions: legacy.positions, bonus: 0 },
+    { method: "tiers", description: tierText, positions: finish(tiers(g, maxColumns)), bonus: -MARGIN },
+    { method: "radial", description: "radial round the hub", positions: finish(radial(g, maxColumns)), bonus: -MARGIN },
+    { method: "stress", description: "stress majorisation (no tiering fits)", positions: finish(stress(g, maxColumns)), bonus: -MARGIN },
+  ];
+  if (both) {
+    const of = (r: string) => ids.filter((id) => tierRole(node.get(id)) === r);
+    for (const c of list) {
+      if (!c.positions) continue;
+      const x = (id: string) => c.positions![id]!.x;
+      const pe = of("pe").map(x), lo = Math.min(...pe), hi = Math.max(...pe);
+      const follows = lo < hi && of("p").every((id) => x(id) > lo + 1e-9 && x(id) < hi - 1e-9) && of("ce").every((id) => x(id) <= lo + 1e-9 || x(id) >= hi - 1e-9);
+      if (follows) c.bonus = c.method === "radial" || c.method === "stress" ? ROLE_BONUS - MARGIN : ROLE_BONUS;
+    }
+  }
+  // On a card, no candidate wider than max_columns (one that follows the roles: one column more).
+  const span = (p: Record<string, Point>) => Math.max(...Object.values(p).map((q) => q.x)) - Math.min(...Object.values(p).map((q) => q.x));
+  const scored = list
+    .filter((c): c is typeof c & { positions: Record<string, Point> } => !!c.positions)
+    .filter((c) => c === list[0] || span(c.positions) <= maxColumns - 1 + (c.bonus > 0 ? 1 : 0) + 1e-9)
+    .map((c, i) => ({ ...c, i, s: scoreLayout(new Map(Object.entries(c.positions)), links, maxColumns) }));
+  const ranked = [...scored].sort((p, q) => p.s.score - p.bonus - (q.s.score - q.bonus) || p.i - q.i);
+  const best = ranked[0]!;
+  return {
+    positions: best.positions,
+    method: best.method,
+    description: best.description,
+    core: legacy.core,
+    candidates: ranked.map((c) => ({ method: c.method, description: c.description, positions: c.positions, ...c.s })),
+  };
 }
 
 // ---- auto ----------------------------------------------------------------------------------------
