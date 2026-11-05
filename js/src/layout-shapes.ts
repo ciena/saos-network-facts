@@ -8,8 +8,11 @@
 //           2004): link lengths as close to the hops between devices as can be, for a mesh that fits
 //           no tiering.
 //   score   crossings, links through devices, devices too close, port badges likely to collide, how
-//           even the link lengths are and how well the layout fits the frame (a landscape card at
-//           most max_columns wide and three rows tall). Lower is better.
+//           even the link lengths are, how well the layout fits the frame (a landscape card at
+//           most max_columns wide and three rows tall) and devices inside the frame of a site they are
+//           not at. Lower is better.
+//   sites   keepSites moves devices out of the frame of a site they are not at (a site's frame is
+//           drawn round its devices, wherever they are), the fewest moves that cost the least.
 // Pure functions, deterministic: every list is walked in name order.
 
 import { compareNames, type LayoutNode, type Point } from "./layout.ts";
@@ -548,6 +551,8 @@ export interface LayoutScore {
   evenness: number;
   width: number;
   height: number;
+  /** Devices inside the frame of a site they are not at (siteIntruders). */
+  foreign: number;
 }
 
 const o = (p: Point, q: Point, r: Point) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
@@ -636,12 +641,13 @@ function badgeCollisions(pos: Pos, edges: Array<[string, string]>, names: boolea
   return n;
 }
 
-// The weights: a crossing costs as much as 4 units of misfit, a link through a device 6.
-const W = { crossing: 4, through: 6, crowded: 6, badge: 1.5, evenness: 3, wide: 1.5, tall: 2, portrait: 2, area: 1.5 };
+// The weights: a crossing costs as much as 4 units of misfit, a link through a device 6, and so does a
+// device inside another site's frame.
+const W = { crossing: 4, through: 6, crowded: 6, badge: 1.5, evenness: 3, wide: 1.5, tall: 2, portrait: 2, area: 1.5, site: 6 };
 
 /** The score of positions for the links `edges` (pairs of names, smaller first; a pair once per link, so
- * parallel links repeat it). `maxColumns` Infinity: no card. */
-export function scoreLayout(pos: Pos, edges: Array<[string, string]>, maxColumns: number, names = true): LayoutScore {
+ * parallel links repeat it). `maxColumns` Infinity: no card. `sites`: device to the site it is at. */
+export function scoreLayout(pos: Pos, edges: Array<[string, string]>, maxColumns: number, names = true, sites: Map<string, string> = new Map()): LayoutScore {
   const once = new Set<string>();
   const es = edges.filter(([a, b]) => pos.has(a) && pos.has(b) && !once.has(`${a}|${b}`) && !!once.add(`${a}|${b}`));
   const crossings = crossingCount(pos, es);
@@ -663,7 +669,111 @@ export function scoreLayout(pos: Pos, edges: Array<[string, string]>, maxColumns
   if (ids.length > 2) fit += W.portrait * Math.max(0, height - width + 0.5);
   // compact: the box's area per device
   fit += (W.area * width * height) / ids.length;
-  const score = W.crossing * crossings + W.through * through + W.crowded * crowded + W.badge * badges + W.evenness * evenness + fit;
+  const foreign = siteIntruders(pos, sites);
+  const score = W.crossing * crossings + W.through * through + W.crowded * crowded + W.badge * badges + W.evenness * evenness + fit + W.site * foreign;
   const r2 = (v: number) => Math.round(v * 100) / 100 + 0;
-  return { score: r2(score), crossings, through, crowded, badges, evenness: r2(evenness), width: r2(width), height: r2(height) };
+  return { score: r2(score), crossings, through, crowded, badges, evenness: r2(evenness), width: r2(width), height: r2(height), foreign };
+}
+
+// ---- sites -----------------------------------------------------------------------------------------
+
+/** How far a site's frame reaches past its devices' centres, in grid units: the renderer draws it round
+ * the device boxes and their labels (frames.js siteFrames: 4.4 font units each side of a 9.4-unit
+ * column; the labels above or below, 4.6 of a 7.6-unit row), a little more so a device at the edge
+ * reads as outside. */
+export const SITE_REACH = { x: 0.5, y: 0.65 };
+
+/** The devices inside the frame of a site they are not at: for each site (`sites`, device to site), the
+ * box round its devices' positions, SITE_REACH larger, and every other device whose centre is in it; and
+ * each two site frames that overlap. A site frame is drawn round wherever its devices are, so a site
+ * split across the layout takes in the devices between them. */
+export function siteIntruders(pos: Pos, sites: Map<string, string>): number {
+  const by = new Map<string, Point[]>();
+  for (const [id, site] of sites) if (pos.has(id)) by.set(site, [...(by.get(site) ?? []), pos.get(id)!]);
+  let n = 0;
+  const boxes: Array<[number, number, number, number]> = [];
+  for (const [site, ps] of by) {
+    const x0 = Math.min(...ps.map((p) => p.x)) - SITE_REACH.x, x1 = Math.max(...ps.map((p) => p.x)) + SITE_REACH.x;
+    const y0 = Math.min(...ps.map((p) => p.y)) - SITE_REACH.y, y1 = Math.max(...ps.map((p) => p.y)) + SITE_REACH.y;
+    for (const [id, p] of pos) if (sites.get(id) !== site && p.x > x0 && p.x < x1 && p.y > y0 && p.y < y1) n++;
+    // Two site frames that overlap count too: each would seem to hold the other's devices.
+    for (const [a0, a1, b0, b1] of boxes) if (x0 < a1 && a0 < x1 && y0 < b1 && b0 < y1) n++;
+    boxes.push([x0, x1, y0, y1]);
+  }
+  return n;
+}
+
+/**
+ * Keeps each site's devices together: while a device is inside the frame of a site it is not at (or two
+ * site frames overlap), the move (one device to a spare spot on a half-step grid round the layout, or
+ * two devices swapped) that leaves fewer such and scores best (scoreLayout) is made; then, with no more
+ * out of place, the moves that score better still. The layout never grows wider than max_columns (or
+ * than it was). A layout with nothing out of place is returned as it is, so a lab without sites, or
+ * whose sites are already apart, keeps its picture. Deterministic: moves in name and grid order, the
+ * first best taken.
+ */
+export function keepSites(pos: Pos, edges: Array<[string, string]>, sites: Map<string, string>, maxColumns: number): Pos {
+  let cur = siteIntruders(pos, sites);
+  if (!cur) return pos;
+  const ids = sorted(pos.keys());
+  const spanX = (at: Pos) => {
+    const xs = [...at.values()].map((p) => p.x);
+    return Math.max(...xs) - Math.min(...xs);
+  };
+  const widest = Math.max(spanX(pos), Number.isFinite(maxColumns) ? maxColumns - 1 : Infinity);
+  for (let pass = 0; pass < 12 && cur > 0; pass++) {
+    const xs = [...pos.values()].map((p) => p.x), ys = [...pos.values()].map((p) => p.y);
+    const grid: Point[] = [];
+    for (let y = Math.floor(Math.min(...ys)) - 1; y <= Math.max(...ys) + 1 + 1e-9; y += 0.5) {
+      for (let x = Math.floor(Math.min(...xs)) - 1; x <= Math.max(...xs) + 1 + 1e-9; x += 0.5) grid.push({ x: round(x), y: round(y) });
+    }
+    let best: { pos: Pos; k: number; s: number } | null = null;
+    const consider = (next: Pos) => {
+      if (spanX(next) > widest + 1e-9) return;
+      const k = siteIntruders(next, sites);
+      if (k >= cur) return;
+      const s = scoreLayout(next, edges, maxColumns, true, sites).score;
+      if (!best || s < best.s - 1e-9) best = { pos: next, k, s };
+    };
+    for (const id of ids) {
+      for (const g of grid) {
+        if (ids.some((o) => o !== id && Math.hypot(pos.get(o)!.x - g.x, pos.get(o)!.y - g.y) < 0.6)) continue;
+        consider(new Map(pos).set(id, g));
+      }
+    }
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      consider(new Map(pos).set(ids[i]!, pos.get(ids[j]!)!).set(ids[j]!, pos.get(ids[i]!)!));
+    }
+    if (!best) break;
+    pos = (best as { pos: Pos }).pos;
+    cur = (best as { k: number }).k;
+  }
+  // Then, the sites kept as they are, any move that scores better (the moves above may have cost a
+  // crossing or a long link that another move wins back).
+  let score = scoreLayout(pos, edges, maxColumns, true, sites).score;
+  for (let pass = 0; pass < 12; pass++) {
+    const xs = [...pos.values()].map((p) => p.x), ys = [...pos.values()].map((p) => p.y);
+    let best: { pos: Pos; s: number } | null = null;
+    const consider = (next: Pos) => {
+      if (spanX(next) > widest + 1e-9 || siteIntruders(next, sites) > cur) return;
+      const s = scoreLayout(next, edges, maxColumns, true, sites).score;
+      if (s < score - 1e-9 && (!best || s < best.s - 1e-9)) best = { pos: next, s };
+    };
+    for (const id of ids) {
+      for (let y = Math.floor(Math.min(...ys)) - 1; y <= Math.max(...ys) + 1 + 1e-9; y += 0.5) {
+        for (let x = Math.floor(Math.min(...xs)) - 1; x <= Math.max(...xs) + 1 + 1e-9; x += 0.5) {
+          const g = { x: round(x), y: round(y) };
+          if (ids.some((o) => o !== id && Math.hypot(pos.get(o)!.x - g.x, pos.get(o)!.y - g.y) < 0.6)) continue;
+          consider(new Map(pos).set(id, g));
+        }
+      }
+    }
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      consider(new Map(pos).set(ids[i]!, pos.get(ids[j]!)!).set(ids[j]!, pos.get(ids[i]!)!));
+    }
+    if (!best) break;
+    pos = (best as { pos: Pos }).pos;
+    score = (best as { s: number }).s;
+  }
+  return pos;
 }

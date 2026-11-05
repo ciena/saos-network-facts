@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { layoutFacts, type LayoutModel, type Point } from "../src/index.ts";
-import { scoreLayout, stress } from "../src/layout-shapes.ts";
+import { keepSites, scoreLayout, siteIntruders, stress } from "../src/layout-shapes.ts";
 
 const CARD = { aspect: "card", max_columns: 4 } as const;
 const links = (pairs: string) => pairs.split(" ").map((p) => ({ a: p.split("-")[0]!, b: p.split("-")[1]! }));
@@ -161,4 +161,28 @@ test("the choice: every candidate scored, the chosen one first; max_columns hold
   const authored = layoutFacts(roles, { hints });
   assert.equal(authored.method, "hints");
   assert.equal(authored.candidates, undefined);
+});
+
+test("siteIntruders: devices inside the frame of a site they are not at, and site frames that overlap", () => {
+  const sq = (o: Record<string, [number, number]>) => new Map(Object.entries(o).map(([k, [x, y]]) => [k, { x, y }]));
+  const sites = new Map([["A1", "A"], ["A2", "A"], ["B1", "B"]]);
+  // A1 and A2 at the two ends of a row: their frame spans X between them.
+  assert.equal(siteIntruders(sq({ A1: [0, 0], X: [1, 0], A2: [2, 0], B1: [0, 2] }), sites), 1);
+  // Together, X a column away, B1 a row and a half below: nothing out of place.
+  assert.equal(siteIntruders(sq({ A1: [0, 0], A2: [1, 0], X: [2, 0], B1: [0, 1.5] }), sites), 0);
+  // B1 half a column from A2: the two frames overlap.
+  assert.equal(siteIntruders(sq({ A1: [0, 0], A2: [1, 0], B1: [1.8, 0] }), sites), 1);
+  // the score counts them
+  assert.equal(scoreLayout(sq({ A1: [0, 0], X: [1, 0], A2: [2, 0] }), [], 4, true, sites).foreign, 1);
+  assert.equal(scoreLayout(sq({ A1: [0, 0], X: [1, 0], A2: [2, 0] }), [], 4).foreign, 0);
+});
+
+test("keepSites: moves devices until no site frame takes in another device; a layout with none is kept", () => {
+  const sq = (o: Record<string, [number, number]>) => new Map(Object.entries(o).map(([k, [x, y]]) => [k, { x, y }]));
+  const sites = new Map([["A1", "A"], ["A2", "A"]]);
+  const edges: Array<[string, string]> = [["A1", "X"], ["A2", "X"]];
+  const out = keepSites(sq({ A1: [0, 0], X: [1, 0], A2: [2, 0] }), edges, sites, 4);
+  assert.equal(siteIntruders(out, sites), 0);
+  const fine = sq({ A1: [0, 0], A2: [1, 0], X: [0.5, 1] });
+  assert.equal(keepSites(fine, edges, sites, 4), fine);
 });

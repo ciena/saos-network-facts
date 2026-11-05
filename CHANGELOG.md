@@ -17,6 +17,32 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-05
+
+### Changed
+
+- **Layout: a site's devices kept together** — a site's frame is drawn round its devices wherever they land, so a
+  site whose devices were laid out apart took in the devices between them (a site frame round devices of
+  another site, or of none). Every layout candidate with a device inside the frame of a site it is not at, or
+  with two site frames overlapping, now has devices moved (one to a spare spot, or two swapped: the move that
+  leaves fewer out of place and scores best) until none is, then any move that scores better while none is;
+  the score counts each one left as much as a link through a device (`foreign` in the candidate's score,
+  `siteIntruders` and `keepSites` in the layout code). A lab without sites, or whose sites are already apart,
+  keeps its picture; the role tiers stay where the sites allow.
+- **Layout: a line system laid out as a chain** — the members of an optical line system (devices without facts
+  with an equipment role: terminals, OADMs, ROADMs, amplifiers) are drawn on the optical frame only, so the
+  other devices are now laid out without them, and each line system is then a row of its own above them, in
+  path order: a terminal, the OADMs or amplifiers, the other terminal, the end cabled to the router further
+  left on the left, each member's label by its box, within `max_columns`. A router cabled only to the line
+  system stands under its terminal. Before, the members joined the core and could fold back on themselves (an
+  OADM site's frame round a terminal). A plain box without an equipment role is laid out as before.
+  `LayoutNode` takes `site` and `equipment` (the importer's nodes carry both already).
+- **Frames: a card whose physical frame has no link opens on the optical frame** — with a signature start
+  (the default), a lab whose every cable runs to the line system (two routers joined only over it) started on
+  a physical frame of unlinked devices; it now starts on the optical frame (`data-start="optical"`, the
+  bare file and its rotation start there). A view's own `frames.start` is kept, and every other card starts as
+  before.
+
 ## [0.22.0] - 2026-11-05
 
 ### Added

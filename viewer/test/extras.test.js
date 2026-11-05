@@ -34,14 +34,18 @@ describe('import', () => {
     expect([core.kind, core.medium, core.over, buildNetwork(imp.topology).igp.adjacencies.find((a) => a.link === 'PE1-PE2')?.state]).toEqual(['core', undefined, 'over ch 25', 'Up']);
   });
 
-  test('sites, notes, and the layout puts the line system on the core ladder', () => {
+  test('sites, notes, and the layout lays the line system out as a chain on a row of its own', () => {
     expect(imp.topology.sites).toEqual([{ name: 'east', nodes: ['PE1', 'ROADM-A'] }, { name: 'west', nodes: ['PE2', 'ROADM-B'] }]);
     expect(imp.topology.notes).toEqual([
       { text: 'in-line amplifier hut, no site of its own', device: 'AMP-1', layer: null },
       { text: 'PE1-PE2 core link rides ch 25; ch 26 is lit on ROADM-A only', device: null, layer: null },
     ]);
-    expect(imp.layout.method).toBe('ladder');
-    expect(imp.layout.core).toEqual(['AMP-1', 'PE1', 'PE2', 'ROADM-A', 'ROADM-B']);
+    // the routers laid out without the line system, the line system a row above them in path order
+    expect(imp.layout.core).toEqual(['PE1', 'PE2']);
+    expect(imp.layout.description).toMatch(/; line system ROADM-A - AMP-1 - ROADM-B in a row above$/);
+    const p = imp.layout.positions;
+    expect(new Set(['ROADM-A', 'AMP-1', 'ROADM-B'].map((id) => p[id].y)).size).toBe(1);
+    expect(p['ROADM-A'].x < p['AMP-1'].x && p['AMP-1'].x < p['ROADM-B'].x && p['ROADM-A'].y < p.PE1.y).toBe(true);
     expect(nodes.get('PE1').site).toBe('east');
   });
 

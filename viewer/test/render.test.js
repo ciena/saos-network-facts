@@ -83,6 +83,22 @@ describe('frames', () => {
     expect(ids).not.toContain('pw');
   });
 
+  test('a physical frame without a link (every cable runs to the line system) starts on the optical frame', () => {
+    // the line-system lab with its routers' facts left out: the PE1-PE2 core link (from the facts) goes,
+    // their cables to the ROADMs stay, on the optical frame
+    const file = JSON.parse(read(LABS['line-system']));
+    for (const r of file.devices) if (r.device === 'PE1' || r.device === 'PE2') (r.status = 'skipped'), delete r.facts;
+    const r = frames(JSON.stringify(file), { preset: 'card-frames' });
+    expect(r.frames.map((f) => f.id)).toEqual(['optical', 'physical']);
+    expect(r.svg).toMatch(/data-title="Physical · 2 devices [^"]*, 0 links/);
+    expect(r.start).toBe('optical');
+    expect(r.svg).toMatch(/data-frames="optical physical" data-start="optical"/);
+    expect(frameIds(r.svg).at(-1)).toBe('optical');
+    // a view's own start is kept; a physical frame with a link keeps the signature start
+    expect(frames(JSON.stringify(file), { preset: 'card-frames', frames: { start: 'physical' } }).start).toBe('physical');
+    expect(frames(read(LABS['line-system']), { preset: 'card-frames' }).start).toBe('pw');
+  });
+
   test('the view picks frames and the start frame; empty layers make none', () => {
     const text = read(LABS['adaptive-sr-cfm']);
     const listed = frames(text, { frames: { rule: 'list', list: ['cfm', 'igp', 'evpn'], start: 'first' } });

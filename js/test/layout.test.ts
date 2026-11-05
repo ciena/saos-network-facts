@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { forceLayout, layoutFacts, longestCycle, resolveView, type LayoutModel, type Point } from "../src/index.ts";
+import { siteIntruders } from "../src/layout-shapes.ts";
 
 // A ring of `n` routers R1..Rn (role pe or p), each PE with a CE hung off it.
 function ringLab(n: number, { roles = "p", ces = [] as number[] } = {}): LayoutModel {
@@ -463,4 +464,77 @@ test("longestCycle: the longest simple cycle from its smallest name", () => {
   ]);
   assert.deepEqual(longestCycle(["D", "C", "B", "A"], adj), ["A", "B", "D", "C"]);
   assert.deepEqual(longestCycle(["A", "B"], new Map([["A", new Set(["B"])], ["B", new Set(["A"])]])), []);
+});
+
+// ---- line systems (members drawn on the optical layer) ------------------------------------------
+
+// Two PEs with a CE each, linked directly and over a line system (terminal, two OADMs, terminal): the
+// members are boxes without facts with an equipment role.
+const lineSystemLab = (extra: Partial<LayoutModel> = {}): LayoutModel => ({
+  nodes: [
+    { id: "PE1", role: "pe" }, { id: "PE2", role: "pe" }, { id: "CE1", role: "ce" }, { id: "CE2", role: "ce" },
+    { id: "LS-T-1", plain: true, equipment: "terminal" }, { id: "LS-O-1", plain: true, equipment: "oadm" },
+    { id: "LS-O-2", plain: true, equipment: "oadm" }, { id: "LS-T-2", plain: true, equipment: "terminal" },
+    ...(extra.nodes ?? []),
+  ],
+  links: [
+    { a: "PE1", b: "PE2" }, { a: "PE1", b: "CE1" }, { a: "PE2", b: "CE2" },
+    // the far end first: the row runs by the routers' places, not the order of the links
+    { a: "LS-T-2", b: "PE1" }, { a: "LS-T-2", b: "LS-O-2" }, { a: "LS-O-2", b: "LS-O-1" }, { a: "LS-O-1", b: "LS-T-1" }, { a: "LS-T-1", b: "PE2" },
+    ...(extra.links ?? []),
+  ],
+});
+
+test("line systems: the other devices laid out without them, then the line system a chain on a row of its own", () => {
+  const lab = lineSystemLab();
+  const r = layoutFacts(lab, { aspect: "card", max_columns: 4 });
+  const p = r.positions;
+  // The routers' layout is the one without the line system.
+  const rest = layoutFacts({ nodes: lab.nodes.filter((n) => !n.equipment), links: lab.links.filter((l) => ![l.a, l.b].some((e) => String(e).startsWith("LS-"))) }, { aspect: "card", max_columns: 4 });
+  const shift = { x: p.PE1!.x - rest.positions.PE1!.x, y: p.PE1!.y - rest.positions.PE1!.y };
+  const r2 = (v: number) => Math.round(v * 100) / 100 + 0;
+  for (const id of ["PE1", "PE2", "CE1", "CE2"]) assert.deepEqual([r2(p[id]!.x - shift.x), r2(p[id]!.y - shift.y)], [rest.positions[id]!.x, rest.positions[id]!.y], id);
+  assert.deepEqual(r.core, rest.core);
+  // One row, in path order, the end cabled to the router further left on the left, above the routers.
+  const row = ["LS-T-2", "LS-O-2", "LS-O-1", "LS-T-1"];
+  const order = p.PE1!.x < p.PE2!.x ? row : [...row].reverse();
+  assert.equal(new Set(row.map((id) => p[id]!.y)).size, 1);
+  for (let i = 1; i < order.length; i++) assert.ok(p[order[i]!]!.x - p[order[i - 1]!]!.x >= 0.99, `${order[i]} right of ${order[i - 1]}`);
+  assert.ok(row.every((id) => p[id]!.y < Math.min(p.PE1!.y, p.PE2!.y, p.CE1!.y, p.CE2!.y)));
+  assert.ok(spanX(p) <= 3 + 1e-9, "within max_columns");
+  assert.match(r.description, /line system LS-T-\d - LS-O-\d - LS-O-\d - LS-T-\d in a row above$/);
+  // A plain box without an equipment role (a device without facts in the path) is laid out as before.
+  const box = layoutFacts({ nodes: lab.nodes.map((n) => ({ ...n, equipment: undefined })), links: lab.links });
+  assert.ok(box.core.includes("LS-O-1"));
+});
+
+test("line systems: a router cabled only to the line system stands under its terminal", () => {
+  const lab: LayoutModel = {
+    nodes: [{ id: "PE1" }, { id: "PE2" }, ...["LS-T-1", "LS-O-1", "LS-T-2"].map((id) => ({ id, plain: true, equipment: id.includes("T") ? "terminal" : "oadm" }))],
+    links: [{ a: "PE1", b: "LS-T-1" }, { a: "LS-T-1", b: "LS-O-1" }, { a: "LS-O-1", b: "LS-T-2" }, { a: "LS-T-2", b: "PE2" }],
+  };
+  const p = layoutFacts(lab, { aspect: "card", max_columns: 4 }).positions;
+  assert.deepEqual([p.PE1!.x, p.PE1!.y], [p["LS-T-1"]!.x, p["LS-T-1"]!.y + 1]);
+  assert.deepEqual([p.PE2!.x, p.PE2!.y], [p["LS-T-2"]!.x, p["LS-T-2"]!.y + 1]);
+  assert.equal(p["LS-O-1"]!.y, p["LS-T-1"]!.y);
+});
+
+// ---- sites ------------------------------------------------------------------------------------------
+
+test("sites: a site's devices are kept together, its frame takes in no other device", () => {
+  // A chain CE1a, CE1b - PE1 - P - PE2 - CE2a, CE2b where site A holds CE1a, CE1b and CE2a (the two
+  // ends of the chain) and site B holds P and CE2b: in a plain chain site A's frame would span it all.
+  const nodes = [
+    { id: "PE1", role: "pe" }, { id: "PE2", role: "pe" }, { id: "P", role: "p", site: "B" },
+    { id: "CE1a", role: "ce", site: "A" }, { id: "CE1b", role: "ce", site: "A" }, { id: "CE2a", role: "ce", site: "A" }, { id: "CE2b", role: "ce", site: "B" },
+  ];
+  const links = [{ a: "PE1", b: "P" }, { a: "P", b: "PE2" }, { a: "PE1", b: "CE1a" }, { a: "PE1", b: "CE1b" }, { a: "PE2", b: "CE2a" }, { a: "PE2", b: "CE2b" }];
+  const r = layoutFacts({ nodes, links }, { aspect: "card", max_columns: 4 });
+  const sites = new Map(nodes.filter((n) => n.site).map((n) => [n.id, n.site!]));
+  assert.equal(siteIntruders(new Map(Object.entries(r.positions)), sites), 0);
+  assert.equal(r.candidates![0]!.foreign, 0);
+  // Without the sites, the same lab is laid out as before (a plain chain would hold the foreign devices).
+  const bare = layoutFacts({ nodes: nodes.map(({ site: _, ...n }) => n), links }, { aspect: "card", max_columns: 4 });
+  assert.ok(siteIntruders(new Map(Object.entries(bare.positions)), sites) > 0);
+  assert.ok(through({ nodes, links }, r.positions).length === 0);
 });

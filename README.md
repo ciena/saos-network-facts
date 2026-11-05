@@ -329,8 +329,12 @@ rides the line system (`over ch 25`, the spans' label when both say the same). A
 its `layers` draws the line system on the physical layer instead. Sites are a dashed frame round their
 devices (on both layers); notes are yellow, beside their device (the snapshot numbers them and lists them
 in the plane's corner) or along the edge, on the note's `layer`, else with their device (a note on a
-line-system member is on the optical layer), else on physical. The layout puts a chain of plain boxes
-between two routers (a ROADM, amplifiers, a ROADM) on the core with them.
+line-system member is on the optical layer), else on physical. The layout lays the other devices out
+without the line system, then the line system as a chain on a row of its own above them: a terminal, the
+OADMs or amplifiers, the other terminal, the end cabled to the router further left on the left, each
+member's label by its box; a router cabled only to the line system stands under its terminal. It keeps a
+site's devices together, so a site's frame takes in no device of another site or of none. A card whose
+physical frame has no link (every cable runs to the line system) opens on the optical frame.
 
 ### Rings
 
@@ -488,7 +492,7 @@ Every property is optional:
 | `preset` | `card-frames` (rotating 2D frames for a lab card), `lab-snapshot` (the exploded 3D snapshot, full screen, iso camera, compact labels), `protocol-stack` (every layer as a stacked plane) |
 | `layers` | the layers that may be shown: `optical` (since 1.2: the optical line system, under physical; without it the line system is drawn on physical), `physical`, `role` (since 1.3: the network roles CE, PE and P, a 2D frame only, `f-role`), `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
 | `frames.rule` | `auto` (one frame per shown layer with content, in the order above), `list` (the layers of `frames.list`, in that order) |
-| `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport), `first`, or a layer |
+| `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport; `optical` instead of a physical frame without a link, when every cable runs to the line system), `first`, or a layer |
 | `frames.period_s` | `4`: seconds per frame, a hint (a consumer may pause offscreen or for reduced motion) |
 | `snapshot.variant` | `exploded`, `stacked` |
 | `layout.algorithm` | `auto` (computed from the facts, below), `force` (force-directed), `hints` |
@@ -556,6 +560,22 @@ wins, with two adjustments: in a lab with both P and PE routers, a candidate tha
 ladder (radial and stress always) must beat the ladder by 3. `layoutFacts` returns every candidate
 with its score (`candidates`, the chosen one first) so a page can show why.
 
+**Sites** (a device's `site`): a site's frame is drawn round its devices wherever they are, so a site
+split across the layout would take in the devices between. Each candidate with a device inside the frame
+of a site it is not at, or with two site frames overlapping, has devices moved (one to a spare spot, or
+two swapped: the move that leaves fewer out of place and scores best) until none is, then any move that
+scores better while none is; the score counts each one left as much as a link through a device
+(`foreign` in the candidate's score). A lab without sites, or whose sites are already apart, keeps its
+picture.
+
+**Line systems** (devices without facts with an equipment role, `plain` and `equipment`): drawn on the
+optical layer, off every other frame, so the other devices are laid out without them, and each line
+system is then a row of its own above them, in path order (a terminal, the OADMs or amplifiers, the
+other terminal), the end cabled to the router further left on the left, spread between the columns of
+the routers at its two ends or a column apart centred over them, within `max_columns`. A router cabled
+only to the line system stands under the member it is cabled to. A plain box without an equipment role
+(a device without facts in the path) is still laid out with the core, as above.
+
 With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns (role tiers that follow the roles one more: `CE | PE | P | PE | CE` is five): outer devices hang sideways while there is room, a ring too long for the ladder runs
 round a rectangle that wide (its rows using the full width, its sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
 10-device lab stays readable on a ~330 px card (the `card-frames` preset: 4 columns). From JavaScript:
@@ -588,7 +608,8 @@ with the same layout as the 3D page:
   Flex-Algo; BGP (sessions, route reflector, sessions not established); L3VPN VRFs; pseudowires over the
   IGP; EVPN instances; CFM MEGs. The view picks them (`layers`, `frames.rule` / `frames.list`) and the
   frame to start on (`frames.start`, by default the lab's signature layer: its services, else its
-  transport). Devices stay put from frame to frame; each object carries two or three short labels, each
+  transport; the optical frame when the physical frame has no link, every cable running to the line
+  system, as with two routers joined only over it). Devices stay put from frame to frame; each object carries two or three short labels, each
   frame a title (port badges and IGP metrics are placed clear of the device boxes and of each other; a port with no room is in its link's hover title), a device without facts is drawn as the same symbol or box with a dashed outline (one without a
   type a faint grey box; line-system members solid, with their role), and a lab whose devices all lack facts
   (none configured yet, or no extractor for their type) is drawn from its records and links: the physical frame,
