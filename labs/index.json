@@ -30,6 +30,11 @@
       "id": "line-system",
       "title": "Optical line system, sites and notes (fixture, plain boxes from --extra)",
       "facts": "line-system/facts.json"
+    },
+    {
+      "id": "config-less",
+      "title": "Lab without configurations: devices by type, roles from --extra (fixture)",
+      "facts": "config-less/facts.json"
     }
   ]
 }
