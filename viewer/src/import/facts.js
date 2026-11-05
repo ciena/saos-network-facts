@@ -1165,6 +1165,15 @@ function placePlain(plain, pos) {
   return out;
 }
 
+// A record's role (schema 1.9 devices[].role, free text from the extra file) when it names a network
+// role, CE, PE or P (any case): what a device without facts is in the lab's network, which the layout
+// and the role frame read as they read the role derived from facts. Any other role (roadm, amplifier,
+// router) is equipment. -> 'ce' | 'pe' | 'p' | null
+export function networkRole(record) {
+  const r = String(record?.role ?? '').trim().toLowerCase();
+  return r === 'ce' || r === 'pe' || r === 'p' ? r : null;
+}
+
 // Plain boxes: the records without facts (a device the extractor skipped, such as an optical line
 // system, a third-party router or a controller, or one it failed on) that are not Linux hosts, with
 // the file's links[] that reach them. They carry no protocol: the engine never sees them (they are
@@ -1177,7 +1186,7 @@ function plainNodes(file, devices, hostNames, report, show) {
     // A record with a role and no configuration (a line-system member from the extra file) is meant to
     // have no facts: no warning.
     if (!(r.role && r.status === 'skipped' && !r.templates?.length)) report.warn(`${r.device}: ${r.status}${r.reason ? ` (${r.reason})` : ''}; ${show ? 'shown as plain box' : 'not shown'}`);
-    if (show && !out.some((n) => n.id === r.device)) out.push({ id: r.device, role: 'plain', plain: true, type: r.type ?? null, platform: r.platform ?? null, status: r.status, reason: r.reason ?? null });
+    if (show && !out.some((n) => n.id === r.device)) out.push({ id: r.device, role: networkRole(r) ?? 'plain', plain: true, type: r.type ?? null, platform: r.platform ?? null, status: r.status, reason: r.reason ?? null });
   }
   return out;
 }
@@ -1231,7 +1240,7 @@ function annotate(file, nodes, links, report) {
   const sites = new Map();
   for (const n of nodes) {
     const r = records.get(n.id) ?? {};
-    if (r.role) n.equipment = r.role;
+    if (r.role && !networkRole(r)) n.equipment = r.role;
     if (r.site) {
       n.site = r.site;
       sites.set(r.site, [...(sites.get(r.site) ?? []), n.id]);
@@ -1253,9 +1262,12 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
   const file = parseFacts(input);
   const devices = devicesByName(file);
   const report = new Report();
-  if (!devices.size) throw new Error('no device in this facts file has facts (status ok or partial)');
   const hostNames = new Set(factsHosts(file).map((h) => h.name));
   const plain = { nodes: plainNodes(file, devices, hostNames, report, showPlain), links: [] };
+  // A lab whose devices all lack facts (no configuration in the lab, or no extractor for their type)
+  // is drawn from its records and links[]: plain boxes and the links between them, no protocol.
+  if (!devices.size && !plain.nodes.length) throw new Error(`no device in this facts file has facts (status ok or partial)${showPlain ? '' : ' and the view leaves out devices without facts (plain: false)'}`);
+  if (!devices.size) report.add('physical', 'facts', 'no facts', `no device has facts: ${plain.nodes.length === 1 ? 'its device is' : `its ${plain.nodes.length} devices are`} drawn from the records (name, type) and the file's links[]`);
 
   const igp = chooseIgp(devices, report);
   // The IS-IS level the view runs: the first instance's (level 1-2 runs as 2).

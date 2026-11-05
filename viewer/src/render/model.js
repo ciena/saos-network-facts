@@ -63,10 +63,15 @@ export function renderModel(imp, net) {
       equipment: n.equipment ?? null,
       // A line-system member: a box without facts with an equipment role (schema 1.9 devices[].role).
       member: !!(n.plain && n.equipment),
+      // A box without facts whose record names its network role (import/facts.js networkRole).
+      given: n.plain && ['ce', 'pe', 'p'].includes(n.role) ? n.role : null,
     };
   });
   // A lab with no IGP router: its devices are L2 switches, not CEs.
   if (!nodes.some((n) => n.role === 'p' || n.role === 'pe')) for (const n of nodes) if (n.role === 'ce') n.role = 'l2';
+  // The network role the role frame shows: CE, PE or P as the importer derives it from the facts, or a
+  // record's own role for a device without facts; none for an L2 switch, a host or a line-system member.
+  for (const n of nodes) n.net = n.given ?? (['ce', 'pe', 'p'].includes(n.role) ? n.role : null);
 
   const adj = new Map((net.igp?.adjacencies ?? []).map((a) => [a.link, a]));
   const ringOf = new Map();
@@ -130,6 +135,7 @@ export function presentLayers(m) {
   const has = {
     optical: m.nodes.some((n) => n.member) || m.links.some((l) => l.medium === 'optical'),
     physical: true,
+    role: m.nodes.some((n) => n.net),
     ring: m.rings.length > 0,
     igp: m.links.some((l) => l.adj),
     mpls: m.policies.length > 0 || m.tunnels.length > 0,
@@ -141,6 +147,25 @@ export function presentLayers(m) {
     cfm: m.megs.length > 0,
   };
   return Object.keys(has).filter((k) => has[k]);
+}
+
+// The platform family a device type belongs to, for its box on the physical frame: Ciena's model
+// numbers by series (3900 access, 5100 aggregation, 8100 / 8700 core and routing), else other (a
+// third-party router, a Waveserver, a controller, no type). The same for a device with facts and one
+// without, so a device the lab has no configuration for looks like its type.
+export function platformFamily(type) {
+  const m = /^(\d)\d{3}/.exec(String(type ?? ''));
+  return m ? ({ 3: 'access', 5: 'aggregation', 8: 'core' }[m[1]] ?? 'other') : 'other';
+}
+
+// The model a device type names, short enough for its box: the model number with its variant (3984,
+// 3926v2, 5170), else the type's leading letters (WSAi, JNP, ELS), at most six characters; '?' without one.
+export function typeTag(type) {
+  const t = String(type ?? '').trim();
+  if (!t) return '?';
+  const num = /^\d{4}(v\d)?/i.exec(t);
+  if (num) return num[0];
+  return (/^[a-z]+/i.exec(t)?.[0] ?? t).slice(0, 6);
 }
 
 // A short tag for a device's box: its role (P, PE, CE...), or for a box without facts its

@@ -313,7 +313,8 @@ notes:                        # free text, on a device or not, on a view layer (
 
 - A name no other input knows (a ROADM, an amplifier, a terminal) becomes a device record with its `type`
   and `role` and no facts (`extractor` null, `status` `skipped`): a line-system member. A known device or
-  host gets its `site` and `role`.
+  host gets its `site` and `role`. A `role` of `ce`, `pe` or `p` (any case) is a network role, not
+  equipment: a device without facts is drawn in that role on the role frame and placed by it.
 - A link joining the same two ports as a topology link gives it its `kind` (`ethernet`, `optical`, `lag`;
   other values are kept) and `label`; any other is added to `links`.
 - `notes[]` is top-level: `{text, device?, layer?}`. Notes describe this lab, like the line system and the
@@ -464,13 +465,13 @@ page fetches the facts from the same site, so they stay as private as the site t
 A view file says what to show of a facts file, so a site or a lab card never computes a layout or
 draws a diagram itself: which layers, the 2D frames a card rotates through (one per layer), the 3D
 snapshot, the layout, the camera and the label density. Its schema is
-[`view-v1.schema.json`](src/saos_network_facts/schema/view-v1.schema.json) (`view_version` 1.2),
+[`view-v1.schema.json`](src/saos_network_facts/schema/view-v1.schema.json) (`view_version` 1.3),
 the defaults and presets are in [`view-presets-v1.json`](src/saos_network_facts/schema/view-presets-v1.json).
 Every property is optional:
 
 ```json
 {
-  "view_version": "1.2",
+  "view_version": "1.3",
   "preset": "card-frames",
   "layers": ["physical", "ring", "igp", "mpls", "pw", "cfm"],
   "frames": {"rule": "list", "list": ["igp", "ring", "pw", "cfm"], "start": "signature", "period_s": 5},
@@ -485,7 +486,7 @@ Every property is optional:
 | Property | Values (default first) |
 |---|---|
 | `preset` | `card-frames` (rotating 2D frames for a lab card), `lab-snapshot` (the exploded 3D snapshot, full screen, iso camera, compact labels), `protocol-stack` (every layer as a stacked plane) |
-| `layers` | the layers that may be shown: `optical` (since 1.2: the optical line system, under physical; without it the line system is drawn on physical), `physical`, `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
+| `layers` | the layers that may be shown: `optical` (since 1.2: the optical line system, under physical; without it the line system is drawn on physical), `physical`, `role` (since 1.3: the network roles CE, PE and P, a 2D frame only, `f-role`), `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
 | `frames.rule` | `auto` (one frame per shown layer with content, in the order above), `list` (the layers of `frames.list`, in that order) |
 | `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport), `first`, or a layer |
 | `frames.period_s` | `4`: seconds per frame, a hint (a consumer may pause offscreen or for reduced motion) |
@@ -577,15 +578,21 @@ For a lab card or a page without WebGL, the viewer renders a facts file and a vi
 with the same layout as the 3D page:
 
 - **`frames.svg`**: one flat frame per layer the lab has content for: the optical line system (members,
-  spans, the routers at their ends); physical; G.8032 rings over the
+  spans, the routers at their ends); physical (each device as its type: a box in its platform family's
+  colour, 3900 access, 5100 aggregation, 8100 core, other, tagged with its model, 3984, 5164, 8110; links
+  and ports); roles (`f-role`, right after physical: CE, PE and P as the viewer derives them from the facts,
+  or a record's `role` for a device without facts, a route reflector as P·RR; left out when no device has
+  a role); G.8032 rings over the
   physical links; the IGP (metrics, loopbacks, prefix SIDs); SR policies and MPLS-TP tunnels over the IGP
   (only when there is no pseudowire frame, which shows the transport already); SRv6 locators and
   Flex-Algo; BGP (sessions, route reflector, sessions not established); L3VPN VRFs; pseudowires over the
   IGP; EVPN instances; CFM MEGs. The view picks them (`layers`, `frames.rule` / `frames.list`) and the
   frame to start on (`frames.start`, by default the lab's signature layer: its services, else its
   transport). Devices stay put from frame to frame; each object carries two or three short labels, each
-  frame a title (port badges and IGP metrics are placed clear of the device boxes and of each other; a port with no room is in its link's hover title), devices without facts are dashed plain boxes (line-system members solid, with their
-  role), optical spans a double line with their label, sites a dashed frame, notes yellow (schema 1.9). Each frame is a group `<g id="f-<layer>">`
+  frame a title (port badges and IGP metrics are placed clear of the device boxes and of each other; a port with no room is in its link's hover title), a device without facts is drawn as its type with a dashed outline (one without a
+  type a faint grey box; line-system members solid, with their role), and a lab whose devices all lack facts
+  (none configured yet, or no extractor for their type) is drawn from its records and links: the physical frame,
+  plus the role frame when its records give roles, optical spans a double line with their label, sites a dashed frame, notes yellow (schema 1.9). Each frame is a group `<g id="f-<layer>">`
   shown by CSS `:target`, so `<img src="frames.svg#f-igp">` shows that frame and stays on it, without any
   script. **The bare file rotates by itself**: CSS inside the SVG (`@keyframes`, no script) shows the start
   frame, then the next frame every `frames.period_s` seconds (default 4), round, wherever the file is shown

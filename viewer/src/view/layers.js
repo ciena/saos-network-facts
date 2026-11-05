@@ -21,7 +21,8 @@ const PAGE_LAYER_OF = { igp: 'isis' }; // a note's view layer id -> the page's l
 export const LAYERS = [
   // Under the physical plane: optical line-system members and the spans to and between them (schema 1.9).
   { id: 'optical', name: 'Optical line system', color: 0x5c7cfa, has: (net) => (net.topo.plain?.nodes ?? []).some((n) => n.equipment) || [...net.topo.links, ...(net.topo.plain?.links ?? [])].some((l) => l.medium === 'optical') },
-  { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8, has: (net) => net.topo.nodes.length > 0 },
+  // A lab with no facts at all still has its plain boxes (devices without facts, not line-system members) here.
+  { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8, has: (net) => net.topo.nodes.length > 0 || (net.topo.plain?.nodes ?? []).some((n) => !n.equipment) },
   { id: 'ring', name: 'G.8032 rings', color: 0xe3b341, has: (net) => (net.g8032?.rings.length ?? 0) > 0 },
   { id: 'isis', name: 'IGP (IS-IS / OSPF)', color: 0x3fb950, has: (net) => net.igp.routers.length > 0 },
   { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', color: 0xd29922, has: (net) => net.tp.tunnels.length > 0 || net.sr.policies.length > 0 || mplsRouters(net).length > 0 },

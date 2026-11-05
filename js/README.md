@@ -61,8 +61,8 @@ import viewSchema from "@ciena/saos-network-facts/view-schema" with { type: "jso
   `{ nodes: [{ id, role?, plain?, host?, group? }], links: [{ a, b }], rings?: [{ nodes, links? }] }`
   (link ends a name, `{ node }` or `{ device }`; p and pe roles are the IGP routers, `group` the IGP
   area); the viewer's imported topology is one. Auto scores candidates and takes the best: the ladder
-  (the core, IGP routers, else the G.8032 ring, else the longest cycle, as two rows, the rest hung
-  outward), tiers (`CE | PE | P | PE | CE` as columns, ordered to cross as few links as possible),
+  (the core, IGP routers, else the G.8032 ring, else the longest cycle, counted in devices with facts, or
+  in plain boxes in a lab that has only those, as two rows, the rest hung outward), tiers (`CE | PE | P | PE | CE` as columns, ordered to cross as few links as possible),
   radial (a hub lab) and stress (stress majorisation, for odd meshes); `candidates` lists each with its
   score, the chosen one first. `aspect: "card"` keeps it within `max_columns` columns (role tiers one
   more). Hints are used when they place every device

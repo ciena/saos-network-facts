@@ -106,6 +106,8 @@ describe('every fixture: the same engine output with or without plain boxes', ()
   for (const [name, facts] of [['adaptive-sr-cfm', example], ...names.map((n) => [n, read(n)])]) {
     test(name, () => {
       const on = importFacts(facts);
+      // a lab with no facts at all has nothing to draw without its plain boxes
+      if (!on.topology.nodes.length) return expect(() => importFacts(facts, { plain: false })).toThrow(/no device in this facts file has facts/);
       const off = importFacts(facts, { plain: false });
       const { plain, ...engineTopo } = on.topology;
       expect(engineOf(on.topology, on.labelMode)).toEqual(engineOf(off.topology, off.labelMode));
@@ -115,8 +117,8 @@ describe('every fixture: the same engine output with or without plain boxes', ()
     });
   }
 
-  test('the lab menu demos plain boxes: the line-system lab, and only it, has them', () => {
+  test('the lab menu demos plain boxes: the line-system and the config-less labs, and only they, have them', () => {
     const withBoxes = LABS.filter((l) => importFacts(readFileSync(new URL(l.source, new URL('../labs.config.js', import.meta.url)), 'utf8')).topology.plain.nodes.length);
-    expect(withBoxes.map((l) => l.id)).toEqual(['line-system']);
+    expect(withBoxes.map((l) => l.id)).toEqual(['line-system', 'config-less']);
   });
 });

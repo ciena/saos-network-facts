@@ -187,6 +187,23 @@ test("the cycle is counted in routers: a line system's chain of plain boxes coun
   assert.equal(ladder.crossings, 0);
 });
 
+test("a lab of plain boxes only (no device has facts): its cycle is the core, counted in boxes", () => {
+  // Every device of a lab nobody has configured yet is a plain box: they are its network, so its ring
+  // is the ladder's cycle as it would be for routers, not "no cycle".
+  const ring = ["N1", "N2", "N3", "N4"];
+  const lab: LayoutModel = {
+    nodes: [...ring, "N5"].map((id) => ({ id, plain: true })),
+    links: [...ring.map((id, i) => ({ a: id, b: ring[(i + 1) % ring.length]! })), { a: "N4", b: "N5" }],
+  };
+  const r = layoutFacts(lab);
+  assert.deepEqual(r.core, ring);
+  assert.ok(r.candidates!.some((c) => c.method === "ladder"));
+  // one device with facts beside them: the boxes count nothing again (a line system between routers),
+  // so there is no cycle to run a ladder on
+  const mixed: LayoutModel = { ...lab, nodes: lab.nodes.map((n) => (n.id === "N5" ? { id: "N5" } : n)) };
+  assert.ok(!layoutFacts(mixed).candidates!.some((c) => c.method === "ladder"));
+});
+
 test("hints: used when they place every device, else reported and the computed layout used", () => {
   const lab = ringLab(4);
   const all = { R1: [100, 100], R2: [300, 100], R3: [300, 300], R4: [100, 300] } as Record<string, [number, number]>;

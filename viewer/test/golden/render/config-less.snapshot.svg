@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="netfacts-snapshot" data-variant="exploded" data-gap="196" data-full-h="316" viewBox="0 0 1587 316" width="1587" height="316" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<title>config-less</title>
+<rect class="bg" x="0" y="-4000" width="1587" height="8316" fill="#ffffff"/>
+<g class="pillars">
+<line class="pillar" data-layers="physical" x1="375.9" y1="206.7" x2="375.9" y2="206.7" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical" x1="605.9" y1="206.7" x2="605.9" y2="206.7" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical" x1="783.2" y1="171" x2="783.2" y2="171" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical" x1="1065.9" y1="206.7" x2="1065.9" y2="206.7" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical" x1="1295.9" y1="206.7" x2="1295.9" y2="206.7" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical" x1="592.5" y1="135.3" x2="592.5" y2="135.3" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+</g>
+<g class="layer" data-layer="physical" transform="translate(0,0)"><polygon points="40,96 1305,96 1526.3,245.9 261.3,245.9" fill="#8b98a8" fill-opacity="0.07" stroke="#8b98a8" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="237.9" font-size="12" font-weight="700" fill="#8b98a8">Physical</text><g><title>CE1 1 — PE1 1
+cabled (links[]), no facts on one end</title><line x1="375.9" y1="206.7" x2="605.9" y2="206.7" stroke="#8a94a3" stroke-width="2" stroke-dasharray="5 4"/><rect x="415" y="199.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="421.9" y="210.2" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="553" y="199.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="559.9" y="210.2" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text></g><g><title>PE1 2 — P1 1
+cabled (links[]), no facts on one end</title><line x1="605.9" y1="206.7" x2="783.2" y2="171" stroke="#8a94a3" stroke-width="2" stroke-dasharray="5 4"/><rect x="634.5" y="192.6" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="641.4" y="203.1" font-size="9.5" text-anchor="middle" fill="#1d2430">2</text><rect x="740.8" y="171.1" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="747.7" y="181.6" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text></g><g><title>P1 2 — PE2 2
+cabled (links[]), no facts on one end</title><line x1="783.2" y1="171" x2="1065.9" y2="206.7" stroke="#8a94a3" stroke-width="2" stroke-dasharray="5 4"/><rect x="832.8" y="171.1" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="839.7" y="181.6" font-size="9.5" text-anchor="middle" fill="#1d2430">2</text><rect x="1002.5" y="192.6" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="1009.4" y="203.1" font-size="9.5" text-anchor="middle" fill="#1d2430">2</text></g><g><title>PE1 3 — PE2 3
+cabled (links[]), no facts on one end</title><line x1="605.9" y1="206.7" x2="1065.9" y2="206.7" stroke="#8a94a3" stroke-width="2" stroke-dasharray="5 4"/><rect x="691" y="199.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="697.9" y="210.2" font-size="9.5" text-anchor="middle" fill="#1d2430">3</text><rect x="967" y="199.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="973.9" y="210.2" font-size="9.5" text-anchor="middle" fill="#1d2430">3</text></g><g><title>PE2 1 — CE2 1
+cabled (links[]), no facts on one end</title><line x1="1065.9" y1="206.7" x2="1295.9" y2="206.7" stroke="#8a94a3" stroke-width="2" stroke-dasharray="5 4"/><rect x="1105" y="199.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="1111.9" y="210.2" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="1243" y="199.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="1249.9" y="210.2" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text></g><g><title>MGMT 1 — P1 9
+cabled (links[]), no facts on one end</title><line x1="592.5" y1="135.3" x2="783.2" y2="171" stroke="#8a94a3" stroke-width="2" stroke-dasharray="5 4"/><rect x="623.7" y="135.4" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="630.6" y="145.9" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="738.2" y="156.9" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="745.1" y="167.4" font-size="9.5" text-anchor="middle" fill="#1d2430">9</text></g><g class="device"><title>CE1
+3984 · SAOS 10
+no facts: no configuration</title><polygon points="396.3,179.5 423.5,197.9 423.5,215.9 396.3,197.5" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" style="filter:brightness(0.72)"/><polygon points="355.5,197.9 423.5,197.9 423.5,215.9 355.5,215.9" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" opacity="0.8"/><polygon points="328.3,179.5 396.3,179.5 423.5,197.9 355.5,197.9" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35"/><rect x="328.3" y="136.5" width="57.2" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="333.3" y="147.5" font-size="12" font-weight="700" fill="#8a94a3">CE1</text><text x="333.3" y="160.5" font-size="10.5" fill="#5b6675">3984</text><text x="333.3" y="173.5" font-size="10.5" fill="#5b6675">no facts</text></g><g class="device"><title>PE1
+5164 · SAOS 10
+no facts: no configuration</title><polygon points="626.3,179.5 653.5,197.9 653.5,215.9 626.3,197.5" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" style="filter:brightness(0.72)"/><polygon points="585.5,197.9 653.5,197.9 653.5,215.9 585.5,215.9" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" opacity="0.8"/><polygon points="558.3,179.5 626.3,179.5 653.5,197.9 585.5,197.9" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35"/><rect x="558.3" y="136.5" width="57.2" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="563.3" y="147.5" font-size="12" font-weight="700" fill="#8a94a3">PE1</text><text x="563.3" y="160.5" font-size="10.5" fill="#5b6675">5164</text><text x="563.3" y="173.5" font-size="10.5" fill="#5b6675">no facts</text></g><g class="device"><title>P1
+8110 · SAOS 10
+no facts: no configuration</title><polygon points="803.6,143.8 830.8,162.2 830.8,180.2 803.6,161.8" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" style="filter:brightness(0.72)"/><polygon points="762.8,162.2 830.8,162.2 830.8,180.2 762.8,180.2" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" opacity="0.8"/><polygon points="735.6,143.8 803.6,143.8 830.8,162.2 762.8,162.2" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35"/><rect x="735.6" y="100.8" width="57.2" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="740.6" y="111.8" font-size="12" font-weight="700" fill="#8a94a3">P1</text><text x="740.6" y="124.8" font-size="10.5" fill="#5b6675">8110</text><text x="740.6" y="137.8" font-size="10.5" fill="#5b6675">no facts</text></g><g class="device"><title>PE2
+5164 · SAOS 10
+no facts: no configuration</title><polygon points="1086.3,179.5 1113.5,197.9 1113.5,215.9 1086.3,197.5" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" style="filter:brightness(0.72)"/><polygon points="1045.5,197.9 1113.5,197.9 1113.5,215.9 1045.5,215.9" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" opacity="0.8"/><polygon points="1018.3,179.5 1086.3,179.5 1113.5,197.9 1045.5,197.9" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35"/><rect x="1018.3" y="136.5" width="57.2" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="1023.3" y="147.5" font-size="12" font-weight="700" fill="#8a94a3">PE2</text><text x="1023.3" y="160.5" font-size="10.5" fill="#5b6675">5164</text><text x="1023.3" y="173.5" font-size="10.5" fill="#5b6675">no facts</text></g><g class="device"><title>CE2
+3926v2 · SAOS 10
+no facts: no configuration</title><polygon points="1316.3,179.5 1343.5,197.9 1343.5,215.9 1316.3,197.5" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" style="filter:brightness(0.72)"/><polygon points="1275.5,197.9 1343.5,197.9 1343.5,215.9 1275.5,215.9" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" opacity="0.8"/><polygon points="1248.3,179.5 1316.3,179.5 1343.5,197.9 1275.5,197.9" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35"/><rect x="1248.3" y="136.5" width="57.2" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="1253.3" y="147.5" font-size="12" font-weight="700" fill="#8a94a3">CE2</text><text x="1253.3" y="160.5" font-size="10.5" fill="#5b6675">3926v2</text><text x="1253.3" y="173.5" font-size="10.5" fill="#5b6675">no facts</text></g><g class="device"><title>MGMT
+3928 · SAOS 10
+no facts: no configuration</title><polygon points="612.9,108.1 640.1,126.5 640.1,144.5 612.9,126.1" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" style="filter:brightness(0.72)"/><polygon points="572.1,126.5 640.1,126.5 640.1,144.5 572.1,144.5" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35" opacity="0.8"/><polygon points="544.9,108.1 612.9,108.1 640.1,126.5 572.1,126.5" fill="#8a94a3" stroke="#fff" stroke-width="0.8" stroke-dasharray="3 2" fill-opacity="0.35"/><rect x="544.9" y="65.1" width="57.2" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="549.9" y="76.1" font-size="12" font-weight="700" fill="#8a94a3">MGMT</text><text x="549.9" y="89.1" font-size="10.5" fill="#5b6675">3928</text><text x="549.9" y="102.1" font-size="10.5" fill="#5b6675">no facts</text></g></g>
+<g class="hud">
+<text x="40" y="30" font-size="17" font-weight="700" fill="#1d2430">config-less</text>
+<text x="40" y="48" font-size="11" fill="#5b6675">6 devices · 6 links · layout: tiers</text>
+<g class="chip" data-layer="physical" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Physical (always shown)</title><rect x="40" y="58" width="82.8" height="22" rx="11" fill="#8b98a8" fill-opacity="0.14" stroke="#8b98a8"/><circle class="dot" cx="52" cy="69" r="4.5" fill="#8b98a8"/><text x="62" y="73" font-size="11" fill="#1d2430">Physical</text></g>
+</g>
+<script><![CDATA[
+(function () {
+  var svgs = document.querySelectorAll('svg.netfacts-snapshot:not([data-wired])');
+  Array.prototype.forEach.call(svgs, function (svg) {
+    svg.setAttribute('data-wired', '1');
+    var gap = +svg.getAttribute('data-gap'), fullH = +svg.getAttribute('data-full-h');
+    var vb = svg.getAttribute('viewBox').split(' ').map(Number);
+    var layers = [].slice.call(svg.querySelectorAll('g.layer'));
+    var order = layers.map(function (g) { return g.getAttribute('data-layer'); }).reverse();
+    var off = {};
+    function apply() {
+      var shown = order.filter(function (id) { return !off[id]; });
+      layers.forEach(function (g) {
+        var id = g.getAttribute('data-layer'), k = shown.indexOf(id);
+        g.style.display = k < 0 ? 'none' : '';
+        if (k >= 0) g.setAttribute('transform', 'translate(0,' + (-k * gap) + ')');
+      });
+      [].forEach.call(svg.querySelectorAll('line.pillar'), function (p) {
+        var ls = (p.getAttribute('data-layers') || '').split(' ');
+        if (p._y0 === undefined) p._y0 = +p.getAttribute('y1');
+        var y0 = p._y0, top = 0, bottom = Infinity;
+        ls.forEach(function (id) { var k = shown.indexOf(id); if (k > top) top = k; if (k >= 0 && k < bottom) bottom = k; });
+        if (bottom === Infinity) bottom = 0;
+        p.setAttribute('y1', y0 - bottom * gap);
+        p.setAttribute('y2', y0 - top * gap);
+      });
+      [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
+        var id = c.getAttribute('data-layer');
+        c.style.opacity = off[id] ? 0.45 : 1;
+        c.querySelector('.dot').setAttribute('fill-opacity', off[id] ? 0 : 1);
+        c.setAttribute('aria-pressed', off[id] ? 'false' : 'true');
+      });
+      var drop = (order.length - shown.length) * gap;
+      svg.setAttribute('viewBox', [vb[0], drop, vb[2], fullH - drop].join(' '));
+      svg.setAttribute('height', fullH - drop);
+      svg.querySelector('g.hud').setAttribute('transform', 'translate(0,' + drop + ')');
+    }
+    [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
+      var id = c.getAttribute('data-layer');
+      if (id === 'physical') { c.style.cursor = 'default'; return; }
+      function toggle() { off[id] = !off[id]; apply(); }
+      c.addEventListener('click', toggle);
+      c.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    });
+    apply();
+  });
+})();]]></script>
+</svg>

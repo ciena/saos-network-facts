@@ -45,3 +45,7 @@ line-system:
   clab: labs/line-system/topo.clab.yml
   extra: labs/line-system/extra.yaml
   recipe: line-system
+config-less:
+  clab: labs/config-less/topo.clab.yml
+  extra: labs/config-less/extra.yaml
+  recipe: config-less

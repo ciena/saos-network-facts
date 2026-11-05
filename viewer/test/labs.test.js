@@ -116,7 +116,7 @@ describe('the page URL', () => {
 describe('the labs the site stages', () => {
   test('labs/index.json lists the example as the default lab and the two-ring fixture, each with its facts file', async () => {
     const files = labFiles();
-    expect(Object.keys(files)).toEqual(['labs/index.json', 'labs/adaptive-sr-cfm/facts.json', 'labs/g8032-two-ring/facts.json', 'labs/g8032-by-name/facts.json', 'labs/srv6-evpn/facts.json', 'labs/l3vpn-hosts/facts.json', 'labs/line-system/facts.json']);
+    expect(Object.keys(files)).toEqual(['labs/index.json', 'labs/adaptive-sr-cfm/facts.json', 'labs/g8032-two-ring/facts.json', 'labs/g8032-by-name/facts.json', 'labs/srv6-evpn/facts.json', 'labs/l3vpn-hosts/facts.json', 'labs/line-system/facts.json', 'labs/config-less/facts.json']);
     expect(JSON.parse(files['labs/index.json'])).toEqual({
       labs: [
         { id: 'adaptive-sr-cfm', title: 'Adaptive-SR-CFM (example)', facts: 'adaptive-sr-cfm/facts.json', default: true },
@@ -125,6 +125,7 @@ describe('the labs the site stages', () => {
         { id: 'srv6-evpn', title: 'SRv6, Flex-Algo, EVPN and an L3VPN over SRv6 (fixture, hosts from --hosts)', facts: 'srv6-evpn/facts.json' },
         { id: 'l3vpn-hosts', title: 'L3VPN with Linux hosts and a management VRF (fixture, links from --clab)', facts: 'l3vpn-hosts/facts.json' },
         { id: 'line-system', title: 'Optical line system, sites and notes (fixture, plain boxes from --extra)', facts: 'line-system/facts.json' },
+        { id: 'config-less', title: 'Lab without configurations: devices by type, roles from --extra (fixture)', facts: 'config-less/facts.json' },
       ],
     });
     expect(LABS.filter((l) => l.default).map((l) => l.id)).toEqual(['adaptive-sr-cfm']);

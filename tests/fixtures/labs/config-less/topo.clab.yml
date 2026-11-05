@@ -1,0 +1,28 @@
+# Synthetic lab with no configurations, as a lab looks before anyone has configured it: six SAOS 10
+# devices with their types and cabling and no startup-config, so every record is skipped ("no
+# configuration"). The viewer draws it from the records and links[]: each device as its type, and
+# the role frame from the roles extra.yaml gives (MGMT has none).
+name: config-less
+topology:
+  defaults:
+    kind: ciena_saos
+  nodes:
+    CE1:
+      type: '3984'
+    PE1:
+      type: '5164'
+    P1:
+      type: '8110'
+    PE2:
+      type: '5164'
+    CE2:
+      type: '3926v2'
+    MGMT:
+      type: '3928'
+  links:
+    - endpoints: ["CE1:1", "PE1:1"]
+    - endpoints: ["PE1:2", "P1:1"]
+    - endpoints: ["P1:2", "PE2:2"]
+    - endpoints: ["PE1:3", "PE2:3"]
+    - endpoints: ["PE2:1", "CE2:1"]
+    - endpoints: ["MGMT:1", "P1:9"]
