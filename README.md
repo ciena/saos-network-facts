@@ -579,7 +579,7 @@ with the same layout as the 3D page:
 
 - **`frames.svg`**: one flat frame per layer the lab has content for: the optical line system (members,
   spans, the routers at their ends); physical (each device as its type: a box in its platform family's
-  colour, 3900 access, 5100 aggregation, 8100 core, other, tagged with its model, 3984, 5164, 8110; links
+  Ciena palette colour, 3900 access teal, 5100 aggregation blue, 8100 core purple, other grey, tagged with its model, 3984, 5164, 8110; links
   and ports); roles (`f-role`, right after physical: CE, PE and P as the viewer derives them from the facts,
   or a record's `role` for a device without facts, a route reflector as P·RR; left out when no device has
   a role); G.8032 rings over the

@@ -9,7 +9,7 @@ import { describe, expect, test } from 'vitest';
 import { buildNetwork } from '../src/engine/index.js';
 import { importFacts, networkRole } from '../src/import/facts.js';
 import { renderOverview } from '../src/panels.js';
-import { physicalLook } from '../src/render/frames.js';
+import { FAMILY, physicalLook } from '../src/render/frames.js';
 import { frames, snapshot } from '../src/render/index.js';
 import { platformFamily, typeTag } from '../src/render/model.js';
 
@@ -90,6 +90,16 @@ describe('the physical frame shows the device types', () => {
     expect(physical).not.toContain('no facts</text>');
     // the title says so only when no device has facts (the card keeps its width)
     expect(frames(JSON.stringify(file)).svg).toMatch(/data-title="Physical · 3 devices \(SAOS 10\), \d+ links?"/);
+  });
+
+  test('the family colours are Ciena palette colours, the tag text at least 4.5:1 on each, the name readable on white', () => {
+    const lum = (hex) => { const c = hex.replace('#', ''); const v = (c.length === 3 ? [...c].map((x) => x + x) : c.match(/../g)).map((x) => parseInt(x, 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+    const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+    expect(Object.values(FAMILY).map((x) => x.fill)).toEqual(['#00c896', '#1e1ec8', '#963cbe', '#c8c8c8']);
+    for (const [k, x] of Object.entries(FAMILY)) {
+      expect(ratio(x.fill, x.text), `${k} tag`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(x.name, '#fff'), `${k} name`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   test('physicalLook: a line-system member keeps its equipment look, a box with no type stays the faint ?', () => {

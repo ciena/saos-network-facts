@@ -24,7 +24,15 @@ const C = {
 const ROLE_TAG = { p: 'P', pe: 'PE', ce: 'CE', l2: 'L2', host: 'H', plain: '?' };
 const ROLE_NAME = { p: 'provider', pe: 'provider edge', ce: 'customer edge' };
 // The physical frame colours a device by its platform family (model.js platformFamily), the role frame by its role.
-const FAMILY = { access: '#2b7a78', aggregation: '#3f5f8f', core: '#6a4c93', other: '#59636e' };
+// Ciena palette colours, one per series, with a tag colour of at least 4.5:1 contrast on each (WCAG AA) and a
+// name colour readable on the white frame (the light fills, teal and grey, take near-black names).
+const NEAR_BLACK = '#1a1a1a';
+export const FAMILY = {
+  access: { fill: '#00c896', text: NEAR_BLACK, name: NEAR_BLACK }, // Ciena teal, 8.0:1
+  aggregation: { fill: '#1e1ec8', text: '#fff', name: '#1e1ec8' }, // Ciena blue, 10.1:1
+  core: { fill: '#963cbe', text: '#fff', name: '#963cbe' }, // Ciena purple, 5.7:1
+  other: { fill: '#c8c8c8', text: NEAR_BLACK, name: NEAR_BLACK }, // Ciena grey, 10.4:1
+};
 const ALGO = ['#e8590c', '#1c7ed6', '#2f9e44', '#c2255c'];
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -333,7 +341,7 @@ function draw(id, ctx) {
       const p = at(n.id);
       const look = physicalLook(n);
       const s = f * 1.3;
-      devices.push(`<g>${title(deviceDetail(n, model))}<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}"${look.dash ? ` fill-opacity="${look.typed ? 1 : 0.35}" stroke-dasharray="${r1(f * 0.3)} ${r1(f * 0.22)}"` : ''} stroke="${look.dash ? (look.typed ? C.ink : C.plain) : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.3)}" font-size="${r1(f * (look.tag.length > 5 ? 0.5 : look.tag.length > 4 ? 0.58 : look.tag.length > 3 ? 0.68 : 0.8))}" font-weight="700" text-anchor="middle" fill="#fff">${esc(look.tag)}</text></g>`);
+      devices.push(`<g>${title(deviceDetail(n, model))}<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}"${look.dash ? ` fill-opacity="${look.typed ? 1 : 0.35}" stroke-dasharray="${r1(f * 0.3)} ${r1(f * 0.22)}"` : ''} stroke="${look.dash ? (look.typed ? C.ink : C.plain) : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.3)}" font-size="${r1(f * (look.tag.length > 5 ? 0.5 : look.tag.length > 4 ? 0.58 : look.tag.length > 3 ? 0.68 : 0.8))}" font-weight="700" text-anchor="middle" fill="${look.text}">${esc(look.tag)}</text></g>`);
       reg.push({ x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s });
     }
     // The device labels next, at their usual place beside the device; the badges then keep clear of
@@ -341,7 +349,7 @@ function draw(id, ctx) {
     for (const n of model.nodes) {
       const p = at(n.id);
       const sub = n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null];
-      labels.push(outward(ctx, reg, p, f * 1.0, [n.id, sub.filter(Boolean).join(' · ')], { color: physicalLook(n).color }));
+      labels.push(outward(ctx, reg, p, f * 1.0, [n.id, sub.filter(Boolean).join(' · ')], { color: physicalLook(n).name }));
     }
     // The port badges, link by link and end by end (a fixed order: the same facts, the same picture),
     // clear of the boxes, captions, labels and each other. Drawn with their link, under the boxes.
@@ -539,10 +547,11 @@ function draw(id, ctx) {
 // outline (`dash`); one without a type either is the faint grey box with '?'.
 export function physicalLook(n) {
   const eq = n.plain ? equipmentTag(n) : null;
-  if (eq) return { color: C.optical, tag: eq, dash: false, typed: true };
-  if (n.host) return { color: C.host, tag: ROLE_TAG.host, dash: false, typed: true };
-  if (n.plain && !n.type) return { color: C.plain, tag: '?', dash: true, typed: false };
-  return { color: FAMILY[platformFamily(n.type)], tag: typeTag(n.type), dash: !!n.plain, typed: true };
+  if (eq) return { color: C.optical, text: '#fff', name: C.optical, tag: eq, dash: false, typed: true };
+  if (n.host) return { color: C.host, text: '#fff', name: C.host, tag: ROLE_TAG.host, dash: false, typed: true };
+  if (n.plain && !n.type) return { color: C.plain, text: '#fff', name: C.plain, tag: '?', dash: true, typed: false };
+  const fam = FAMILY[platformFamily(n.type)];
+  return { color: fam.fill, text: fam.text, name: fam.name, tag: typeTag(n.type), dash: !!n.plain, typed: true };
 }
 
 // A note's frame: its layer when the drawing has that frame, else physical.

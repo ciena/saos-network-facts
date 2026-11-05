@@ -25,8 +25,8 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   `role`, view schema 1.3) sits right after physical and shows the network roles, CE, PE and P, as the viewer
   derives them from the facts (a route reflector P·RR), or a record's `role` for a device without facts; it
   is left out when no device has a role, listed in `data-frames`, and the devices keep their places. The
-  physical frame now shows each device as its type, not its role: a box in its platform family's colour
-  (3900 access, 5100 aggregation, 8100 core, other) tagged with its model (3984, 3926v2, 5164, 8110, WSAi),
+  physical frame now shows each device as its type, not its role: a box in its platform family's Ciena palette colour
+  (3900 access teal, 5100 aggregation blue, 8100 core purple, other grey; tag text 4.5:1 or better) tagged with its model (3984, 3926v2, 5164, 8110, WSAi),
   the same with facts or without, and the links and ports as before. The role tags and role colours moved
   from physical to the role frame (no duplicate: physical keeps none). A device without facts is drawn as
   its type with a dashed outline instead of a grey plain box ("no facts" stays in its hover title); one
