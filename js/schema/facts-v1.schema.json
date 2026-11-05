@@ -288,7 +288,7 @@
         },
         "role": {
           "type": "string",
-          "description": "What the device is in the lab, when the inputs say (`--extra`): free text such as `roadm`, `amplifier`, `terminal` for the members of an optical line system, or `router`. A line-system member is a record with a role and no facts (`extractor` null, `status` `skipped`): it has no configuration here, and links[] with `kind` `optical` connect it. Since schema 1.9."
+          "description": "What the device is in the lab, when the inputs say (`--extra`): free text such as `roadm`, `amplifier`, `terminal` for the members of an optical line system, or `router`; `ce`, `pe` or `p` (any case) is the device's network role, which the drawings show for a device without facts as they show the role derived from facts. A line-system member is a record with a role and no facts (`extractor` null, `status` `skipped`): it has no configuration here, and links[] with `kind` `optical` connect it. Since schema 1.9."
         },
         "site": {
           "type": "string",

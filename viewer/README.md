@@ -10,8 +10,9 @@ link and LAG member failure replays, found by loss of signal or, for a silent fa
 the LACP timeout or the IGP hold timer, with the G.8032 protection switch and revert when the link
 is on a ring. The
 published site opens the [Adaptive-SR-CFM example](../examples/adaptive-sr-cfm/) and offers the
-`g8032-two-ring`, `g8032-by-name`, `srv6-evpn`, `l3vpn-hosts` and `line-system` (plain boxes: an optical
-line system, sites and notes) fixture labs, from the `labs/index.json` the build stages
+`g8032-two-ring`, `g8032-by-name`, `srv6-evpn`, `l3vpn-hosts`, `line-system` (plain boxes: an optical
+line system, sites and notes) and `config-less` (no configurations: every device drawn as its type, roles
+from `--extra`) fixture labs, from the `labs/index.json` the build stages
 (`labs.config.js`); *Load
 your facts.json* (or drop a file on the page) reads any facts file of schema 1.x in the browser,
 without uploading it. `?facts=<url>`, `?labs=<index>` and `?lab=<id>` open facts served next to
@@ -65,7 +66,11 @@ box". They are `topology.plain` (`{ nodes, links }`, each with `plain: true`), n
 engine never sees them and computes exactly what it would without them; `drawnNodes` / `drawnLinks`
 (`src/import/facts.js`) give every device and link a 2D view or layout draws. The view property `plain`
 (a view file's `"plain": false`, or `?plain=0`) leaves them out, as before: the page resolves the view
-(`src/viewprops.js` `importOptions`) and passes `importFacts(text, { plain })`.
+(`src/viewprops.js` `importOptions`) and passes `importFacts(text, { plain })`. A file whose devices all
+lack facts (a lab nobody has configured yet) is drawn the same way, plain boxes and their links on the
+physical plane with no protocol; only with `plain` false is there nothing to draw, and the import says no
+device has facts. A record `role` of `ce`, `pe` or `p` is the box's network role (`networkRole`): the layout
+places it by that role and the role frame shows it.
 
 What the extractor's `--extra` file adds (schema 1.9) is drawn, never simulated: a drawn link whose two
 ports match a `links[]` entry gets its `kind` as `medium` and its `label` as `caption` (an optical span is a

@@ -63,10 +63,15 @@ export function renderModel(imp, net) {
       equipment: n.equipment ?? null,
       // A line-system member: a box without facts with an equipment role (schema 1.9 devices[].role).
       member: !!(n.plain && n.equipment),
+      // A box without facts whose record names its network role (import/facts.js networkRole).
+      given: n.plain && ['ce', 'pe', 'p'].includes(n.role) ? n.role : null,
     };
   });
   // A lab with no IGP router: its devices are L2 switches, not CEs.
   if (!nodes.some((n) => n.role === 'p' || n.role === 'pe')) for (const n of nodes) if (n.role === 'ce') n.role = 'l2';
+  // The network role the role frame shows: CE, PE or P as the importer derives it from the facts, or a
+  // record's own role for a device without facts; none for an L2 switch, a host or a line-system member.
+  for (const n of nodes) n.net = n.given ?? (['ce', 'pe', 'p'].includes(n.role) ? n.role : null);
 
   const adj = new Map((net.igp?.adjacencies ?? []).map((a) => [a.link, a]));
   const ringOf = new Map();
@@ -130,6 +135,7 @@ export function presentLayers(m) {
   const has = {
     optical: m.nodes.some((n) => n.member) || m.links.some((l) => l.medium === 'optical'),
     physical: true,
+    role: m.nodes.some((n) => n.net),
     ring: m.rings.length > 0,
     igp: m.links.some((l) => l.adj),
     mpls: m.policies.length > 0 || m.tunnels.length > 0,
@@ -141,6 +147,24 @@ export function presentLayers(m) {
     cfm: m.megs.length > 0,
   };
   return Object.keys(has).filter((k) => has[k]);
+}
+
+// Whether a device is a router, for its symbol on the physical frame: a Ciena SAOS device (its type a Ciena
+// model number, 3984, 5164, 8110, or its record a SAOS extractor's), SAOS 6 and 8 switches included (they
+// route and switch as the SAOS 10 ones do, and one symbol keeps a mixed lab even). A Waveserver, a
+// third-party box, an ELS shelf or a type the library does not know is not.
+export function isRouter(n) {
+  return /^\d{4}/.test(String(n?.type ?? '')) || !!n?.os;
+}
+
+// The model a device type names, short enough for its box: the model number with its variant (3984,
+// 3926v2, 5170), else the type's leading letters (WSAi, JNP, ELS), at most six characters; '?' without one.
+export function typeTag(type) {
+  const t = String(type ?? '').trim();
+  if (!t) return '?';
+  const num = /^\d{4}(v\d)?/i.exec(t);
+  if (num) return num[0];
+  return (/^[a-z]+/i.exec(t)?.[0] ?? t).slice(0, 6);
 }
 
 // A short tag for a device's box: its role (P, PE, CE...), or for a box without facts its

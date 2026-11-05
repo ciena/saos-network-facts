@@ -78,7 +78,7 @@ test("unknown properties and bad values are reported, not fatal; the lower value
     "view: device_info: unknown property, ignored",
     'view: camera: "orbit" is not one of fit, top, iso',
     'view: layers: unknown layer "lambda"',
-    'view: frames.start: "middle" is not one of signature, first, optical, physical, ring, igp, mpls, srv6, bgp, vrf, pw, evpn, cfm',
+    'view: frames.start: "middle" is not one of signature, first, optical, physical, role, ring, igp, mpls, srv6, bgp, vrf, pw, evpn, cfm',
     "view: frames.speed: unknown property, ignored",
     "view: layout.max_columns: expected a whole number from 1",
     "view: layout.hints.PE1: expected [x, y]",
@@ -147,6 +147,19 @@ test("the defaults and presets are not changed by resolving", () => {
   view.layers.push("cfm");
   view.layout.hints.P1 = [1, 1];
   assert.equal(JSON.stringify([VIEW_DEFAULTS, VIEW_PRESETS]), before);
+});
+
+test("the role layer (view 1.3): right after physical; a frame when a device has a role, never the signature", () => {
+  assert.deepEqual(LAYER_IDS.slice(0, 3), ["optical", "physical", "role"]);
+  assert.equal(VIEW_VERSION, "1.3");
+  const { view } = resolveView(undefined);
+  assert.ok(view.layers.includes("role"));
+  assert.deepEqual(viewFrames(view, ["physical", "role", "igp", "pw"]), { frames: ["physical", "role", "igp", "pw"], start: "pw" });
+  assert.deepEqual(viewFrames(view, ["physical", "role"]), { frames: ["physical", "role"], start: "physical" });
+  assert.deepEqual(viewFrames(resolveView(undefined, "start=role").view, ["physical", "role", "igp"]).start, "role");
+  // a 1.2 view listing its layers leaves it out, and still validates
+  const old = resolveView({ view_version: "1.2", layers: ["physical", "igp"] });
+  assert.deepEqual([old.warnings, viewFrames(old.view, ["physical", "role", "igp"]).frames], [[], ["physical", "igp"]]);
 });
 
 test("the optical layer (view 1.2): first, under physical; a frame when the facts have a line system, never the signature", () => {

@@ -277,8 +277,10 @@ function autoLayout(
   // The longest cycle counted in routers: plain boxes add nothing, so a chain of them (a line system's
   // ROADMs and amplifiers, a span between two routers) counts as one link, and of equally long cycles
   // the one with the fewest boxes wins (a cycle of routers alone, when there is one).
+  // A lab of plain boxes only (no device has facts) counts them all: they are its network.
   const isPlain = (id: string) => !!node.get(id)?.plain;
-  if (!core.size) core = new Set(longestCycle(ids, adj, isPlain));
+  const uncounted = ids.every(isPlain) ? undefined : isPlain;
+  if (!core.size) core = new Set(longestCycle(ids, adj, uncounted));
   if (!core.size) {
     // No router, ring or cycle: the devices that link others (the chain or tree's inner devices),
     // else every linked device; laid out in columns by hops.
@@ -332,7 +334,7 @@ function autoLayout(
   const coreAdj = new Map([...core].map((id) => [id, new Set([...adj.get(id)!].filter((x) => core.has(x)))]));
   const ring = rings.find((r) => r.members.length >= 3 && r.members.every((id) => core.has(id)));
   const ordered = ring ? ringOrder(ring.members, ring.links ?? [], linkEnds) : null;
-  const cycle = ordered ?? longestCycle(sorted(core), coreAdj, isPlain);
+  const cycle = ordered ?? longestCycle(sorted(core), coreAdj, uncounted);
   const external = new Set(sorted(core).filter((id) => [...adj.get(id)!].some((x) => !core.has(x))));
   const pes = new Set(ids.filter((id) => node.get(id)?.role === "pe"));
 

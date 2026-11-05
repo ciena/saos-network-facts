@@ -10,12 +10,13 @@
  */
 export type PresetName = "card-frames" | "lab-snapshot" | "protocol-stack";
 /**
- * A layer: optical (since 1.2: optical line-system members and the optical spans to and between them, under the physical layer; a view without it draws them on the physical layer), physical (devices, links, LAGs), ring (G.8032 rings), igp (IS-IS / OSPF adjacencies), mpls (SR policies, LSPs, MPLS-TP tunnels), srv6 (SRv6 locators, Flex-Algo), bgp (BGP sessions), vrf (VRFs / L3VPN), pw (VPWS pseudowires), evpn (EVPN instances), cfm (CFM MEGs and MEPs).
+ * A layer: optical (since 1.2: optical line-system members and the optical spans to and between them, under the physical layer; a view without it draws them on the physical layer), physical (devices by type, links, LAGs), role (since 1.3: the network roles, CE, PE and P, over the physical layer; a lab with no device in a role has none), ring (G.8032 rings), igp (IS-IS / OSPF adjacencies), mpls (SR policies, LSPs, MPLS-TP tunnels), srv6 (SRv6 locators, Flex-Algo), bgp (BGP sessions), vrf (VRFs / L3VPN), pw (VPWS pseudowires), evpn (EVPN instances), cfm (CFM MEGs and MEPs).
  *
  * This interface was referenced by `ViewFile`'s JSON-Schema
  * via the `definition` "LayerId".
  */
-export type LayerId = "optical" | "physical" | "ring" | "igp" | "mpls" | "srv6" | "bgp" | "vrf" | "pw" | "evpn" | "cfm";
+export type LayerId =
+  "optical" | "physical" | "role" | "ring" | "igp" | "mpls" | "srv6" | "bgp" | "vrf" | "pw" | "evpn" | "cfm";
 /**
  * The 3D view point: fit (front and above, far enough back for the whole stack), top (straight down on the top plane, the planes' common outline filling the view), iso (isometric, from a corner, the whole stack in view).
  *
@@ -36,7 +37,7 @@ export type Density = "full" | "compact" | "minimal" | null;
  */
 export interface ViewFile {
   /**
-   * The view schema version the file follows (major.minor; this schema is 1.2: 1.1 added `density`, 1.2 the `optical` layer).
+   * The view schema version the file follows (major.minor; this schema is 1.3: 1.1 added `density`, 1.2 the `optical` layer, 1.3 the `role` layer).
    */
   view_version?: string;
   preset?: PresetName;

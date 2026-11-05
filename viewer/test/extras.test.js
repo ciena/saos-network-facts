@@ -68,11 +68,12 @@ describe('frames and snapshot', () => {
 
   test('the optical frame: the line system (spans with captions, members tagged) and the routers at its ends', () => {
     const r = frames(text, { preset: 'card-frames' });
-    expect(r.frames.map((x) => x.id)).toEqual(['optical', 'physical', 'igp', 'bgp', 'pw']);
+    expect(r.frames.map((x) => x.id)).toEqual(['optical', 'physical', 'role', 'igp', 'bgp', 'pw']);
     const optical = group(r.svg, 'optical');
     expect(optical.match(/class="link-optical"/g)).toHaveLength(5);
     for (const caption of ['ch 25', 'ch 26 · dark', 'span 1 · 40 km', 'span 2 · 38 km']) expect(optical).toContain(`>${caption}</text>`);
-    for (const tag of ['ROADM', 'AMP', 'PE·RR', 'PE']) expect(optical).toContain(`>${tag}</text>`);
+    // the routers at the spans' ends by their type (5164, 5162), as on the physical frame
+    for (const tag of ['ROADM', 'AMP', '5164', '5162']) expect(optical).toContain(`>${tag}</text>`);
     expect(optical.match(/<g class="site">/g)).toHaveLength(2);
     // the note on AMP-1 (no layer of its own) goes with AMP-1, on the optical frame
     expect(optical).toContain('>in-line amplifier hut, no</text>');

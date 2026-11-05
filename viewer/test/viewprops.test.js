@@ -7,7 +7,7 @@ import { buildNetwork } from '../src/engine/index.js';
 import { importFacts } from '../src/import/facts.js';
 import { DEFAULT_LABELS } from '../src/view/labels.js';
 import { LAYERS, LAYER_GAP, planeBox, presentLayers } from '../src/view/layers.js';
-import { CAMERAS, cameraPose, densityLabels, importOptions, pageLayerId, pageView, viewLayers } from '../src/viewprops.js';
+import { CAMERAS, cameraPose, densityLabels, FRAME_ONLY, importOptions, pageLayerId, pageView, viewLayers } from '../src/viewprops.js';
 import { LAYER_IDS } from '../../js/src/index.ts';
 
 const example = readFileSync(new URL('../../examples/adaptive-sr-cfm/facts.json', import.meta.url), 'utf8');
@@ -26,9 +26,10 @@ function page(search, { aspect = 600 / 800 } = {}) {
 const round = (xyz) => xyz.map((v) => Math.round(v * 100) / 100);
 
 describe('view properties on the page', () => {
-  test('every view layer is a layer of the page', () => {
+  test('every view layer is a layer of the page, but the frame-only role layer', () => {
     const pageIds = LAYERS.map((l) => l.id);
-    expect(LAYER_IDS.map(pageLayerId).sort()).toEqual([...pageIds].sort());
+    expect(FRAME_ONLY).toEqual(['role']);
+    expect(LAYER_IDS.filter((id) => !FRAME_ONLY.includes(id)).map(pageLayerId).sort()).toEqual([...pageIds].sort());
   });
 
   test('no view: every layer the facts have, the fit camera, the visitor\'s labels, no warnings', () => {

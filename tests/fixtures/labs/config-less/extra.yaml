@@ -1,0 +1,8 @@
+# What the lab's plan says about the config-less lab (synthetic): each device's network role. MGMT,
+# an out-of-band switch, has none.
+devices:
+  CE1: {role: ce}
+  PE1: {role: pe}
+  P1: {role: p}
+  PE2: {role: pe}
+  CE2: {role: CE}

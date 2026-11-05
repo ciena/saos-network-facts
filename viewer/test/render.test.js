@@ -25,6 +25,8 @@ const LABS = {
   'line-system': 'tests/fixtures/expected/line-system.facts.json',
   // short host links and a bond's two member cables to one PE: port badges that stacked before
   'vpws-bonds': 'tests/fixtures/expected/vpws-bonds.facts.json',
+  // no configurations at all: every device drawn as its type, the roles from the extra file
+  'config-less': 'tests/fixtures/expected/config-less.facts.json',
 };
 const GOLDEN = resolve(here, 'golden/render');
 const frameIds = (svg) => [...svg.matchAll(/<g class="frame[ a-z0-9]*" id="f-([a-z0-9]+)"/g)].map((m) => m[1]);
@@ -54,7 +56,7 @@ describe('golden renders of the fixture labs', () => {
 describe('frames', () => {
   test('one frame per layer with content, in the view order, the signature layer first shown', () => {
     const r = frames(read(LABS['adaptive-sr-cfm']));
-    expect(r.frames.map((f) => f.id)).toEqual(['physical', 'ring', 'igp', 'bgp', 'pw', 'cfm']);
+    expect(r.frames.map((f) => f.id)).toEqual(['physical', 'role', 'ring', 'igp', 'bgp', 'pw', 'cfm']);
     expect(r.start).toBe('pw');
     // the start frame is the static one (no CSS animation: it shows); a fragment shows that frame instead
     expect(frameIds(r.svg).at(-1)).toBe('pw');
@@ -66,10 +68,10 @@ describe('frames', () => {
     expect(frames(read(LABS['g8032-two-ring'])).start).toBe('ring');
     expect(frames(read(LABS['l3vpn-hosts'])).start).toBe('vrf');
     const s = frames(read(LABS['srv6-evpn']));
-    expect(s.frames.map((f) => f.id)).toEqual(['physical', 'igp', 'srv6', 'bgp', 'vrf', 'evpn']);
+    expect(s.frames.map((f) => f.id)).toEqual(['physical', 'role', 'igp', 'srv6', 'bgp', 'vrf', 'evpn']);
     expect(s.start).toBe('evpn');
     // SRv6 over OSPF (OSPF's SPF is per router and area): an SRv6 frame, no crash
-    expect(frames(read(LABS['srv6-ospf'])).frames.map((f) => f.id)).toEqual(['physical', 'igp', 'srv6', 'pw']);
+    expect(frames(read(LABS['srv6-ospf'])).frames.map((f) => f.id)).toEqual(['physical', 'role', 'igp', 'srv6', 'pw']);
   });
 
   test('SR policies get a frame only when there is no pseudowire frame', () => {
@@ -90,11 +92,11 @@ describe('frames', () => {
     expect(frames(text, { layers: ['physical', 'igp'] }).frames.map((f) => f.id)).toEqual(['physical', 'igp']);
   });
 
-  test('devices without facts are plain boxes, unless the view says plain: false', () => {
+  test('devices without facts are drawn as their type, dashed, unless the view says plain: false', () => {
     const text = read(LABS['plain-box']);
     const on = frames(text).svg;
-    expect(on).toContain('line-system · no facts');
-    expect(on).toContain('stroke-dasharray="4 3"');
+    expect(on).toContain('data-title="Physical · 3 devices (SAOS 10), 3 links"');
+    expect(on).toMatch(/<title>OLS1\n[^<]*<\/title><rect [^>]*stroke-dasharray="[^"]+"[^>]*\/><text [^>]*>line<\/text>/);
     expect(frames(text, { plain: false }).svg).not.toContain('OLS1');
   });
 });
@@ -189,12 +191,12 @@ describe('self-rotating frames', () => {
     const r = frames(read(LABS['adaptive-sr-cfm']), { preset: 'card-frames' });
     const ids = r.frames.map((f) => f.id);
     expect(r.period).toBe(4);
-    expect(r.svg).toContain(`@keyframes nf-rotate{0%{visibility:visible}16.666%,100%{visibility:hidden}}`);
+    expect(r.svg).toContain(`@keyframes nf-rotate{0%{visibility:visible}14.285%,100%{visibility:hidden}}`);
     expect(r.svg).toContain(`.frame{animation:nf-rotate ${ids.length * 4}s step-end infinite}`);
     expect(r.svg).toMatch(/<g class="frame r0 start" id="f-pw"/);
     expect(r.svg).toMatch(/<g class="frame r1" id="f-cfm"/); // the frame after the start frame, then round
     expect(r.svg).toMatch(/<g class="frame r2" id="f-physical"/);
-    expect(r.svg).toContain('.r1{animation-delay:-20s}');
+    expect(r.svg).toContain('.r1{animation-delay:-24s}');
     // inside a reduced-motion guard; a fragment, #still or data-rotate="off" stops it
     expect(r.svg).toMatch(/@media \(prefers-reduced-motion:no-preference\)\{@keyframes/);
     expect(r.svg).toContain(':root:has(.frame:target) .frame,:root:has(#still:target) .frame,:root[data-rotate="off"] .frame{animation:none}');
@@ -251,7 +253,7 @@ describe('port badges and metric pills never overlap', () => {
   const overlap = (a, b, pad = 0.5) => a[0] < b[0] + b[2] - pad && b[0] < a[0] + a[2] - pad && a[1] < b[1] + b[3] - pad && b[1] < a[1] + a[3] - pad;
   const frameOf = (svg, id) => svg.match(new RegExp(`<g class="frame[ a-z0-9]*" id="f-${id}"[\\s\\S]*?(?=\\n<g class="frame|\\n</svg>)`))?.[0] ?? '';
   const BADGE = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#fff" stroke="#9aa4b1"/g;
-  const DEVICE = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#(?!fff)[0-9a-f]{6}"[^>]*stroke="#(?:fff|8a94a3)"/g;
+  const DEVICE = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#(?!fff)[0-9a-f]{6}"[^>]*stroke="#(?:fff|8a94a3|1d2430)"/g;
   const METRIC = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#fff" stroke="#2e9e5b"/g;
   const GHOST = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#eef1f4"/g;
   const pairs = (xs, ys = null) => (ys ? xs.flatMap((a) => ys.filter((b) => overlap(a, b))) : xs.flatMap((a, i) => xs.slice(i + 1).filter((b) => overlap(a, b))));
@@ -262,7 +264,9 @@ describe('port badges and metric pills never overlap', () => {
       for (const id of ['physical', 'optical']) {
         const fr = frameOf(svg, id);
         if (!fr) continue;
-        const badges = rects(fr, BADGE), devices = rects(fr, DEVICE);
+        // a router symbol counts as its ring's square (render/frames.js deviceRect)
+        const routers = [...fr.matchAll(/<g class="router"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map((m) => { const r = (+m[3] * 0.88) / 0.75; return [+m[1] - r, +m[2] - r, 2 * r, 2 * r]; });
+        const badges = rects(fr, BADGE), devices = [...rects(fr, DEVICE), ...routers];
         expect(devices.length, `${id}: device boxes found`).toBeGreaterThan(0);
         expect(pairs(badges), `${id}: badge on badge`).toEqual([]);
         expect(pairs(badges, devices), `${id}: badge on device`).toEqual([]);

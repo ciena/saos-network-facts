@@ -17,6 +17,38 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-05
+
+### Added
+
+- **Frames: a role frame, and the physical frame shows the devices, not their roles** — a new frame `f-role` (view layer
+  `role`, view schema 1.3) sits right after physical and shows the network roles, CE, PE and P, as the viewer
+  derives them from the facts (a route reflector P·RR), or a record's `role` for a device without facts; it
+  is left out when no device has a role, listed in `data-frames`, and the devices keep their places. The
+  physical frame now draws every router (a Ciena SAOS device: SAOS 10, and SAOS 6 and 8 too) as the same
+  common router symbol, a Ciena red (#DC0000) disc with four white arrows pointing in, its name and model
+  (3984-10x, 5164-10x) beside it in near-black; any other device (a Waveserver, a third-party box, an ELS
+  shelf without a role) is a neutral grey box tagged with its model (WSAi, JNP, ELS); every text 4.5:1 or
+  better on its background. The links and ports as before. The role tags and role colours moved
+  from physical to the role frame (no duplicate: physical keeps none). A device without facts is drawn as
+  the same symbol with a dashed ring (a grey box with a dashed outline) instead of a grey plain box ("no facts" stays in its hover title); one
+  without a type stays the faint grey box. The snapshot has no role plane (its physical plane keeps the role
+  colours), nor has the 3D page. A view that lists its `layers` without `role` gets no role frame, as before.
+- **A lab whose devices all lack facts is drawn** — `importFacts` threw "no device in this facts file has
+  facts" when every record was skipped (no configuration in the lab yet, or no extractor for the type). It
+  now draws the records and the file's `links[]` as plain boxes (the physical frame; the role frame too
+  when the records give roles; the 3D page's physical plane), and throws only when there is nothing to
+  draw (the view's `plain: false`). The layout counts the boxes of such a lab as its network, so a cycle of
+  them gets the ladder rather than "no cycle" columns (a chain of boxes between routers still counts as one
+  link). A record `role` of `ce`, `pe` or `p` (any case) is a network role, not equipment: the layout and the
+  role frame read it (facts schema description only). Fixture lab `config-less` (six devices, no
+  configurations, roles from `--extra`) is in the site's lab menu. On the 202 published CAL lab cards (196
+  plus the 6 without configurations, now drawn): every physical frame shows router symbols and grey boxes; 58
+  cards gain a role frame; on 23 cards 57 skipped devices beside configured ones change from the grey "?"
+  box to their symbol or box; layout, crossings and card sizes unchanged on the 196; port badges moved off
+  their spot 188 -> 151 and dropped 11 -> 11, cards with any badge collision 58 -> 52 (the router symbol is
+  narrower than the old box; 32 cards better, 3 cards one or two badges worse as placement order shifts). Render goldens of the fixture labs regenerated.
+
 ## [0.21.0] - 2026-11-04
 
 ### Added

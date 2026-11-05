@@ -64,6 +64,10 @@ documentation ranges) and services are made up.
   and 2 to ROADM-A, `ch 25` and `ch 26 · dark`; the two line spans; ROADM-B to PE2 port 1), sites `east`
   (PE1, ROADM-A) and `west` (PE2, ROADM-B), and two notes (one on AMP-1, one free). The PEs' routed core
   link rides the line system: the viewer draws it over the spans.
+- `labs/config-less/`: a containerlab topology of six SAOS 10 devices with their types and links and no
+  startup-config, as a lab looks before anyone configures it (every record `skipped`, "no configuration"),
+  and an `extra.yaml` giving five of them a network role (`ce`, `pe`, `p`; MGMT has none). The viewer
+  draws it from the records: each device as its type, and a role frame CE | PE | P | PE | CE.
 - `cases.yaml`: the extraction cases the tests run; `expected/`: their facts files.
 - `pivots.json`: the translator's recorded replies for every SAOS 10 file (`scripts/record_pivots.py`),
   all recorded with translator 4.2.1.

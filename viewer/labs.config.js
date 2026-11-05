@@ -39,6 +39,11 @@ export const LABS = [
     title: 'Optical line system, sites and notes (fixture, plain boxes from --extra)',
     source: '../tests/fixtures/expected/line-system.facts.json',
   },
+  {
+    id: 'config-less',
+    title: 'Lab without configurations: devices by type, roles from --extra (fixture)',
+    source: '../tests/fixtures/expected/config-less.facts.json',
+  },
 ];
 
 // The files to stage: labs/index.json and one facts.json per lab, as { path: text }.
