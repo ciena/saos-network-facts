@@ -37,10 +37,17 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   gains `candidates` (each with its positions and score, the chosen one first) and the methods `tiers`,
   `radial` and `stress`; `LayoutNode` gains `group` (the IGP area), which the viewer's importer now sets.
   Hints (an authored layout) and algorithm force are unchanged. Measured on 196 published CAL lab cards:
-  50 change; port badges moved off their natural spot 310 -> 190, dropped to the hover title 22 -> 11
-  (labs with any 90 -> 59); link-length spread (coefficient of variation) 0.163 -> 0.110; crossings
-  unchanged (15) and no lab worse; labs with P and PE routers drawn by role 1 -> 10 of 19. Render goldens
+  51 change (with the next entry); port badges moved off their natural spot 310 -> 188, dropped to the
+  hover title 22 -> 11 (labs with any 90 -> 58); link-length spread (coefficient of variation) 0.163 ->
+  0.109; crossings unchanged (15) and no lab worse; labs with P and PE routers drawn by role 1 -> 10 of 19. Render goldens
   of five fixture labs regenerated (ospf-tp, srv6-ospf, srv6-evpn and l3vpn-hosts now PE | P | PE).
+- **Layout: the ladder's cycle is counted in routers** — plain boxes add nothing to a cycle's length, so
+  a line system's chain of them (ROADMs and amplifiers between two routers) counts as one link, and of
+  equally long cycles the one with the fewest boxes wins: a cycle of routers alone, when there is one, is
+  the ladder's rather than a longer one through the line system. `longestCycle` takes an optional
+  `uncounted` test. With the ELS line systems' spans added to the 196 cards, the one lab whose ladder ran
+  through its line system (3 crossings) now runs on its router triangle with none; without the spans one
+  other card changes (a dual-homed device no longer counted into the ring: 0 badges moved instead of 2).
 
 ## [0.20.0] - 2026-11-02
 

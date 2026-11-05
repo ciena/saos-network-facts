@@ -12,6 +12,8 @@
 //      core too, as is a chain of them (a ROADM, amplifiers, a ROADM), and so is a second cycle linked to the core (routers without an IGP, such as MPLS-TP
 //      nodes, on a ring of their own). Linux hosts never are.
 //   2. A core with a cycle (a G.8032 ring, else the longest cycle of the core) is a ladder: the cycle
+//      (counted in routers: a line system's chain of plain boxes counts as one link, so a span through
+//      it never outweighs a cycle of routers alone)
 //      as a racetrack of a top and a bottom row, at the rotation and split that keep the other core
 //      links (rungs) short, uncrossed and clear of devices, and put the devices that face customers at
 //      the row ends. Core devices off the cycle sit between the rows, under their placed neighbours.
@@ -272,7 +274,11 @@ function autoLayout(
   let transit = false;
   let core = new Set(ids.filter((id) => node.get(id)?.role === "p" || node.get(id)?.role === "pe"));
   if (!core.size) core = new Set(rings.flatMap((r) => r.members));
-  if (!core.size) core = new Set(longestCycle(ids, adj));
+  // The longest cycle counted in routers: plain boxes add nothing, so a chain of them (a line system's
+  // ROADMs and amplifiers, a span between two routers) counts as one link, and of equally long cycles
+  // the one with the fewest boxes wins (a cycle of routers alone, when there is one).
+  const isPlain = (id: string) => !!node.get(id)?.plain;
+  if (!core.size) core = new Set(longestCycle(ids, adj, isPlain));
   if (!core.size) {
     // No router, ring or cycle: the devices that link others (the chain or tree's inner devices),
     // else every linked device; laid out in columns by hops.
@@ -326,7 +332,7 @@ function autoLayout(
   const coreAdj = new Map([...core].map((id) => [id, new Set([...adj.get(id)!].filter((x) => core.has(x)))]));
   const ring = rings.find((r) => r.members.length >= 3 && r.members.every((id) => core.has(id)));
   const ordered = ring ? ringOrder(ring.members, ring.links ?? [], linkEnds) : null;
-  const cycle = ordered ?? longestCycle(sorted(core), coreAdj);
+  const cycle = ordered ?? longestCycle(sorted(core), coreAdj, isPlain);
   const external = new Set(sorted(core).filter((id) => [...adj.get(id)!].some((x) => !core.has(x))));
   const pes = new Set(ids.filter((id) => node.get(id)?.role === "pe"));
 
@@ -599,9 +605,14 @@ function ringOrder(members: string[], links: Array<string | [string, string]>, l
   return closes && order.length >= 3 ? order : null;
 }
 
-/** The longest simple cycle among `ids` (a bounded search: labs are small), starting at its smallest name. */
-export function longestCycle(ids: string[], adj: Map<string, Set<string>>): string[] {
+/**
+ * The longest simple cycle among `ids` (a bounded search: labs are small), starting at its smallest
+ * name. With `uncounted`, those devices add nothing to a cycle's length (ties: the fewer of them).
+ */
+export function longestCycle(ids: string[], adj: Map<string, Set<string>>, uncounted?: (id: string) => boolean): string[] {
   let best: string[] = [];
+  let bestScore = -1;
+  const score = (p: string[]) => (uncounted ? p.filter((id) => !uncounted(id)).length * 1000 - p.length : p.length);
   let steps = 0;
   const order = [...ids].sort(compareNames);
   const within = new Set(order);
@@ -611,7 +622,10 @@ export function longestCycle(ids: string[], adj: Map<string, Set<string>>): stri
     const dfs = (cur: string) => {
       if (++steps > CYCLE_SEARCH_LIMIT) return;
       for (const nx of [...(adj.get(cur) ?? [])].filter((x) => within.has(x)).sort(compareNames)) {
-        if (nx === start && path.length >= 3 && path.length > best.length) best = [...path];
+        if (nx === start && path.length >= 3 && score(path) > bestScore) {
+          best = [...path];
+          bestScore = score(path);
+        }
         if (on.has(nx) || compareNames(nx, start) < 0) continue;
         path.push(nx);
         on.add(nx);
@@ -621,7 +635,7 @@ export function longestCycle(ids: string[], adj: Map<string, Set<string>>): stri
       }
     };
     dfs(start);
-    if (best.length === order.length) break;
+    if (!uncounted && best.length === order.length) break;
   }
   return best;
 }

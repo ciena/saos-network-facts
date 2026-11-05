@@ -153,6 +153,40 @@ test("the core: IGP routers first, else the G.8032 ring, else the longest cycle;
   assert.ok(minDistance(o.positions) >= 0.5);
 });
 
+test("the cycle is counted in routers: a line system's chain of plain boxes counts as one link", () => {
+  // A triangle of routers, and a span from C to D through a line system (two terminals, two
+  // amplifiers) beside a direct C-D link: the cycle through the line system has more devices (six)
+  // but fewer routers (two) than the triangle, so the triangle is the ladder's cycle.
+  const plain = ["LS-T-1", "LS-O-1", "LS-O-2", "LS-T-2"];
+  const lab: LayoutModel = {
+    nodes: [...["A", "B", "C", "D"].map((id) => ({ id })), ...plain.map((id) => ({ id, plain: true }))],
+    links: [
+      { a: "A", b: "B" }, { a: "B", b: "C" }, { a: "C", b: "A" }, { a: "C", b: "D" },
+      { a: "C", b: "LS-T-1" }, { a: "LS-T-1", b: "LS-O-1" }, { a: "LS-O-1", b: "LS-O-2" }, { a: "LS-O-2", b: "LS-T-2" }, { a: "LS-T-2", b: "D" },
+    ],
+  };
+  // Without an IGP router the cycle is the core: the triangle, the line system hangs off it.
+  assert.deepEqual(layoutFacts(lab).core, ["A", "B", "C"]);
+  const adj = new Map<string, Set<string>>();
+  for (const { a, b } of lab.links as Array<{ a: string; b: string }>) {
+    for (const [x, y] of [[a, b], [b, a]] as const) adj.set(x, (adj.get(x) ?? new Set()).add(y));
+  }
+  const ids = [...adj.keys()];
+  assert.equal(longestCycle(ids, adj).length, 6);
+  assert.deepEqual(longestCycle(ids, adj, (id) => plain.includes(id)), ["A", "B", "C"]);
+  // A longer cycle of routers (D-E-A closes a pentagon) wins over the triangle.
+  adj.get("D")!.add("E");
+  adj.set("E", new Set(["D", "A"]));
+  adj.get("A")!.add("E");
+  assert.deepEqual(longestCycle([...adj.keys()], adj, (id) => plain.includes(id)), ["A", "B", "C", "D", "E"]);
+
+  // With IGP routers (all four core, the line system too) the ladder runs on the triangle: D and the
+  // line system off it, no link crossing.
+  const igp: LayoutModel = { ...lab, nodes: lab.nodes.map((n) => (n.plain ? n : { ...n, role: "p" })) };
+  const ladder = layoutFacts(igp).candidates!.find((x) => x.method === "ladder")!;
+  assert.equal(ladder.crossings, 0);
+});
+
 test("hints: used when they place every device, else reported and the computed layout used", () => {
   const lab = ringLab(4);
   const all = { R1: [100, 100], R2: [300, 100], R3: [300, 300], R4: [100, 300] } as Record<string, [number, number]>;

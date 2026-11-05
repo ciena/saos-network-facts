@@ -526,7 +526,9 @@ same positions), and shared by every renderer:
 2. **A ladder**: the ring (else the core's longest cycle) as a racetrack of two rows, at the rotation
    and split that keep the other core links short and uncrossed and put the devices facing customers at
    the row ends; core devices off it sit between the rows. A core without a cycle is laid out in
-   columns by hops.
+   columns by hops. A cycle is counted in routers: plain boxes add nothing, so a line system's chain
+   of them counts as one link, and of equally long cycles the one with the fewest boxes wins (a cycle
+   of routers alone, when there is one, rather than a span through the line system).
 3. **Everything else** (CEs, hosts, plain boxes) hangs off its core neighbour, outward: sideways off a
    row end, else up from the top row and down from the bottom row; a dual-homed device sits between its
    two neighbours.
