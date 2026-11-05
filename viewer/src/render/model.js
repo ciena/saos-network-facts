@@ -149,13 +149,12 @@ export function presentLayers(m) {
   return Object.keys(has).filter((k) => has[k]);
 }
 
-// The platform family a device type belongs to, for its box on the physical frame: Ciena's model
-// numbers by series (3900 access, 5100 aggregation, 8100 / 8700 core and routing), else other (a
-// third-party router, a Waveserver, a controller, no type). The same for a device with facts and one
-// without, so a device the lab has no configuration for looks like its type.
-export function platformFamily(type) {
-  const m = /^(\d)\d{3}/.exec(String(type ?? ''));
-  return m ? ({ 3: 'access', 5: 'aggregation', 8: 'core' }[m[1]] ?? 'other') : 'other';
+// Whether a device is a router, for its symbol on the physical frame: a Ciena SAOS device (its type a Ciena
+// model number, 3984, 5164, 8110, or its record a SAOS extractor's), SAOS 6 and 8 switches included (they
+// route and switch as the SAOS 10 ones do, and one symbol keeps a mixed lab even). A Waveserver, a
+// third-party box, an ELS shelf or a type the library does not know is not.
+export function isRouter(n) {
+  return /^\d{4}/.test(String(n?.type ?? '')) || !!n?.os;
 }
 
 // The model a device type names, short enough for its box: the model number with its variant (3984,

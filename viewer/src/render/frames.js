@@ -12,7 +12,7 @@
 //   <img src="frames.svg">        the start frame (the view's frames.start, by default the signature layer)
 // A page that inlines the SVG can show one group at a time itself (a card that rotates).
 
-import { deviceDetail, equipmentTag, layerModel, noteLayerOf, platformFamily, typeTag, wrapNote } from './model.js';
+import { deviceDetail, equipmentTag, isRouter, layerModel, noteLayerOf, typeTag, wrapNote } from './model.js';
 
 const C = {
   ink: '#1d2430', mute: '#5b6675', ghost: '#c3cad3', ghostInk: '#8a94a3',
@@ -23,16 +23,11 @@ const C = {
 };
 const ROLE_TAG = { p: 'P', pe: 'PE', ce: 'CE', l2: 'L2', host: 'H', plain: '?' };
 const ROLE_NAME = { p: 'provider', pe: 'provider edge', ce: 'customer edge' };
-// The physical frame colours a device by its platform family (model.js platformFamily), the role frame by its role.
-// Ciena palette colours, one per series, with a tag colour of at least 4.5:1 contrast on each (WCAG AA) and a
-// name colour readable on the white frame (the light fills, teal and grey, take near-black names).
-const NEAR_BLACK = '#1a1a1a';
-export const FAMILY = {
-  access: { fill: '#00c896', text: NEAR_BLACK, name: NEAR_BLACK }, // Ciena teal, 8.0:1
-  aggregation: { fill: '#1e1ec8', text: '#fff', name: '#1e1ec8' }, // Ciena blue, 10.1:1
-  core: { fill: '#963cbe', text: '#fff', name: '#963cbe' }, // Ciena purple, 5.7:1
-  other: { fill: '#c8c8c8', text: NEAR_BLACK, name: NEAR_BLACK }, // Ciena grey, 10.4:1
-};
+// The physical frame draws a router as the common router symbol in Ciena red (a disc with four arrows
+// pointing in), any other device as a neutral grey box tagged with its model; names and types near-black
+// on the white frame. The role frame colours devices by role.
+export const ROUTER = { fill: '#dc0000', arrow: '#fff', name: '#1a1a1a' }; // white on Ciena red 5.2:1, near-black on white 17.4:1
+export const OTHER = { fill: '#c8c8c8', text: '#1a1a1a', name: '#1a1a1a' }; // Ciena grey, near-black tag 10.4:1
 const ALGO = ['#e8590c', '#1c7ed6', '#2f9e44', '#c2255c'];
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -313,7 +308,7 @@ function draw(id, ctx) {
     for (const l of model.links) pairs.set(pair(l), [...(pairs.get(pair(l)) ?? []), l.id]);
     // Every device box first, then the link captions: the port badges are placed clear of them all
     // (placeBadges), and of each other. One size here: a route reflector is a role (the role frame).
-    const boxes = new Map(model.nodes.map((n) => { const p = at(n.id), s = f * 1.3; return [n.id, { x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s }]; }));
+    const boxes = new Map(model.nodes.map((n) => [n.id, deviceRect(at(n.id), f, physicalLook(n))]));
     const taken = [...boxes.values()];
     const linkDraw = [];
     for (const l of model.links) {
@@ -341,8 +336,11 @@ function draw(id, ctx) {
       const p = at(n.id);
       const look = physicalLook(n);
       const s = f * 1.3;
-      devices.push(`<g>${title(deviceDetail(n, model))}<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}"${look.dash ? ` fill-opacity="${look.typed ? 1 : 0.35}" stroke-dasharray="${r1(f * 0.3)} ${r1(f * 0.22)}"` : ''} stroke="${look.dash ? (look.typed ? C.ink : C.plain) : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.3)}" font-size="${r1(f * (look.tag.length > 5 ? 0.5 : look.tag.length > 4 ? 0.58 : look.tag.length > 3 ? 0.68 : 0.8))}" font-weight="700" text-anchor="middle" fill="${look.text}">${esc(look.tag)}</text></g>`);
-      reg.push({ x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s });
+      const body = look.router
+        ? routerIcon(p, f, look.dash)
+        : `<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}"${look.dash ? ` fill-opacity="${look.typed ? 1 : 0.35}" stroke-dasharray="${r1(f * 0.3)} ${r1(f * 0.22)}"` : ''} stroke="${look.dash ? (look.typed ? C.ink : C.plain) : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.3)}" font-size="${r1(f * (look.tag.length > 5 ? 0.5 : look.tag.length > 4 ? 0.58 : look.tag.length > 3 ? 0.68 : 0.8))}" font-weight="700" text-anchor="middle" fill="${look.text}">${esc(look.tag)}</text>`;
+      devices.push(`<g>${title(deviceDetail(n, model))}${body}</g>`);
+      reg.push(boxes.get(n.id));
     }
     // The device labels next, at their usual place beside the device; the badges then keep clear of
     // them too (a label pushed away by a badge would leave its device).
@@ -540,18 +538,44 @@ function draw(id, ctx) {
   return g;
 }
 
-// How a device looks on the physical frame: its type. A line-system member (a box without facts that has
-// an equipment role) is meant to have no facts: solid, in the optical colour, tagged with its equipment.
-// A host is a host. Any other device has its platform family's colour (FAMILY) and its model as the tag,
-// with facts or without: one the lab has no configuration for is drawn as its type, with a dashed
-// outline (`dash`); one without a type either is the faint grey box with '?'.
+// How a device looks on the physical frame. A line-system member (a box without facts that has an
+// equipment role) is meant to have no facts: solid, in the optical colour, tagged with its equipment. A
+// host is a host. A router (model.js isRouter: a Ciena SAOS device, SAOS 6 and 8 included) is the red
+// router symbol, the same for every model; any other device (a Waveserver, a third-party box, an ELS
+// shelf without a role) a neutral grey box tagged with its model. A device without facts looks like its
+// kind with a dashed outline (`dash`); one without a type either is the faint grey box with '?'.
 export function physicalLook(n) {
   const eq = n.plain ? equipmentTag(n) : null;
-  if (eq) return { color: C.optical, text: '#fff', name: C.optical, tag: eq, dash: false, typed: true };
-  if (n.host) return { color: C.host, text: '#fff', name: C.host, tag: ROLE_TAG.host, dash: false, typed: true };
-  if (n.plain && !n.type) return { color: C.plain, text: '#fff', name: C.plain, tag: '?', dash: true, typed: false };
-  const fam = FAMILY[platformFamily(n.type)];
-  return { color: fam.fill, text: fam.text, name: fam.name, tag: typeTag(n.type), dash: !!n.plain, typed: true };
+  if (eq) return { color: C.optical, text: '#fff', name: C.optical, tag: eq, dash: false, typed: true, router: false };
+  if (n.host) return { color: C.host, text: '#fff', name: C.host, tag: ROLE_TAG.host, dash: false, typed: true, router: false };
+  if (n.plain && !n.type) return { color: C.plain, text: '#fff', name: C.plain, tag: '?', dash: true, typed: false, router: false };
+  if (isRouter(n)) return { color: ROUTER.fill, text: ROUTER.arrow, name: ROUTER.name, tag: typeTag(n.type), dash: !!n.plain, typed: true, router: true };
+  return { color: OTHER.fill, text: OTHER.text, name: OTHER.name, tag: typeTag(n.type), dash: !!n.plain, typed: true, router: false };
+}
+
+// The router symbol's radius, and the dashed ring of one without facts, in font units.
+const ROUTER_R = 0.68, RING_R = 0.78;
+
+// The area a device takes on the physical frame (port badges and labels keep clear of it): a router's
+// symbol with its ring, else the box.
+export function deviceRect(p, f, look) {
+  if (look.router) { const r = f * RING_R; return { x: p.x - r, y: p.y - r, w: 2 * r, h: 2 * r }; }
+  const s = f * 1.3;
+  return { x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s };
+}
+
+// The common router symbol: a Ciena red disc with four thin white arrows, horizontal and vertical, their
+// heads pointing in toward the centre; `dashed` (no facts) adds a dashed ring round it.
+export function routerIcon(p, f, dashed = false) {
+  const r = f * ROUTER_R;
+  const w = r1(r * 0.13);
+  const parts = [`<circle cx="${p.x}" cy="${p.y}" r="${r1(r)}" fill="${ROUTER.fill}"/>`];
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const at = (k, side = 0) => `${r1(p.x + dx * k * r - dy * side * r)},${r1(p.y + dy * k * r + dx * side * r)}`;
+    parts.push(`<path d="M${at(0.8)} L${at(0.4)}" stroke="${ROUTER.arrow}" stroke-width="${w}" stroke-linecap="round"/><path d="M${at(0.22)} L${at(0.46, 0.17)} L${at(0.46, -0.17)} Z" fill="${ROUTER.arrow}"/>`);
+  }
+  if (dashed) parts.push(`<circle cx="${p.x}" cy="${p.y}" r="${r1(f * RING_R)}" fill="none" stroke="${C.ink}" stroke-width="${r1(f * 0.08)}" stroke-dasharray="${r1(f * 0.25)} ${r1(f * 0.18)}"/>`);
+  return `<g class="router">${parts.join('')}</g>`;
 }
 
 // A note's frame: its layer when the drawing has that frame, else physical.

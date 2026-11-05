@@ -264,7 +264,9 @@ describe('port badges and metric pills never overlap', () => {
       for (const id of ['physical', 'optical']) {
         const fr = frameOf(svg, id);
         if (!fr) continue;
-        const badges = rects(fr, BADGE), devices = rects(fr, DEVICE);
+        // a router symbol counts as its ring's square (render/frames.js deviceRect)
+        const routers = [...fr.matchAll(/<g class="router"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map((m) => { const r = (+m[3] * 0.88) / 0.75; return [+m[1] - r, +m[2] - r, 2 * r, 2 * r]; });
+        const badges = rects(fr, BADGE), devices = [...rects(fr, DEVICE), ...routers];
         expect(devices.length, `${id}: device boxes found`).toBeGreaterThan(0);
         expect(pairs(badges), `${id}: badge on badge`).toEqual([]);
         expect(pairs(badges, devices), `${id}: badge on device`).toEqual([]);

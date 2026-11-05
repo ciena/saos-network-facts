@@ -578,9 +578,9 @@ For a lab card or a page without WebGL, the viewer renders a facts file and a vi
 with the same layout as the 3D page:
 
 - **`frames.svg`**: one flat frame per layer the lab has content for: the optical line system (members,
-  spans, the routers at their ends); physical (each device as its type: a box in its platform family's
-  Ciena palette colour, 3900 access teal, 5100 aggregation blue, 8100 core purple, other grey, tagged with its model, 3984, 5164, 8110; links
-  and ports); roles (`f-role`, right after physical: CE, PE and P as the viewer derives them from the facts,
+  spans, the routers at their ends); physical (each router, any Ciena SAOS device, as the common router symbol in Ciena red, its name and
+  model beside it; any other device, a Waveserver, a third-party box, an ELS shelf, as a grey box tagged with
+  its model; links and ports); roles (`f-role`, right after physical: CE, PE and P as the viewer derives them from the facts,
   or a record's `role` for a device without facts, a route reflector as P·RR; left out when no device has
   a role); G.8032 rings over the
   physical links; the IGP (metrics, loopbacks, prefix SIDs); SR policies and MPLS-TP tunnels over the IGP
@@ -589,7 +589,7 @@ with the same layout as the 3D page:
   IGP; EVPN instances; CFM MEGs. The view picks them (`layers`, `frames.rule` / `frames.list`) and the
   frame to start on (`frames.start`, by default the lab's signature layer: its services, else its
   transport). Devices stay put from frame to frame; each object carries two or three short labels, each
-  frame a title (port badges and IGP metrics are placed clear of the device boxes and of each other; a port with no room is in its link's hover title), a device without facts is drawn as its type with a dashed outline (one without a
+  frame a title (port badges and IGP metrics are placed clear of the device boxes and of each other; a port with no room is in its link's hover title), a device without facts is drawn as the same symbol or box with a dashed outline (one without a
   type a faint grey box; line-system members solid, with their role), and a lab whose devices all lack facts
   (none configured yet, or no extractor for their type) is drawn from its records and links: the physical frame,
   plus the role frame when its records give roles, optical spans a double line with their label, sites a dashed frame, notes yellow (schema 1.9). Each frame is a group `<g id="f-<layer>">`

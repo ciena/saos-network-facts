@@ -9,15 +9,17 @@ import { describe, expect, test } from 'vitest';
 import { buildNetwork } from '../src/engine/index.js';
 import { importFacts, networkRole } from '../src/import/facts.js';
 import { renderOverview } from '../src/panels.js';
-import { FAMILY, physicalLook } from '../src/render/frames.js';
+import { OTHER, physicalLook, ROUTER } from '../src/render/frames.js';
 import { frames, snapshot } from '../src/render/index.js';
-import { platformFamily, typeTag } from '../src/render/model.js';
+import { isRouter, typeTag } from '../src/render/model.js';
 
 const expected = (name) => readFileSync(new URL(`../../tests/fixtures/expected/${name}.facts.json`, import.meta.url), 'utf8');
 const example = readFileSync(new URL('../../examples/adaptive-sr-cfm/facts.json', import.meta.url), 'utf8');
 const group = (svg, id) => svg.split(/(?=<g class="frame[ a-z0-9]*")/).find((g) => g.includes(`id="f-${id}"`));
 // The box of each device in a frame: the first <rect> after the device's hover title.
 const boxes = (g) => Object.fromEntries([...g.matchAll(/<g><title>([^\n<]+)\n[^<]*(?:<\/title>)<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"[^>]*fill="([^"]+)"([^>]*)\/><text[^>]*>([^<]*)<\/text>/g)].map((m) => [m[1], { x: +m[2], y: +m[3], w: +m[4], h: +m[5], fill: m[6], rest: m[7], tag: m[8] }]));
+// The router symbols of a physical frame: { name: { cx, cy, r, dashed } }.
+const routers = (g) => Object.fromEntries([...g.matchAll(/<g><title>([^\n<]+)\n[^<]*<\/title><g class="router"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)" fill="([^"]+)"\/>(.*?)<\/g><\/g>/g)].map((m) => [m[1], { cx: +m[2], cy: +m[3], r: +m[4], fill: m[5], dashed: m[6].includes('stroke-dasharray') }]));
 const centre = (b) => [b.x + b.w / 2, b.y + b.h / 2];
 
 // A facts file with every device's facts removed, as a lab nobody has configured yet.
@@ -38,7 +40,8 @@ describe('a lab whose devices all lack facts', () => {
     expect(r.frames.map((f) => f.id)).toEqual(['physical']);
     expect(r.start).toBe('physical');
     const physical = group(r.svg, 'physical');
-    expect(Object.keys(boxes(physical))).toHaveLength(JSON.parse(text).devices.length);
+    expect(Object.keys(routers(physical))).toHaveLength(JSON.parse(text).devices.length);
+    expect(Object.values(routers(physical)).every((x) => x.dashed)).toBe(true);
     expect(physical.match(/<line /g).length).toBe(JSON.parse(text).links.length);
     expect(r.svg).toContain('data-title="Physical · 9 devices (SAOS 10, no facts), 10 links"');
   });
@@ -64,49 +67,52 @@ describe('a lab whose devices all lack facts', () => {
   });
 });
 
-describe('the physical frame shows the device types', () => {
-  test('platformFamily and typeTag: Ciena model numbers by series, else the leading letters', () => {
-    expect(['3984-10x', '3926v2-10x', '5170-8x', '8110-10x', 'WSAi', null].map(platformFamily)).toEqual(['access', 'access', 'aggregation', 'core', 'other', 'other']);
+describe('the physical frame shows the devices, not their roles', () => {
+  test('isRouter and typeTag: a Ciena SAOS device is a router; the model tag of any other box', () => {
+    expect([{ type: '3984-10x' }, { type: '3928-6x', os: 'SAOS 6/8' }, { type: 'odd', os: 'SAOS 10' }, { type: 'WSAi' }, { type: 'JNP7100-48L' }, { type: 'ELS-TERM' }, {}].map(isRouter)).toEqual([true, true, true, false, false, false, false]);
     expect(['3984-10x', '3926v2-10x', '3926-TDM-6x', '5164', 'WSAi', 'JNP7100-48L', 'ELS-TERM', '', null].map(typeTag)).toEqual(['3984', '3926v2', '3926', '5164', 'WSAi', 'JNP', 'ELS', '?', '?']);
   });
 
-  test('every box is its type, never its role: no CE / PE / P tag on the physical frame', () => {
+  test('every router is the same red router symbol, never a role tag; its name and type beside it', () => {
     const physical = group(frames(example).svg, 'physical');
-    const b = boxes(physical);
-    expect(Object.values(b).map((x) => x.tag).filter((t) => ['P', 'PE', 'CE', 'L2', 'PE·RR', 'P·RR'].includes(t))).toEqual([]);
-    const types = JSON.parse(example).devices.filter((r) => r.facts).map((r) => [r.device, typeTag(r.type)]);
-    for (const [id, tag] of types) expect(b[id]?.tag, id).toBe(tag);
+    const r = routers(physical);
+    const ids = JSON.parse(example).devices.filter((x) => x.facts).map((x) => x.device);
+    expect(Object.keys(r).sort()).toEqual([...ids].sort());
+    expect(new Set(Object.values(r).map((x) => x.fill))).toEqual(new Set([ROUTER.fill]));
+    expect(Object.values(boxes(physical)).map((x) => x.tag).filter((t) => ['P', 'PE', 'CE', 'L2', 'PE·RR', 'P·RR'].includes(t))).toEqual([]);
+    for (const x of JSON.parse(example).devices.filter((d) => d.facts)) expect(physical).toContain(`>${x.type}</text>`);
   });
 
-  test('a device without facts looks like a device of its type with facts, with a dashed outline', () => {
+  test('a device without facts is the same symbol with a dashed ring; a non-router a grey box with its model', () => {
     const file = JSON.parse(expected('plain-box'));
     const pe2 = file.devices.find((r) => r.device === 'PE2');
-    Object.assign(pe2, { facts: null, status: 'skipped', reason: 'no configuration', templates: [], type: file.devices.find((r) => r.device === 'PE1').type });
+    Object.assign(pe2, { facts: null, status: 'skipped', reason: 'no configuration', templates: [] });
     const physical = group(frames(JSON.stringify(file)).svg, 'physical');
-    const b = boxes(physical);
-    expect([b.PE2.fill, b.PE2.tag]).toEqual([b.PE1.fill, b.PE1.tag]);
-    expect(b.PE2.rest).toContain('stroke-dasharray');
-    expect(b.PE1.rest).not.toContain('stroke-dasharray');
+    const r = routers(physical);
+    expect([r.PE2.fill, r.PE2.r, r.PE2.dashed, r.PE1.dashed]).toEqual([r.PE1.fill, r.PE1.r, true, false]);
     expect(physical).not.toContain('no facts</text>');
+    // OLS1 (type line-system, no extractor): a grey box, dashed, tagged with its model
+    expect(boxes(physical).OLS1).toMatchObject({ fill: OTHER.fill, tag: 'line' });
+    expect(boxes(physical).OLS1.rest).toContain('stroke-dasharray');
     // the title says so only when no device has facts (the card keeps its width)
     expect(frames(JSON.stringify(file)).svg).toMatch(/data-title="Physical · 3 devices \(SAOS 10\), \d+ links?"/);
   });
 
-  test('the family colours are Ciena palette colours, the tag text at least 4.5:1 on each, the name readable on white', () => {
+  test('the colours are Ciena\'s: white arrows on Ciena red, near-black tags on grey, near-black names on white, all 4.5:1 or more', () => {
     const lum = (hex) => { const c = hex.replace('#', ''); const v = (c.length === 3 ? [...c].map((x) => x + x) : c.match(/../g)).map((x) => parseInt(x, 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
     const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-    expect(Object.values(FAMILY).map((x) => x.fill)).toEqual(['#00c896', '#1e1ec8', '#963cbe', '#c8c8c8']);
-    for (const [k, x] of Object.entries(FAMILY)) {
-      expect(ratio(x.fill, x.text), `${k} tag`).toBeGreaterThanOrEqual(4.5);
-      expect(ratio(x.name, '#fff'), `${k} name`).toBeGreaterThanOrEqual(4.5);
-    }
+    expect([ROUTER.fill, OTHER.fill]).toEqual(['#dc0000', '#c8c8c8']);
+    expect(ratio(ROUTER.fill, ROUTER.arrow)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(OTHER.fill, OTHER.text)).toBeGreaterThanOrEqual(4.5);
+    for (const name of [ROUTER.name, OTHER.name]) expect(ratio(name, '#fff')).toBeGreaterThanOrEqual(4.5);
   });
 
   test('physicalLook: a line-system member keeps its equipment look, a box with no type stays the faint ?', () => {
-    expect(physicalLook({ plain: true, equipment: 'roadm', type: 'roadm-2d' })).toMatchObject({ tag: 'ROADM', dash: false });
-    expect(physicalLook({ plain: true, type: null })).toMatchObject({ tag: '?', dash: true, typed: false });
-    expect(physicalLook({ plain: true, type: '3984-10x' })).toMatchObject({ tag: '3984', dash: true, typed: true });
-    expect(physicalLook({ plain: false, type: '3984-10x' }).color).toBe(physicalLook({ plain: true, type: '3984-10x' }).color);
+    expect(physicalLook({ plain: true, equipment: 'roadm', type: 'roadm-2d' })).toMatchObject({ tag: 'ROADM', dash: false, router: false });
+    expect(physicalLook({ plain: true, type: null })).toMatchObject({ tag: '?', dash: true, typed: false, router: false });
+    expect(physicalLook({ plain: true, type: '3984-10x' })).toMatchObject({ router: true, dash: true });
+    expect(physicalLook({ plain: false, type: '3984-10x', os: 'SAOS 10' })).toMatchObject({ router: true, dash: false });
+    expect(physicalLook({ plain: true, type: 'WSAi' })).toMatchObject({ router: false, tag: 'WSAi', color: OTHER.fill, dash: true });
     expect(physicalLook({ host: true, role: 'host' })).toMatchObject({ tag: 'H' });
   });
 });
@@ -128,7 +134,7 @@ describe('the role frame', () => {
   test('the devices stay put: each box has the same centre on the physical and the role frame', () => {
     for (const text of [example, expected('srv6-evpn'), expected('config-less')]) {
       const r = frames(text, { preset: 'card-frames' });
-      const phys = boxes(group(r.svg, 'physical')), role = boxes(group(r.svg, 'role'));
+      const phys = Object.fromEntries(Object.entries(routers(group(r.svg, 'physical'))).map(([k, c]) => [k, { x: c.cx - c.r, y: c.cy - c.r, w: 2 * c.r, h: 2 * c.r }])), role = boxes(group(r.svg, 'role'));
       expect(Object.keys(role).length).toBeGreaterThan(0);
       // (a route reflector's box is larger on the role frame: the same centre, to the rounding)
       for (const id of Object.keys(role)) centre(role[id]).forEach((v, k) => expect(Math.abs(v - centre(phys[id])[k]), id).toBeLessThan(0.11));
