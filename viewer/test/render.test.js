@@ -95,8 +95,11 @@ describe('frames', () => {
     const svg = r.svg;
     expect(svg).toMatch(/data-title="Physical · 5 devices [^"]*, 5 links \(5 optical\)/);
     // one connection over the line system, PE1 1 to PE2 1, captioned with the two cables' label (ch 25),
-    // a thin dashed line without port badges of its own; the dark ch 26 cable (PE1 2, no far end) none
+    // a thin dashed line with the router port badged at each end (PE1 1, PE2 1); the dark ch 26 cable
+    // (PE1 2, no far end) none
     expect(svg.match(/class="lightpath"/g)).toHaveLength(1);
+    const lp = svg.slice(svg.indexOf('<g class="lightpath">')).split('</g>')[0];
+    expect(lp.match(/<rect [^>]*stroke="#9aa4b1"[^>]*\/><text [^>]*>1<\/text>/g)).toHaveLength(2);
     expect(svg).toMatch(/<g class="lightpath"><title>PE1 1 — PE2 1\nover ch 25: through ROADM-A … ROADM-B<\/title><line [^>]*stroke-dasharray/);
     expect(svg).toContain('>over ch 25</text>');
     expect(r.model.links.filter((l) => l.lightpath).map((l) => [l.a, l.b, l.over])).toEqual([[{ node: 'PE1', port: '1' }, { node: 'PE2', port: '1' }, 'over ch 25']]);

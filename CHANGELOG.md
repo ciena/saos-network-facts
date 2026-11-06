@@ -49,7 +49,7 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   line system with every cable (the row, the spans with their labels, the router to terminal cables with
   their port badges), and two routers cabled to the same port of two members of one line system (a
   terminal's channel port) are joined by a connection over it: a thin dashed blue line captioned
-  `over ch 25` (the two cables' label when they match, else `ch N` for a numbered port), derived from the
+  `over ch 25`, the router port badged at each end like a cable's (the two cables' label when they match, else `ch N` for a numbered port), derived from the
   cabling (`topology.lightpaths`, `lightpathsOf` in the importer), drawn only, never on a protocol frame,
   not a link of the 3D view's network. Where the facts give a routed link over the line system, its own
   `over` caption says so and nothing is derived. The connection joins its routers in the layout

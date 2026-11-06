@@ -385,8 +385,8 @@ function draw(id, ctx) {
     // The port badges, link by link and end by end (a fixed order: the same facts, the same picture),
     // clear of the boxes, captions, labels and each other. Drawn with their link, under the boxes.
     taken.push(...reg.filter((r) => !taken.includes(r)));
-    // (none on a connection over the line system: its ports are its cables' own, badged there)
-    const want = linkDraw.flatMap((d, i) => (d.l.lightpath ? [] : [[d.a, d.b, d.l.a], [d.b, d.a, d.l.b]]).map(([from, to, end], e) => ({ i, e, from, to, len: d.len, text: end.port ?? '?', box: boxes.get(end.node), spot: null })));
+    // (a connection over the line system too: the router port at each end, as its cable's)
+    const want = linkDraw.flatMap((d, i) => [[d.a, d.b, d.l.a], [d.b, d.a, d.l.b]].map(([from, to, end], e) => ({ i, e, from, to, len: d.len, text: end.port ?? '?', box: boxes.get(end.node), spot: null })));
     for (const step of BADGE_STEPS) {
       for (const b of want) {
         if (b.spot) continue;

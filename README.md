@@ -330,7 +330,7 @@ optical frame unless the view lists one (`frames.rule` `list`), as it would repe
 frame. On both, a routed link whose two ports are cabled by optical spans says it rides the line system
 (`over ch 25`, the spans' label when both say the same); where the facts give no such link, two routers
 cabled to the same port of two members of one line system (a terminal's channel port: an ELS terminal's
-port 25 is channel 25) are joined by a connection over it, a thin dashed blue line `over ch 25` (the two
+port 25 is channel 25) are joined by a connection over it, a thin dashed blue line `over ch 25` with the router port badged at each end (the two
 cables' label when they have the same one, else `ch N` for a port that is a number), drawn only: it is
 not a link of the network the 3D view runs, and a protocol layer never shows it. Protocol frames leave
 the line system out. A view without `optical` in its `layers` draws the line system on the physical

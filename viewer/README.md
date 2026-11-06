@@ -88,7 +88,7 @@ draw the same. The layout keeps a site's devices together (no site's outline tak
 another site) and lays a line system out as a chain on a row of its own above the routers, terminal to
 terminal, two OADMs cabled back to back side by side with their express span left out. The frames draw
 the line system on the physical frame with every cable, and two routers cabled to the same channel port
-of its two terminals joined by a dashed `over ch N` connection; no optical frame unless the view lists one.
+of its two terminals joined by a dashed `over ch N` connection, each router's port badged; no optical frame unless the view lists one.
 
 IPv6: a link may be an IPv6 subnet (link-local addresses never link), and a router whose IS-IS
 interfaces carry IPv6 only, or whose loopback has no IPv4 address, runs IS-IS, BGP and the label
