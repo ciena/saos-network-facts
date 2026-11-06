@@ -17,6 +17,53 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-05
+
+### Changed
+
+- **Layout: a line system laid out as a chain** — the members of an optical line system (devices without facts
+  with an equipment role: terminals, OADMs, ROADMs, amplifiers) are now laid out after the other devices,
+  without them, and each line system is then a row of its own above them, in
+  path order: a terminal, the OADMs or amplifiers, the other terminal, the end cabled to the router further
+  left on the left, each member's label by its box, within `max_columns`. A router cabled only to the line
+  system stands under its terminal. Before, the members joined the core and could fold back on themselves. A plain box without an equipment role is laid out as before.
+  `LayoutNode` takes `equipment` (the importer's nodes carry it already).
+- **Frames: two OADMs back to back drawn as one, their express span implied** — two OADMs cabled to each
+  other (both line-system members with the equipment role `oadm`, any case: the express span of a back-to-back
+  pair) take one place in the line system's row, side by side (`BACK_TO_BACK`, 0.3 columns, in the layout;
+  the frames draw their boxes touching, under one label `OADM-1 | OADM-2`, names left to right), and the frames and the snapshot leave the span between them out
+  (`isExpress` in the viewer's render model): express traffic is implied by the two standing together. The
+  facts and the 3D model keep the link; the frame titles count the spans they draw.
+- **Frames: an optical frame for the line system, the routers joined through it on the physical frame** —
+  the line system was drawn on the optical frame with the routers at its ends, so the physical frame showed
+  those routers unconnected (and a lab cabled only through it had a physical frame without a link). A lab
+  with a line system now has two frames for it. The optical frame draws the line system alone: its row
+  (terminal, the OADMs side by side, terminal), the spans with their labels, and at each member port a
+  router is cabled to a callout naming what rides it, `PE-1 2/1 · ch 25` (the cable's label as its channel,
+  else `ch N` for a numbered port), instead of the router and its cable. The physical frame draws the
+  routers: two routers cabled to the same port of two members of one line system (a terminal's channel
+  port) are joined by a connection over it, a rainbow of dashes (a dash of each of six colours in turn, for a
+  wavelength) labelled with its channel (`ch 25`), the router
+  port badged at each end, derived from the cabling (`topology.lightpaths`, `lightpathsOf` in the
+  importer), drawn only, never on a protocol frame, not a link of the 3D view's network. Where the facts
+  give a routed link over the line system, nothing is derived and that link is drawn the same way: a
+  rainbow of dashes captioned with its channel, badged with the router ports its cables to the line
+  system leave from (not its interface names), on the frames, the snapshot and the 3D page. The
+  frames other than optical lay their devices out without the line system, each connection over it an
+  ordinary link (the importer's `cardLayout`), so the chain no longer pushes the routers apart; the
+  optical frame keeps the line system's places. A view without the optical layer keeps the line system
+  with every cable on the physical frame. The start frame is unchanged; protocol frames leave the line
+  system out.
+- **3D view and snapshot: the physical plane shows the routers joined through the line system** — the 3D
+  page and the snapshot keep their optical plane under the physical one (the members, the spans, the
+  router cables, each router end now labelled with its port on the page), and their physical plane now
+  joins the routers too: each connection over the line system is a rainbow of dashes captioned
+  `over ch 25`, with the router port at each end (`physicalLineSystem` in `view/layers.js`; the snapshot
+  badges it as a cable). Without an optical plane (a view that leaves it out) the page's physical plane
+  draws all of it. Two OADMs back to back share one label (`OADM-1 | OADM-2 oadm`) and their express span
+  is not drawn, as on the frames. A free note hangs just in front of the plane's front right corner
+  instead of over the devices there.
+
 ## [0.22.0] - 2026-11-05
 
 ### Added

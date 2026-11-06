@@ -321,16 +321,32 @@ notes:                        # free text, on a device or not, on a view layer (
   labels written beside them, so they live in the facts; a view is a presentation that many labs share.
 - A link end or note on a name no input knows, or an unknown key, is an error before anything is extracted.
 
-Drawn on their own layer, `optical` (view schema 1.2), under the physical one: the line-system members
-as solid blue boxes tagged with their role (ROADM, AMP, OT), the optical spans as a blue double line with
-their label, and the routers at the spans' ends, whose risers start there. The physical layer then keeps
-the routers and the links between them; a routed link whose two ports are cabled by optical spans says it
-rides the line system (`over ch 25`, the spans' label when both say the same). A view without `optical` in
-its `layers` draws the line system on the physical layer instead. Sites are a dashed frame round their
+In the 3D view and the snapshot they are drawn on their own layer, `optical` (view schema 1.2), under the
+physical one: the line-system members as solid blue boxes tagged with their role (ROADM, AMP, OT), the
+optical spans as a blue double line with their label, and the routers at the spans' ends, whose risers
+start there; the physical layer keeps the routers and the links between them, and the connections over
+the line system described below (a rainbow of dashes, the router port at each end). The 2D frames draw the
+line system on an optical frame of its own, without the routers: at each member port a router is cabled
+to, a callout names what rides it (`PE-1 2/1 · ch 25`); their physical frame shows the routers, laid out
+without the line system (a view without `optical` keeps the line system with every cable on the physical
+frame). On both, a routed link whose two ports are cabled by optical spans rides the line system
+(`over ch 25`, the spans' label when both say the same) and is drawn as a connection over it, below; where
+the facts give no such link, two routers
+cabled to the same port of two members of one line system (a terminal's channel port: an ELS terminal's
+port 25 is channel 25) are joined by a connection over it, a rainbow of dashes (a dash of each of six colours in turn, for a wavelength) with the router port badged at each end, `over ch 25` in 3D and `ch 25` on the frames (the two
+cables' label when they have the same one, else `ch N` for a port that is a number), drawn only: it is
+not a link of the network the 3D view runs, and a protocol layer never shows it. Protocol frames leave
+the line system out. A view without `optical` in its `layers` draws the line system on the physical
+layer in 3D too. Sites are a dashed frame round their
 devices (on both layers); notes are yellow, beside their device (the snapshot numbers them and lists them
 in the plane's corner) or along the edge, on the note's `layer`, else with their device (a note on a
-line-system member is on the optical layer), else on physical. The layout puts a chain of plain boxes
-between two routers (a ROADM, amplifiers, a ROADM) on the core with them.
+line-system member is on the optical layer when the drawing has one), else on physical. The layout lays the other devices out
+without the line system, then the line system as a chain on a row of its own above them: a terminal, the
+OADMs or amplifiers, the other terminal, the end cabled to the router further left on the left, each
+member's label by its box; two OADMs cabled back to back stand side by side, boxes touching, and the
+express span between them is not drawn (express traffic is implied); a router cabled only to the line
+system stands under its terminal, and a connection over the line system joins its two routers in the
+layout.
 
 ### Rings
 
@@ -556,6 +572,17 @@ wins, with two adjustments: in a lab with both P and PE routers, a candidate tha
 ladder (radial and stress always) must beat the ladder by 3. `layoutFacts` returns every candidate
 with its score (`candidates`, the chosen one first) so a page can show why.
 
+**Line systems** (devices without facts with an equipment role, `plain` and `equipment`): the other
+devices are laid out without them (a connection over the line system, a link with `lightpath`, joins
+its two routers there), and each line
+system is then a row of its own above them, in path order (a terminal, the OADMs or amplifiers, the
+other terminal), the end cabled to the router further left on the left, spread between the columns of
+the routers at its two ends or a column apart centred over them, within `max_columns`. Two OADMs cabled
+to each other (equipment `oadm`, any case: a back-to-back pair and its express span) take one place in
+the row, `BACK_TO_BACK` (0.3 columns) apart; the frames draw their boxes touching and leave the express
+span out. A router cabled only to the line system (a `lightpath` link does not count) stands under the member it is cabled to. A plain box without an equipment role
+(a device without facts in the path) is still laid out with the core, as above.
+
 With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns (role tiers that follow the roles one more: `CE | PE | P | PE | CE` is five): outer devices hang sideways while there is room, a ring too long for the ladder runs
 round a rectangle that wide (its rows using the full width, its sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
 10-device lab stays readable on a ~330 px card (the `card-frames` preset: 4 columns). From JavaScript:
@@ -577,8 +604,9 @@ In Python, `saos_network_facts.schema.view_errors(view)` validates a view file.
 For a lab card or a page without WebGL, the viewer renders a facts file and a view to two SVG files,
 with the same layout as the 3D page:
 
-- **`frames.svg`**: one flat frame per layer the lab has content for: the optical line system (members,
-  spans, the routers at their ends); physical (each router, any Ciena SAOS device, as the common router symbol in Ciena red, its name and
+- **`frames.svg`**: one flat frame per layer the lab has content for (optical: the line system, with a
+  callout for what rides each port a router is cabled to); physical (the routers, joined by the connections
+  over the line system; each router, any Ciena SAOS device, as the common router symbol in Ciena red, its name and
   model beside it; any other device, a Waveserver, a third-party box, an ELS shelf, as a grey box tagged with
   its model; links and ports); roles (`f-role`, right after physical: CE, PE and P as the viewer derives them from the facts,
   or a record's `role` for a device without facts, a route reflector as P·RR; left out when no device has

@@ -28,11 +28,14 @@ export function prepare(facts, view, params, { name } = {}) {
   const net = buildNetwork(imp.topology, { labelMode: imp.labelMode });
   const model = renderModel(imp, net);
   if (resolved.title) model.name = resolved.title;
-  return { model, view: resolved, positions: imp.layout.positions, method: imp.layout.method, warnings: [...warnings, ...imp.layout.warnings] };
+  // cardPositions: a lab with a line system, the 2D frames' places of the devices off it (all frames but
+  // the optical one, which draws the line system at its places in `positions`)
+  return { model, view: resolved, positions: imp.layout.positions, cardPositions: imp.cardLayout?.positions ?? null, method: imp.layout.method, warnings: [...warnings, ...imp.layout.warnings] };
 }
 
 // The frames a card shows: the present layers, SR policies / MPLS-TP only when there is no
 // pseudowire frame (which shows the transport already), in the view's order, from its start frame.
+// A lab with a line system has an optical frame for it; the physical frame then shows the routers.
 export function frameLayers(model, view) {
   const present = presentLayers(model);
   return viewFrames(view, present.includes('pw') ? present.filter((id) => id !== 'mpls') : present);
@@ -41,7 +44,7 @@ export function frameLayers(model, view) {
 export function frames(facts, view, params, opts) {
   const p = prepare(facts, view, params, opts);
   const { frames: list, start } = frameLayers(p.model, p.view);
-  const out = renderFrames(p.model, p.positions, { frames: list.length ? list : ['physical'], start: start ?? 'physical', period: p.view.frames.period_s });
+  const out = renderFrames(p.model, p.positions, { frames: list.length ? list : ['physical'], start: start ?? 'physical', period: p.view.frames.period_s, cardPositions: p.cardPositions });
   return { ...out, view: p.view, warnings: p.warnings, model: p.model };
 }
 

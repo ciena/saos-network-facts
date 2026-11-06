@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { forceLayout, layoutFacts, longestCycle, resolveView, type LayoutModel, type Point } from "../src/index.ts";
+import { BACK_TO_BACK, forceLayout, layoutFacts, longestCycle, resolveView, type LayoutModel, type Point } from "../src/index.ts";
 
 // A ring of `n` routers R1..Rn (role pe or p), each PE with a CE hung off it.
 function ringLab(n: number, { roles = "p", ces = [] as number[] } = {}): LayoutModel {
@@ -463,4 +463,72 @@ test("longestCycle: the longest simple cycle from its smallest name", () => {
   ]);
   assert.deepEqual(longestCycle(["D", "C", "B", "A"], adj), ["A", "B", "D", "C"]);
   assert.deepEqual(longestCycle(["A", "B"], new Map([["A", new Set(["B"])], ["B", new Set(["A"])]])), []);
+});
+
+// ---- line systems (members drawn on the optical layer) ------------------------------------------
+
+// Two PEs with a CE each, linked directly and over a line system (terminal, two OADMs, terminal): the
+// members are boxes without facts with an equipment role.
+const lineSystemLab = (extra: Partial<LayoutModel> = {}): LayoutModel => ({
+  nodes: [
+    { id: "PE1", role: "pe" }, { id: "PE2", role: "pe" }, { id: "CE1", role: "ce" }, { id: "CE2", role: "ce" },
+    { id: "LS-T-1", plain: true, equipment: "terminal" }, { id: "LS-O-1", plain: true, equipment: "oadm" },
+    { id: "LS-O-2", plain: true, equipment: "oadm" }, { id: "LS-T-2", plain: true, equipment: "terminal" },
+    ...(extra.nodes ?? []),
+  ],
+  links: [
+    { a: "PE1", b: "PE2" }, { a: "PE1", b: "CE1" }, { a: "PE2", b: "CE2" },
+    // the far end first: the row runs by the routers' places, not the order of the links
+    { a: "LS-T-2", b: "PE1" }, { a: "LS-T-2", b: "LS-O-2" }, { a: "LS-O-2", b: "LS-O-1" }, { a: "LS-O-1", b: "LS-T-1" }, { a: "LS-T-1", b: "PE2" },
+    ...(extra.links ?? []),
+  ],
+});
+
+test("line systems: the other devices laid out without them, then the line system a chain on a row of its own", () => {
+  const lab = lineSystemLab();
+  const r = layoutFacts(lab, { aspect: "card", max_columns: 4 });
+  const p = r.positions;
+  // The routers' layout is the one without the line system.
+  const rest = layoutFacts({ nodes: lab.nodes.filter((n) => !n.equipment), links: lab.links.filter((l) => ![l.a, l.b].some((e) => String(e).startsWith("LS-"))) }, { aspect: "card", max_columns: 4 });
+  const shift = { x: p.PE1!.x - rest.positions.PE1!.x, y: p.PE1!.y - rest.positions.PE1!.y };
+  const r2 = (v: number) => Math.round(v * 100) / 100 + 0;
+  for (const id of ["PE1", "PE2", "CE1", "CE2"]) assert.deepEqual([r2(p[id]!.x - shift.x), r2(p[id]!.y - shift.y)], [rest.positions[id]!.x, rest.positions[id]!.y], id);
+  assert.deepEqual(r.core, rest.core);
+  // One row, in path order, the end cabled to the router further left on the left, above the routers.
+  const row = ["LS-T-2", "LS-O-2", "LS-O-1", "LS-T-1"];
+  const order = p.PE1!.x < p.PE2!.x ? row : [...row].reverse();
+  assert.equal(new Set(row.map((id) => p[id]!.y)).size, 1);
+  // The two OADMs, cabled back to back, side by side as one place; the terminals a column off.
+  const gaps = order.slice(1).map((id, i) => r2(p[id]!.x - p[order[i]!]!.x));
+  assert.deepEqual(gaps.map((g) => g >= 0.99), [true, false, true], `gaps ${gaps}`);
+  assert.equal(gaps[1], BACK_TO_BACK);
+  assert.ok(row.every((id) => p[id]!.y < Math.min(p.PE1!.y, p.PE2!.y, p.CE1!.y, p.CE2!.y)));
+  assert.ok(spanX(p) <= 3 + 1e-9, "within max_columns");
+  assert.match(r.description, /line system LS-T-\d - LS-O-\d \+ LS-O-\d back to back - LS-T-\d in a row above$/);
+  // Members that are not OADMs (ROADMs) keep a column between them.
+  const roadm = layoutFacts({ ...lab, nodes: lab.nodes.map((n) => (n.equipment === "oadm" ? { ...n, equipment: "roadm" } : n)) }, { aspect: "card", max_columns: 4 }).positions;
+  const rorder = order.map((id) => roadm[id]!.x).sort((a, b) => a - b);
+  assert.ok(rorder.slice(1).every((x, i) => x - rorder[i]! >= 0.99), "roadms a column apart");
+  // A plain box without an equipment role (a device without facts in the path) is laid out as before.
+  const box = layoutFacts({ nodes: lab.nodes.map((n) => ({ ...n, equipment: undefined })), links: lab.links });
+  assert.ok(box.core.includes("LS-O-1"));
+});
+
+test("line systems: a router cabled only to the line system stands under its terminal", () => {
+  const lab: LayoutModel = {
+    nodes: [{ id: "PE1" }, { id: "PE2" }, ...["LS-T-1", "LS-O-1", "LS-T-2"].map((id) => ({ id, plain: true, equipment: id.includes("T") ? "terminal" : "oadm" }))],
+    links: [{ a: "PE1", b: "LS-T-1" }, { a: "LS-T-1", b: "LS-O-1" }, { a: "LS-O-1", b: "LS-T-2" }, { a: "LS-T-2", b: "PE2" }],
+  };
+  const p = layoutFacts(lab, { aspect: "card", max_columns: 4 }).positions;
+  assert.deepEqual([p.PE1!.x, p.PE1!.y], [p["LS-T-1"]!.x, p["LS-T-1"]!.y + 1]);
+  assert.deepEqual([p.PE2!.x, p.PE2!.y], [p["LS-T-2"]!.x, p["LS-T-2"]!.y + 1]);
+  assert.equal(p["LS-O-1"]!.y, p["LS-T-1"]!.y);
+  // A connection over the line system between them (a lightpath, not a cable) keeps them there; as a
+  // cable it would not (they are no longer cabled only to the line system).
+  const over = (lightpath: boolean) => layoutFacts({ ...lab, links: [...lab.links, { a: "PE1", b: "PE2", lightpath }] }, { aspect: "card", max_columns: 4 }).positions;
+  const q = over(true);
+  assert.deepEqual([q.PE1!.x, q.PE1!.y], [q["LS-T-1"]!.x, q["LS-T-1"]!.y + 1]);
+  assert.deepEqual([q.PE2!.x, q.PE2!.y], [q["LS-T-2"]!.x, q["LS-T-2"]!.y + 1]);
+  const c = over(false);
+  assert.notDeepEqual([c.PE1!.x, c.PE2!.x], [c["LS-T-1"]!.x, c["LS-T-2"]!.x]);
 });

@@ -12,7 +12,8 @@
 //   <img src="frames.svg">        the start frame (the view's frames.start, by default the signature layer)
 // A page that inlines the SVG can show one group at a time itself (a card that rotates).
 
-import { deviceDetail, equipmentTag, isRouter, layerModel, noteLayerOf, typeTag, wrapNote } from './model.js';
+import { RAINBOW } from '../rainbow.js';
+import { cardLayer, deviceDetail, equipmentTag, hasLineSystem, isExpress, isRouter, layerModel, noteLayerOf, typeTag, wrapNote } from './model.js';
 
 const C = {
   ink: '#1d2430', mute: '#5b6675', ghost: '#c3cad3', ghostInk: '#8a94a3',
@@ -49,7 +50,10 @@ export function frameTitle(id, m) {
       const bare = m.nodes.filter((n) => n.plain && !n.member).length;
       // a lab with no facts at all says so; in a mixed lab the dashed outline marks them (the card keeps its width)
       const said = [oses.length === 1 ? oses[0] : null, bare && bare === m.nodes.length ? 'no facts' : null].filter(Boolean);
-      return `Physical · ${plural(m.nodes.length, 'device')}${said.length ? ` (${said.join(', ')})` : ''}, ${plural(m.links.length, 'link')}${optical ? ` (${optical} optical)` : ''}${m.sites.length ? ` · ${plural(m.sites.length, 'site')}` : ''}`;
+      // the connections over the line system are not links (cables) of their own
+      const cables = m.links.filter((l) => !l.lightpath).length;
+      const over = m.links.length - cables;
+      return `Physical · ${plural(m.nodes.length, 'device')}${said.length ? ` (${said.join(', ')})` : ''}, ${cables || !over ? `${plural(cables, 'link')}${optical ? ` (${optical} optical)` : ''}` : ''}${over ? `${cables ? ', ' : ''}${over} over the line system` : ''}${m.sites.length ? ` · ${plural(m.sites.length, 'site')}` : ''}`;
     }
     case 'role': {
       const count = (r) => m.nodes.filter((n) => n.net === r).length;
@@ -87,29 +91,72 @@ export function frameTitle(id, m) {
 }
 
 // frames: the layer ids in order (js/src/view.ts viewFrames), start: the one shown by the bare file.
-export function renderFrames(m, positions, { frames, start, period = 4 }) {
-  const P = positions;
-  const xs = Object.values(P).map((p) => p.x), ys = Object.values(P).map((p) => p.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+export function renderFrames(m, positions, { frames, start, period = 4, cardPositions = null }) {
+  // A lab with a line system (model.js hasLineSystem): the line system on an optical frame of its own,
+  // at its places in `positions`, a callout at each member port a router is cabled to; the routers on
+  // the other frames, at their places in `cardPositions` (laid out without the line system, each
+  // connection over it an ordinary link), else `positions`. Any other lab, or a view without the optical
+  // frame: every frame at `positions`, the physical frame with the line system and every cable on it.
+  const split = hasLineSystem(m) && frames.includes('optical');
+  const layer = (id) => (split ? cardLayer(m, id) : layerModel(m, id, hasLineSystem(m), { cabling: true }));
+  const lms = Object.fromEntries(frames.map((id) => [id, layer(id)]));
+  const sets = [];
+  const setOf = new Map();
+  for (const id of frames) {
+    const opt = split && id === 'optical';
+    const P = opt ? positions : (split && cardPositions) || positions;
+    const ids = split ? lms[id].nodes.map((n) => n.id).filter((x) => P[x]) : Object.keys(P);
+    let set = sets.find((x) => x.opt === opt);
+    if (!set) sets.push((set = { opt, P, ids: new Set() }));
+    for (const x of ids) set.ids.add(x);
+    setOf.set(id, set);
+  }
+  for (const set of sets) {
+    const pts = [...set.ids].map((x) => set.P[x]);
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    Object.assign(set, { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) });
+    if (!pts.length) Object.assign(set, { minX: 0, maxX: 0, minY: 0, maxY: 0 });
+  }
+  const span = Math.max(...sets.map((x) => x.maxX - x.minX));
   // Fonts grow with the drawing so a big lab still reads when a card scales it down; the grid is in
   // font units so three label lines fit between rows.
-  const f = Math.round(13 * Math.max(1, ((maxX - minX) * 160 + 300) / 760));
+  const f = Math.round(13 * Math.max(1, (span * 160 + 300) / 760));
   const U = Math.max(160, f * 9.4), V = f * 7.6;
   // A site frame's name sits on its top edge, above the device labels: a line more at the top.
   const mx = f * 5.5, myTop = f * (m.sites.length ? 8.6 : 7.4), myBot = f * 6.6;
-  // An optical frame takes the line system off the others (render/model.js layerModel).
-  const split = frames.includes('optical');
-  const titles = Object.fromEntries(frames.map((id) => [id, frameTitle(id, layerModel(m, id, split))]));
+  // The optical frame's callouts: one block under each member a router is cabled to, a line per cable.
+  const callouts = lms.optical?.callouts ?? [];
+  const perMember = Math.max(0, ...[...new Set(callouts.map((c) => c.member))].map((x) => callouts.filter((c) => c.member === x).length));
+  const titles = Object.fromEntries(frames.map((id) => [id, frameTitle(id, lms[id])]));
   // Wide enough for the longest title, so a small lab keeps its titles whole.
-  const W = Math.ceil(Math.max((maxX - minX) * U + 2 * mx, Math.max(...Object.values(titles).map((t) => t.length)) * f * 1.15 * 0.6 + f * 2.4));
+  const W = Math.ceil(Math.max(...sets.map((x) => (x.maxX - x.minX) * U + 2 * mx), Math.max(...Object.values(titles).map((t) => t.length)) * f * 1.15 * 0.6 + f * 2.4));
   // Free notes (no device) sit along the bottom edge: room for the frame with the most of them.
   const freeLines = Math.max(0, ...frames.map((id) => notesOn(m, id, frames).filter((x) => !x.device).reduce((k, x) => k + wrapNote(x.text, 60).length, 0)));
   const notesH = freeLines ? freeLines * f * 1.0 + f * 1.4 : 0;
-  const H = Math.ceil((maxY - minY) * V + myTop + myBot + notesH);
-  const ox = (W - ((maxX - minX) * U + 2 * mx)) / 2;
-  const at = (id) => ({ x: r1(ox + mx + (P[id].x - minX) * U), y: r1(myTop + (P[id].y - minY) * V) });
+  // The optical frame: its labels above the row, its callouts below (room for the tallest block), and
+  // room under them for a note on a member.
+  const memberNotes = split && frames.includes('optical') ? notesOn(m, 'optical', frames).filter((x) => x.device).length : 0;
+  for (const x of sets) x.h = (x.maxY - x.minY) * V + myTop + (x.opt && perMember ? Math.max(myBot, f * (2.4 + perMember * 1.15 + 1.4)) : myBot) + (x.opt && memberNotes ? f * 4.6 : 0);
+  const H = Math.ceil(Math.max(...sets.map((x) => x.h)) + notesH);
+  // Two OADMs cabled back to back (model.js isExpress) stand side by side in the layout: drawn with
+  // their boxes touching, each moved halfway toward the other.
+  for (const set of sets) {
+    const P = set.P;
+    set.ox = (W - ((set.maxX - set.minX) * U + 2 * mx)) / 2;
+    set.pull = new Map();
+    for (const l of m.links) {
+      const [a, b] = [l.a.node, l.b.node];
+      if (!isExpress(m, l) || !set.ids.has(a) || !set.ids.has(b) || Math.abs(P[a].y - P[b].y) > 1e-9) continue;
+      const gap = (Math.abs(P[a].x - P[b].x) * U - 2 * f * 1.3) / 2;
+      if (gap <= 0) continue;
+      const s = Math.sign(P[b].x - P[a].x);
+      set.pull.set(a, (set.pull.get(a) ?? 0) + s * gap);
+      set.pull.set(b, (set.pull.get(b) ?? 0) - s * gap);
+    }
+    set.at = (id) => ({ x: r1(set.ox + mx + (P[id].x - set.minX) * U + (set.pull.get(id) ?? 0)), y: r1(myTop + (P[id].y - set.minY) * V) });
+  }
   const nodes = new Map(m.nodes.map((n) => [n.id, n]));
-  const ctx = { model: m, full: m, at, f, nodes, W, H, frames, notesH };
+  const ctx = { model: m, full: m, at: sets[0]?.at, f, nodes, W, H, frames, notesH };
   const order = start && frames.includes(start) ? [...frames.filter((x) => x !== start), start] : frames;
 
   const open = `<svg xmlns="http://www.w3.org/2000/svg" class="netfacts-frames" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" data-frames="${frames.join(' ')}" data-start="${start ?? ''}">`;
@@ -117,8 +164,8 @@ export function renderFrames(m, positions, { frames, start, period = 4 }) {
   const background = `<rect id="still" width="${W}" height="${H}" fill="#fff"/>`;
   const groups = {};
   for (const id of order) {
-    const lm = layerModel(m, id, split);
-    const g = draw(id, { ...ctx, model: lm, nodes: new Map(lm.nodes.map((n) => [n.id, n])) });
+    const lm = lms[id];
+    const g = draw(id, { ...ctx, at: setOf.get(id).at, model: lm, nodes: new Map(lm.nodes.map((n) => [n.id, n])), callouts: id === 'optical' ? callouts : [] });
     g.push(`<rect width="${W}" height="${r1(f * 2.5)}" fill="#fff" fill-opacity="0.92"/><text x="${r1(f * 1.1)}" y="${r1(f * 1.7)}" font-size="${r1(f * 1.15)}" font-weight="700" fill="${id === 'physical' ? C.ink : C[id] ?? C.ink}">${esc(titles[id])}</text>`);
     groups[id] = `<g class="frame r${rotIndex(frames, start, id)}${id === start ? ' start' : ''}" id="f-${id}" data-title="${esc(titles[id])}">${g.join('')}</g>`;
   }
@@ -189,6 +236,12 @@ function block(ctx, reg, x, y, lines, { color = C.ink, anchor = 'middle', up = f
 function outward(ctx, reg, p, gap, lines, opts = {}) {
   const below = p.y > ctx.H * 0.5;
   return block(ctx, reg, p.x, below ? p.y + gap : p.y - gap, lines, { ...opts, up: !below });
+}
+
+// A connection over the line system: a rainbow of dashes (six colours, a dash each in turn), a wavelength.
+function underlayLine(a, b, f) {
+  const d = f * 0.6;
+  return RAINBOW.map((c, i) => line(a, b, c, r1(f * 0.2), ` stroke-dasharray="${r1(d * 0.8)} ${r1(d * RAINBOW.length - d * 0.8)}" stroke-dashoffset="${r1(-i * d)}"`)).join('');
 }
 
 function line(a, b, color, w, extra = '') {
@@ -313,22 +366,30 @@ function draw(id, ctx) {
     const linkDraw = [];
     for (const l of model.links) {
       const [a, b] = ends.get(l.id);
-      // A routed link over the line system says so (`over ch 25`) where it has no label of its own.
-      const caption = l.caption ?? l.over;
-      const tip = `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium ? `\n${l.medium}${l.caption ? `: ${l.caption}` : ''}` : l.caption ? `\n${l.caption}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}`;
-      // An optical span: a fibre, drawn as a blue double line (white core).
+      // A link over the line system, a connection over it (no link of its own) or a routed link from the
+      // facts (`over`), is labelled with its channel (`ch 25`).
+      const caption = l.over ? l.over.replace(/^over /, '') : l.caption;
+      const tip = l.lightpath ? `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}\n${l.over}: through ${l.via.join(' … ')}` : `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium ? `\n${l.medium}${l.caption ? `: ${l.caption}` : ''}` : l.caption ? `\n${l.caption}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}`;
+      // An optical span: a fibre, drawn as a blue double line (white core). A link over the line system
+      // (a connection over it, or a routed link with `over`): a rainbow of dashes between its routers (a
+      // dash of each colour in turn), for a wavelength.
       const body = l.medium === 'optical'
         ? `${line(a, b, C.optical, f * 0.42, ' stroke-linecap="round"')}${line(a, b, '#fff', f * 0.14, ' stroke-linecap="round"')}`
-        : line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '');
+        : l.over
+          ? underlayLine(a, b, f)
+          : line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '');
       // The caption on the link, staggered along parallel links; the port pills only where they fit
       // between the device and the caption (else the ports are in the hover title only).
       const sibs = pairs.get(pair(l));
       const t = 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3;
       const len = Math.hypot(b.x - a.x, b.y - a.y);
-      const cw = caption ? pillW(caption) : 0;
-      const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || !l.caption ? C.optical : '#9aa4b1') : '';
-      if (caption) { const c = lerp(a, b, t); const r = { x: c.x - cw / 2, y: c.y - f * 0.55, w: cw, h: f * 1.1 }; reg.push(r); taken.push(r); }
-      linkDraw.push({ l, a, b, len, head: `<g${l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}`, cap });
+      // a link over the line system's channel chip is smaller, leaving more of the line to show
+      const ck = l.over ? 0.8 : 1;
+      const cw = caption ? pillW(caption) * ck : 0;
+      const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || l.over || !l.caption ? C.optical : '#9aa4b1', ck) : '';
+      if (caption) { const c = lerp(a, b, t); const r = { x: c.x - cw / 2, y: c.y - f * 0.55 * ck, w: cw, h: f * 1.1 * ck }; reg.push(r); taken.push(r); }
+      const cls = l.lightpath ? 'lightpath' : l.medium ? `link-${esc(l.medium)}` : null;
+      linkDraw.push({ l, a, b, len, head: `<g${cls ? ` class="${cls}"` : ''}>${title(tip)}${body}`, cap });
     }
     const devices = [];
     const labels = [];
@@ -344,14 +405,41 @@ function draw(id, ctx) {
     }
     // The device labels next, at their usual place beside the device; the badges then keep clear of
     // them too (a label pushed away by a badge would leave its device).
+    // Two OADMs back to back (their boxes touching) share one label over the pair, names left to right.
+    const subOf = (n) => (n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null]).filter(Boolean).join(' · ');
+    const drawn = new Set(model.nodes.map((n) => n.id));
+    const partner = new Map();
+    for (const l of ctx.full.links) {
+      if (!isExpress(ctx.full, l) || !drawn.has(l.a.node) || !drawn.has(l.b.node) || partner.has(l.a.node) || partner.has(l.b.node)) continue;
+      const [a, b] = at(l.a.node).x <= at(l.b.node).x ? [l.a.node, l.b.node] : [l.b.node, l.a.node];
+      if (Math.abs(at(a).y - at(b).y) > 0.5) continue;
+      partner.set(a, b);
+      partner.set(b, null);
+    }
     for (const n of model.nodes) {
-      const p = at(n.id);
-      const sub = n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null];
-      labels.push(outward(ctx, reg, p, f * 1.0, [n.id, sub.filter(Boolean).join(' · ')], { color: physicalLook(n).name }));
+      if (partner.get(n.id) === null) continue;
+      const mate = partner.get(n.id) ? ctx.nodes.get(partner.get(n.id)) : null;
+      const p = mate ? { x: r1((at(n.id).x + at(mate.id).x) / 2), y: at(n.id).y } : at(n.id);
+      const sub = mate && subOf(mate) !== subOf(n) ? `${subOf(n)} | ${subOf(mate)}` : subOf(n);
+      const lines = [mate ? `${n.id} | ${mate.id}` : n.id, sub];
+      // on the optical frame above the row, its callouts below
+      labels.push(ctx.callouts.length ? block(ctx, reg, p.x, p.y - f * 1.0, lines, { color: physicalLook(n).name, up: true }) : outward(ctx, reg, p, f * 1.0, lines, { color: physicalLook(n).name }));
+    }
+    // The optical frame's callouts: under each member a router is cabled to, what rides each of its
+    // client ports (`PE-1 2/1 · ch 25`), with a short lead from the box.
+    for (const member of [...new Set(ctx.callouts.map((c) => c.member))]) {
+      if (!ctx.nodes.has(member)) continue;
+      const mine = ctx.callouts.filter((c) => c.member === member);
+      const p = at(member);
+      const top = p.y + f * 1.6;
+      const box = block(ctx, reg, p.x, top, mine.map((c) => c.text), { bold: false, stroke: C.optical });
+      const y0 = Number(/ y="([\d.]+)"/.exec(box)[1]);
+      labels.push(`<g class="callout">${title(mine.map((c) => `${c.router} ${c.routerPort ?? '?'} → ${member} ${c.port ?? '?'}`).join('\n'))}${line({ x: p.x, y: r1(p.y + f * 0.8) }, { x: p.x, y: r1(y0) }, C.optical, r1(f * 0.08))}${box}</g>`);
     }
     // The port badges, link by link and end by end (a fixed order: the same facts, the same picture),
     // clear of the boxes, captions, labels and each other. Drawn with their link, under the boxes.
     taken.push(...reg.filter((r) => !taken.includes(r)));
+    // (a connection over the line system too: the router port at each end, as its cable's)
     const want = linkDraw.flatMap((d, i) => [[d.a, d.b, d.l.a], [d.b, d.a, d.l.b]].map(([from, to, end], e) => ({ i, e, from, to, len: d.len, text: end.port ?? '?', box: boxes.get(end.node), spot: null })));
     for (const step of BADGE_STEPS) {
       for (const b of want) {
@@ -614,6 +702,8 @@ function drawNotes(id, ctx, reg) {
     // below, further above), else the one that overlaps least.
     const w = Math.max(...lines.map((l) => l.length * f * 0.85 * 0.58)) + f * 0.6, h = lines.length * f * 1.15 + f * 0.35;
     const spots = [-h / 2, f * 1.2, -f * 1.2 - h, f * 2.6, -f * 2.6 - h].flatMap((dy) => [f * 2.2, f * 4.4].flatMap((dx) => [[p.x + dx, p.y + dy], [p.x - dx - w, p.y + dy]]));
+    // on the optical frame of a card, under the row's callouts too, centred below the member
+    if (ctx.callouts?.length) spots.push(...[f * 2.6, f * 3.6, f * 4.6].map((dy) => [p.x - w / 2, p.y + dy]));
     const overlap = ([sx, sy]) => (sx < 2 || sx + w > ctx.W - 2 || sy < f * 2.6 || sy + h > H - notesH ? Infinity
       : reg.reduce((k, r) => k + Math.max(0, Math.min(sx + w, r.x + r.w) - Math.max(sx, r.x)) * Math.max(0, Math.min(sy + h, r.y + r.h) - Math.max(sy, r.y)), 0));
     const [sx, sy] = spots.find((q) => overlap(q) === 0) ?? spots.reduce((best, q) => (overlap(q) < overlap(best) ? q : best));

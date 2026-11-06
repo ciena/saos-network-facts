@@ -26,6 +26,14 @@
 //      links cross none is preferred. A last pass swaps devices, or moves one to a spare spot, while
 //      that removes crossings or links through devices (the cycle's devices stay put).
 //   6. Islands (linked to nothing placed) go in a row underneath.
+// Line systems: the members of an optical line system (devices without facts the facts give an
+// equipment role: terminals, OADMs, ROADMs, amplifiers) are drawn on the optical layer, off every other
+// frame. The other devices are laid out without them; then each line system is a row of its own above
+// them, in path order (a terminal, the OADMs or amplifiers, the other terminal), the end cabled to the
+// router further left on the left, spread between its two routers' columns when they are far enough
+// apart, else a column apart centred over them, within max_columns. OADMs cabled to each other (back to
+// back, the express span between them) stand side by side, BACK_TO_BACK apart, one place in the chain.
+// A router cabled only to the line system stands under the member it is cabled to.
 // aspect card: a landscape card, at most `max_columns` columns and wider than tall where it can be. A
 // ladder too long for that runs round a rectangle that wide instead (its rows use the full width; its
 // sides and rotation chosen like the ladder's); a triangle that is the whole core is a V; a column
@@ -59,6 +67,9 @@ export interface LayoutNode {
   host?: boolean;
   /** The IGP area the device is in: the tiers keep the devices of one area together. */
   group?: string | null;
+  /** The equipment role a device without facts has (schema 1.9 devices[].role: terminal, oadm, roadm,
+   * amplifier): with `plain`, a line-system member, laid out as a chain on a row of its own. */
+  equipment?: string | null;
 }
 
 /** A link end: a device name, or an object naming it (`node` as the importer, `device` as a facts file's links[]). */
@@ -68,6 +79,10 @@ export interface LayoutLink {
   id?: string;
   a: LayoutEnd;
   b: LayoutEnd;
+  /** A connection over an optical line system, not a cable (two routers cabled to the same channel port
+   * of its two terminals): it joins its routers in the layout, but a router with nothing else is still
+   * "cabled only to the line system" and stands under its terminal. */
+  lightpath?: boolean;
 }
 
 /** A G.8032 ring: its members (names or { node }) and its links (link ids, or pairs of device names). */
@@ -135,6 +150,7 @@ export function layoutFacts(model: LayoutModel, layout: Layout | null = {}): Lay
 
   const known = new Set(ids);
   const adj = new Map(ids.map((id) => [id, new Set<string>()]));
+  const cabled = new Map(ids.map((id) => [id, new Set<string>()])); // without the lightpaths
   const raw: Array<[string, string]> = []; // every link, in the order given (the force layout's input)
   const linkEnds = new Map<string, [string, string]>();
   for (const l of model.links) {
@@ -145,6 +161,7 @@ export function layoutFacts(model: LayoutModel, layout: Layout | null = {}): Lay
     raw.push([a, b]);
     adj.get(a)!.add(b);
     adj.get(b)!.add(a);
+    if (!l.lightpath) (cabled.get(a)!.add(b), cabled.get(b)!.add(a));
   }
 
   if (algorithm === "force") {
@@ -165,8 +182,118 @@ export function layoutFacts(model: LayoutModel, layout: Layout | null = {}): Lay
 
   const card = opts.aspect === "card";
   const maxColumns = Math.max(1, Math.floor(opts.max_columns ?? 6));
-  return { ...chooseLayout(model, ids, adj, linkEnds, card ? maxColumns : Infinity), warnings };
+  const limit = card ? maxColumns : Infinity;
+  // Line systems: the other devices first, without them, then each line system as a row above.
+  const isMember = (n: LayoutNode) => !!n.plain && !!n.equipment && !n.host;
+  const members = new Set(model.nodes.filter(isMember).map((n) => n.id));
+  if (members.size && members.size < ids.length) {
+    const rest: LayoutModel = {
+      nodes: model.nodes.filter((n) => !members.has(n.id)),
+      links: model.links.filter((l) => !members.has(endName(l.a) ?? "") && !members.has(endName(l.b) ?? "")),
+      rings: model.rings,
+    };
+    const restIds = ids.filter((id) => !members.has(id));
+    const restAdj = new Map(restIds.map((id) => [id, new Set([...adj.get(id)!].filter((x) => !members.has(x)))]));
+    const inner = chooseLayout(rest, restIds, restAdj, linkEnds, limit);
+    const pos = new Map(Object.entries(inner.positions).map(([id, p]) => [id, { ...p }]));
+    const oadms = new Set(model.nodes.filter((n) => members.has(n.id) && isOadm(n)).map((n) => n.id));
+    const rows = lineSystems(pos, ids, cabled, members, oadms, limit);
+    const positions: Record<string, Point> = {};
+    for (const id of ids) positions[id] = { x: round(pos.get(id)!.x), y: round(pos.get(id)!.y) };
+    return { ...inner, positions: normalise(positions), description: `${inner.description}; ${rows.join("; ")}`, warnings };
+  }
+  return { ...chooseLayout(model, ids, adj, linkEnds, limit), warnings };
 }
+
+// An OADM: a line-system member whose equipment role is `oadm` (any case).
+export const isOadm = (n: LayoutNode) => /^oadm$/i.test(n.equipment ?? "");
+
+/** How far apart (in columns) two OADMs cabled back to back stand: their boxes (2.6 font units wide, a
+ * column at least 9.4) touch or nearly so. */
+export const BACK_TO_BACK = 0.3;
+
+// Each line system (a connected piece of `members`) as a row of its own above everything placed, the
+// next one above that: in path order from one end to the other (a piece that is not a path: breadth
+// first from its first name), the end cabled to the router further left on the left. Consecutive
+// `oadms` cabled to each other are one place in the row, side by side BACK_TO_BACK apart. The places
+// are spread evenly between the columns of the routers at the two ends when they are at least a column
+// a place apart, else a column apart centred over them (closer on a card too narrow for that), then
+// shifted to stay within max_columns of the layout. A router cabled to nothing but line systems stands
+// under the member it is cabled to, when that spot is free. Returns what it did, a phrase per line system.
+function lineSystems(pos: Map<string, Point>, ids: string[], adj: Map<string, Set<string>>, members: Set<string>, oadms: Set<string>, maxColumns: number): string[] {
+  const memberIds = ids.filter((id) => members.has(id));
+  const memberAdj = new Map(memberIds.map((id) => [id, new Set([...adj.get(id)!].filter((x) => members.has(x)))]));
+  // Routers cabled to line systems only: they move under their member, so they do not set the row.
+  const onlyOptical = new Set(ids.filter((id) => !members.has(id) && adj.get(id)!.size > 0 && [...adj.get(id)!].every((x) => members.has(x))));
+  const anchorX = (id: string) => {
+    const xs = sortedNames(adj.get(id)!).filter((x) => !members.has(x) && !onlyOptical.has(x) && pos.has(x)).map((x) => pos.get(x)!.x);
+    return xs.length ? xs.reduce((t, v) => t + v, 0) / xs.length : null;
+  };
+  const placed = () => [...pos.values()];
+  const out: string[] = [];
+  let y = pos.size ? Math.min(...placed().map((p) => p.y)) - 1 : 0;
+  for (const piece of components(memberIds, memberAdj)) {
+    const ends = piece.filter((id) => memberAdj.get(id)!.size <= 1);
+    let order: string[] = [];
+    if (piece.length === 1) order = [...piece];
+    else if (ends.length === 2) {
+      order = [ends[0]!];
+      while (order.length < piece.length) {
+        const next = sortedNames(memberAdj.get(order.at(-1)!)!).find((x) => !order.includes(x));
+        if (!next) break;
+        order.push(next);
+      }
+    }
+    if (order.length !== piece.length) {
+      order = [piece[0]!];
+      for (let i = 0; i < order.length; i++) for (const x of sortedNames(memberAdj.get(order[i]!)!)) if (!order.includes(x)) order.push(x);
+    }
+    let xa = anchorX(order[0]!), xb = anchorX(order.at(-1)!);
+    if (xa !== null && xb !== null && xa > xb + 1e-9) {
+      order.reverse();
+      [xa, xb] = [xb, xa];
+    }
+    // The places: OADMs cabled back to back share one.
+    const places: string[][] = [];
+    for (const id of order) {
+      const last = places.at(-1)?.at(-1);
+      if (last && oadms.has(id) && oadms.has(last) && memberAdj.get(last)!.has(id)) places.at(-1)!.push(id);
+      else places.push([id]);
+    }
+    const inner = places.reduce((t, pl) => t + (pl.length - 1) * BACK_TO_BACK, 0);
+    const xs = placed().map((p) => p.x);
+    const mid = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 0;
+    const lo = xa ?? xb ?? mid, hi = xb ?? xa ?? mid;
+    const k = places.length;
+    let step = k > 1 ? Math.max(1, (hi - lo - inner) / (k - 1)) : 0;
+    if (Number.isFinite(maxColumns) && k > 1 && step * (k - 1) + inner > maxColumns - 1) step = Math.max(BACK_TO_BACK, (maxColumns - 1 - inner) / (k - 1));
+    const width = step * (k - 1) + inner;
+    let start = (lo + hi) / 2 - width / 2;
+    if (Number.isFinite(maxColumns) && xs.length) {
+      // Within max_columns of the layout: shifted toward it as far as needed.
+      const end = start + width;
+      const over = Math.max(Math.max(...xs), end) - Math.min(Math.min(...xs), start) - (maxColumns - 1);
+      if (over > 1e-9) start += start < Math.min(...xs) ? Math.min(over, Math.min(...xs) - start) : -Math.min(over, end - Math.max(...xs));
+    }
+    let x = start;
+    for (const pl of places) {
+      pl.forEach((id, j) => pos.set(id, { x: round(x + j * BACK_TO_BACK), y }));
+      x += (pl.length - 1) * BACK_TO_BACK + step;
+    }
+    out.push(`line system ${places.map((pl) => (pl.length > 1 ? `${pl.join(" + ")} back to back` : pl[0])).join(" - ")} in a row above`);
+    y -= 1;
+  }
+  // A router cabled only to line systems: under the member it is cabled to, when no device is there.
+  const top = Math.max(...memberIds.map((id) => pos.get(id)!.y));
+  for (const id of [...onlyOptical].sort(compareNames)) {
+    const near = sortedNames(adj.get(id)!).map((x) => pos.get(x)!);
+    const want = { x: round(near.reduce((t, p) => t + p.x, 0) / near.length), y: top + 1 };
+    if (![...pos].some(([o, p]) => o !== id && Math.hypot(p.x - want.x, p.y - want.y) < SPACE)) pos.set(id, want);
+  }
+  return out;
+}
+
+const sortedNames = (s: Iterable<string>) => [...s].sort(compareNames);
 
 // ---- the candidates and the choice ---------------------------------------------------------------
 

@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { buildNetwork } from '../src/engine/index.js';
 import { importFacts } from '../src/import/facts.js';
-import { LAYERS, mplsRouters, presentLayers, toggleState, transportEndpoints, transportLsps } from '../src/view/layers.js';
+import { LAYERS, mplsRouters, physicalLineSystem, presentLayers, toggleState, transportEndpoints, transportLsps } from '../src/view/layers.js';
 import { LABS } from '../labs.config.js';
 
 const read = (source) => readFileSync(new URL(`../${source}`, import.meta.url), 'utf8');
@@ -123,5 +123,22 @@ describe('toggle state', () => {
     expect(after.cfm).toBe(true); // not in this network: comes back visible in the next one that has it
     expect(after.physical).toBe(true);
     expect(Object.keys(after)).toEqual(LAYERS.map((l) => l.id));
+  });
+});
+
+describe('a line system on the page: router ports on the optical plane, the routers joined through it on physical', () => {
+  test('the line-system lab: the router ports of the cables to the ROADMs; no connection over it (the core link has facts), its routed link over it drawn alike', () => {
+    const ls = physicalLineSystem(netOf(read(LABS.find((l) => l.id === 'line-system').source)));
+    expect(ls.lightpaths).toEqual([]);
+    expect(ls.ports.filter((p) => !p.lightpath).map((p) => [p.node, p.port, p.toward])).toEqual([['PE1', '1', 'ROADM-A'], ['PE1', '2', 'ROADM-A'], ['PE2', '1', 'ROADM-B']]);
+    // the routed core link (over ch 25) on the physical plane: the router port its cable leaves from at each end
+    expect(ls.ports.filter((p) => p.lightpath).map((p) => [p.node, p.port, p.toward])).toEqual([['PE1', '1', 'PE2'], ['PE2', '1', 'PE1']]);
+  });
+  test('routers joined only through it: a dashed connection with its caption, the router port at each end', () => {
+    const file = JSON.parse(read(LABS.find((l) => l.id === 'line-system').source));
+    for (const r of file.devices) if (r.device === 'PE1' || r.device === 'PE2') (r.status = 'skipped'), delete r.facts;
+    const ls = physicalLineSystem(netOf(JSON.stringify(file)));
+    expect(ls.lightpaths.map((l) => [l.a.node, l.a.port, l.b.node, l.b.port, l.over, l.index, l.count])).toEqual([['PE1', '1', 'PE2', '1', 'over ch 25', 0, 1]]);
+    expect(ls.ports.filter((p) => p.lightpath).map((p) => [p.node, p.port, p.toward])).toEqual([['PE1', '1', 'PE2'], ['PE2', '1', 'PE1']]);
   });
 });

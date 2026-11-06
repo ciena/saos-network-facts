@@ -8,6 +8,13 @@ import { isisArea } from '../../../js/src/index.ts';
 import { nodeSid } from '../engine/mpls.js';
 import { drawnLinks, drawnNodes } from '../import/facts.js';
 
+// The router port of a link's cable to a line system (import/facts.js: a routed link over it lists its
+// `cables`), or null.
+const cablePort = (l, node) => {
+  const port = l.cables?.find((c) => c.node === node)?.port;
+  return port == null ? null : String(port);
+};
+
 const OS = { saos10: 'SAOS 10', saos6: 'SAOS 6/8' };
 
 const ringRoleName = (m) => (m.rpl === 'owner' ? 'RPL owner' : m.rpl === 'neighbor' || m.rpl === 'neighbour' ? 'RPL neighbour' : m.terminates ? 'interconnection' : 'member');
@@ -81,10 +88,13 @@ export function renderModel(imp, net) {
       ringOf.set(l, { ring: r.name ?? r.id, type: r.type, rpl: rpl?.node ?? null });
     }
   }
+  // a routed link over the line system shows the router port its cable to the line system leaves from
+  // (as a connection over it does), not the interface name
+  const portOf = (l, end) => (l.over ? cablePort(l, end.node) : null) ?? end.port ?? end.if ?? null;
   const links = drawnLinks(topo).map((l) => ({
     id: l.id,
-    a: { node: l.a.node, port: l.a.port ?? l.a.if ?? null },
-    b: { node: l.b.node, port: l.b.port ?? l.b.if ?? null },
+    a: { node: l.a.node, port: portOf(l, l.a) },
+    b: { node: l.b.node, port: portOf(l, l.b) },
     subnet: l.subnet ?? null,
     metric: l.metric ?? null,
     adj: adj.get(l.id)?.state ?? null,
@@ -94,7 +104,10 @@ export function renderModel(imp, net) {
     medium: l.medium ?? null,
     caption: l.caption ?? null,
     over: l.over ?? null,
+    lightpath: false,
   }));
+  // The connections over a line system (import/facts.js lightpathsOf): drawn on the physical layer only.
+  for (const x of topo.lightpaths ?? []) links.push({ id: x.id, a: { ...x.a }, b: { ...x.b }, subnet: null, metric: null, adj: null, lag: 0, ring: null, plain: false, medium: null, caption: null, over: x.over, lightpath: true, via: x.via });
 
   const pws = (net.vpws?.pseudowires ?? []).map((pw) => {
     const [a, b] = pw.ends;
@@ -188,22 +201,65 @@ export function wrapNote(text, width = 34, max = 3) {
   return lines;
 }
 
-// The part of the model a layer draws. With an optical layer (`split`: the drawing has one), line-system
-// members and the links to them, and the optical spans, are on it, with the routers at their ends; the
-// other layers leave the members and their links out (a link between two routers stays, an optical one
-// too). Without one, every layer has everything, as before.
-export function layerModel(m, id, split) {
-  if (!split) return m;
+// The part of the model a layer draws. With an optical layer (`split`), line-system members and the
+// links to them, and the optical spans, are on it, with the routers at their ends; the protocol layers
+// leave the members and their links out (a link between two routers stays, an optical one too). The
+// physical layer keeps the connections over the line system (lightpaths) and, with `cabling` (the
+// frames), the whole line system too: every cable, so the routers are seen joined through it; without
+// (the snapshot, whose optical plane is under it) it leaves the members out like the others. Without an
+// optical layer, every layer has everything. Never an express span (isExpress); lightpaths on physical only.
+export function layerModel(m, id, split, { cabling = false } = {}) {
+  const shown = m.links.filter((l) => !isExpress(m, l) && (id === 'physical' || !l.lightpath));
+  if (!split) return shown.length === m.links.length ? m : { ...m, links: shown };
   const members = new Set(m.nodes.filter((n) => n.member).map((n) => n.id));
   const toMember = (l) => members.has(l.a.node) || members.has(l.b.node);
   if (id === 'optical') {
-    const links = m.links.filter((l) => toMember(l) || l.medium === 'optical');
+    const links = shown.filter((l) => toMember(l) || l.medium === 'optical');
     const ends = new Set(links.flatMap((l) => [l.a.node, l.b.node]));
     const nodes = m.nodes.filter((n) => n.member || ends.has(n.id));
     return { ...m, nodes, links, sites: sitesOf(m, nodes) };
   }
+  if (id === 'physical' && cabling) return { ...m, links: shown };
   const nodes = m.nodes.filter((n) => !n.member);
-  return { ...m, nodes, links: m.links.filter((l) => !toMember(l)), sites: sitesOf(m, nodes) };
+  return { ...m, nodes, links: shown.filter((l) => !toMember(l)), sites: sitesOf(m, nodes) };
+}
+
+// The part of the model a 2D card's frame draws in a lab with a line system (frames.js; the 3D page and
+// the snapshot use layerModel). The optical frame: the line system alone, its members and the spans
+// between them (an optical link between two routers too, with them), and a callout for each router
+// cable to a member: `PE-1 2/1 · ch 25` at the member, the cable's label as its channel, else `ch N`
+// for a port that is a number, else the port. Every other frame: the devices off the line system, and on
+// the physical frame each connection over it (lightpath) between its routers. Never an express span.
+export function cardLayer(m, id) {
+  const members = new Set(m.nodes.filter((n) => n.member).map((n) => n.id));
+  const toMember = (l) => members.has(l.a.node) || members.has(l.b.node);
+  const shown = m.links.filter((l) => !isExpress(m, l) && (id === 'physical' || !l.lightpath));
+  if (id === 'optical') {
+    const links = shown.filter((l) => !l.lightpath && (members.has(l.a.node) && members.has(l.b.node) || (l.medium === 'optical' && !toMember(l))));
+    const ends = new Set(links.flatMap((l) => [l.a.node, l.b.node]));
+    const nodes = m.nodes.filter((n) => n.member || ends.has(n.id));
+    const callouts = [];
+    for (const l of shown) {
+      if (l.lightpath || members.has(l.a.node) === members.has(l.b.node)) continue;
+      const [mem, rtr] = members.has(l.a.node) ? [l.a, l.b] : [l.b, l.a];
+      const channel = l.caption ?? (/^\d+$/.test(String(mem.port ?? '')) ? `ch ${mem.port}` : mem.port ?? '?');
+      callouts.push({ member: mem.node, port: mem.port ?? null, router: rtr.node, routerPort: rtr.port ?? null, text: `${rtr.node} ${rtr.port ?? '?'} · ${channel}` });
+    }
+    return { ...m, nodes, links, sites: sitesOf(m, nodes), callouts };
+  }
+  const nodes = m.nodes.filter((n) => !n.member);
+  return { ...m, nodes, links: shown.filter((l) => !toMember(l)), sites: sitesOf(m, nodes) };
+}
+
+// A lab with an optical line system: its members are off the protocol layers.
+export const hasLineSystem = (m) => m.nodes.some((n) => n.member) || m.links.some((l) => l.medium === 'optical');
+
+// The express span of two OADMs cabled back to back (both line-system members with the equipment role
+// `oadm`, any case): left out of the drawings, where the two stand side by side (js/src/layout.ts
+// BACK_TO_BACK) and express traffic is implied. The facts and the model keep the link.
+export function isExpress(m, l) {
+  const oadm = (id) => { const n = m.nodes.find((x) => x.id === id); return !!n?.member && /^oadm$/i.test(n.equipment ?? ''); };
+  return l.a.node !== l.b.node && oadm(l.a.node) && oadm(l.b.node);
 }
 
 const sitesOf = (m, nodes) => {

@@ -9,6 +9,7 @@ import { describe, expect, test } from 'vitest';
 import { labName, main, parseArgs } from '../bin/saos-network-facts-render.mjs';
 import { framePngs, pngName } from '../src/render/png.js';
 import { frameStyle } from '../src/render/frames.js';
+import { importFacts } from '../src/import/facts.js';
 import { frameLayers, frames, prepare, snapshot } from '../src/render/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -81,6 +82,82 @@ describe('frames', () => {
     const ids = frames(JSON.stringify(file)).frames.map((f) => f.id);
     expect(ids).toContain('mpls');
     expect(ids).not.toContain('pw');
+  });
+
+  test('routers joined only through the line system: the connection over it on physical, callouts on optical', () => {
+    // the line-system lab with its routers' facts left out: the PE1-PE2 core link (from the facts) goes,
+    // their cables to the ROADMs stay; PE1 1 and PE2 1 are cabled to the same port (add-1) of the two ROADMs
+    const file = JSON.parse(read(LABS['line-system']));
+    for (const r of file.devices) if (r.device === 'PE1' || r.device === 'PE2') (r.status = 'skipped'), delete r.facts;
+    const r = frames(JSON.stringify(file), { preset: 'card-frames' });
+    expect(r.frames.map((f) => f.id)).toEqual(['optical', 'physical']);
+    expect(r.start).toBe('physical');
+    const [optical, physical] = r.svg.split('id="f-physical"');
+    // physical: the two routers alone, joined by one connection over the line system, PE1 1 to PE2 1,
+    // labelled with its channel (the two cables' label, ch 25), a rainbow of dashes (a dash of each of
+    // six colours in turn), the router port badged at each end; the dark ch 26 cable (PE1 2, no far end) none
+    expect(r.svg).toMatch(/data-title="Physical · 2 devices \(SAOS 10, no facts\), 1 over the line system · 2 sites"/);
+    expect(physical).not.toContain('class="link-optical"');
+    expect(physical.match(/class="lightpath"/g)).toHaveLength(1);
+    const lp = physical.slice(physical.indexOf('<g class="lightpath">')).split('</g>')[0];
+    expect(lp.match(/<rect [^>]*stroke="#9aa4b1"[^>]*\/><text [^>]*>1<\/text>/g)).toHaveLength(2);
+    expect(lp).toMatch(/^<g class="lightpath"><title>PE1 1 — PE2 1\nover ch 25: through ROADM-A … ROADM-B<\/title><line [^>]*stroke-dasharray/);
+    expect(new Set([...lp.matchAll(/<line [^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dashoffset/g)].map((m) => m[1])).size).toBe(6);
+    expect(lp).toContain('>ch 25</text>');
+    expect(physical).not.toContain('>over ch 25</text>');
+    // optical: the line system, a callout at each ROADM port a router is cabled to
+    const callouts = [...optical.matchAll(/<g class="callout">[\s\S]*?<\/g>/g)].map((m) => [...m[0].matchAll(/>([^<>]+)<\/text>/g)].map((t) => t[1]));
+    expect(callouts).toEqual([['PE1 1 · ch 25', 'PE1 2 · ch 26 · dark'], ['PE2 1 · ch 25']]);
+    expect(optical).not.toContain('class="lightpath"');
+    expect(r.model.links.filter((l) => l.lightpath).map((l) => [l.a, l.b, l.over])).toEqual([[{ node: 'PE1', port: '1' }, { node: 'PE2', port: '1' }, 'over ch 25']]);
+    // drawn only: not a link of the engine's network
+    const imp = importFacts(JSON.stringify(file));
+    expect(imp.topology.lightpaths.map((l) => l.id)).toEqual(['PE1~PE2~add-1']);
+    expect([...imp.topology.links, ...imp.topology.plain.links].some((l) => l.lightpath)).toBe(false);
+    // the cards lay the routers out without the line system, the connection an ordinary link: side by
+    // side; the 3D page's layout keeps each under its ROADM
+    const { positions: p, cardPositions: c } = prepare(JSON.stringify(file), { preset: 'card-frames' });
+    expect(Object.keys(c).sort()).toEqual(['PE1', 'PE2']);
+    expect(c.PE1.y).toBe(c.PE2.y);
+    expect([p.PE1.x, p.PE2.x]).toEqual([p['ROADM-A'].x, p['ROADM-B'].x]);
+    // a view without the optical layer: the physical frame draws the line system with every cable too
+    const bare = frames(JSON.stringify(file), { layers: ['physical'] });
+    expect(bare.frames.map((f) => f.id)).toEqual(['physical']);
+    expect(bare.svg.match(/class="link-optical"/g)).toHaveLength(5);
+    expect(bare.svg.match(/class="lightpath"/g)).toHaveLength(1);
+    // a channel port that is a number and cables without a label: `ch N`
+    const unlabelled = JSON.parse(JSON.stringify(file));
+    for (const l of unlabelled.links) {
+      delete l.label;
+      for (const e of [l.a, l.b]) if (e.port === 'add-1') e.port = '25';
+    }
+    const u = frames(JSON.stringify(unlabelled), { preset: 'card-frames' }).svg;
+    expect(u.split('id="f-physical"')[1]).toContain('>ch 25</text>');
+    expect(u.split('id="f-physical"')[0]).toContain('>PE1 1 · ch 25</text>');
+  });
+
+  test('two OADMs cabled back to back stand side by side and their express span is not drawn', () => {
+    // the line-system lab with ROADM-A and AMP-1 made OADMs: the span between them is their express span
+    const file = JSON.parse(read(LABS['line-system']));
+    for (const r of file.devices) if (r.device === 'ROADM-A' || r.device === 'AMP-1') r.role = 'oadm';
+    const r = frames(JSON.stringify(file), { preset: 'card-frames' });
+    // one label over the pair, names left to right, on the optical frame
+    expect(r.svg).toMatch(/>(ROADM-A \| AMP-1|AMP-1 \| ROADM-A)<\/text>/);
+    expect(r.svg).not.toMatch(/>AMP-1<\/text>/);
+    expect(r.svg).not.toContain('span 1 · 40 km');
+    expect(r.svg).toContain('span 2 · 38 km');
+    expect(r.svg).toMatch(/data-title="Optical · 3 line-system members, 1 span/);
+    // a view without the optical layer, the line system on the physical frame: left out there too
+    const flat = frames(JSON.stringify(file), { layers: ['physical'] });
+    expect(flat.svg).not.toContain('span 1 · 40 km');
+    expect(flat.svg).toMatch(/data-title="Physical · 5 devices [^"]*, 5 links \(4 optical\)/);
+    // the facts keep the link; the layout puts the two a box apart, the rest of the chain a column apart
+    expect(r.model.links.some((l) => [l.a.node, l.b.node].sort().join() === 'AMP-1,ROADM-A')).toBe(true);
+    const { positions: p } = prepare(JSON.stringify(file), { preset: 'card-frames' });
+    expect(Math.abs(p['ROADM-A'].x - p['AMP-1'].x)).toBeCloseTo(0.3, 5);
+    expect(Math.abs(p['AMP-1'].x - p['ROADM-B'].x)).toBeGreaterThanOrEqual(0.99);
+    // as given (ROADMs and an amplifier), every span is drawn
+    expect(frames(read(LABS['line-system']), { preset: 'card-frames' }).svg).toContain('span 1 · 40 km');
   });
 
   test('the view picks frames and the start frame; empty layers make none', () => {

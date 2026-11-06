@@ -79,12 +79,22 @@ blue tube with its label); a plain box whose record has a `role` (a line-system 
 optical spans the page has an `optical` layer under the physical one (`LAYERS`; physical moves up one gap,
 so physical-plane code places things at `layerY('physical')`, not 0): the members, the spans and links to
 them, and a disc for each router at a span's end, whose pillar starts there; the physical plane leaves them
-out, and a routed link whose ports are cabled by optical spans carries `over` (`over ch 25`) as its label.
+out, and a routed link whose ports are cabled by optical spans (`over`, `over ch 25`) is drawn as a
+connection over the line system: a rainbow of dashes over a thin core (which carries the walk's highlight;
+red when it is down), the router port its cable leaves from at each end.
+The physical plane joins two routers cabled to the same port of two members of one line system with a
+`over ch N` connection drawn as a rainbow of dashes (`topology.lightpaths`), the router port at each end; the optical plane
+labels each router end of a cable with its port (`physicalLineSystem`, `buildPorts`).
 A view without `optical` keeps everything on the physical plane; devices and hosts get their
 `site`, and `topology.sites` (`[{ name, nodes }]`) is a dashed outline round each site's devices on the
 physical plane; `topology.notes` (`[{ text, device, layer }]`) are yellow labels on their layer (physical
-when the page does not show it), above their device or at the plane's corner. The frames and the snapshot
-draw the same.
+when the page does not show it), above their device or just in front of the plane's corner. The frames and the snapshot
+draw the same. The layout lays a line system out as a chain on a row of its own above the routers, terminal to
+terminal, two OADMs cabled back to back side by side with their express span left out. The frames draw
+the line system on an optical frame with a callout at each member port a router is cabled to
+(`render/model.js` `cardLayer`), and the routers on the physical frame, laid out without the line system
+(`cardLayout`), two routers cabled to the same channel port of its two terminals joined by a `ch N`
+connection drawn as a rainbow of dashes (`src/rainbow.js`), each router's port badged.
 
 IPv6: a link may be an IPv6 subnet (link-local addresses never link), and a router whose IS-IS
 interfaces carry IPv6 only, or whose loopback has no IPv4 address, runs IS-IS, BGP and the label

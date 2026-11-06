@@ -34,14 +34,18 @@ describe('import', () => {
     expect([core.kind, core.medium, core.over, buildNetwork(imp.topology).igp.adjacencies.find((a) => a.link === 'PE1-PE2')?.state]).toEqual(['core', undefined, 'over ch 25', 'Up']);
   });
 
-  test('sites, notes, and the layout puts the line system on the core ladder', () => {
+  test('sites, notes, and the layout lays the line system out as a chain on a row of its own', () => {
     expect(imp.topology.sites).toEqual([{ name: 'east', nodes: ['PE1', 'ROADM-A'] }, { name: 'west', nodes: ['PE2', 'ROADM-B'] }]);
     expect(imp.topology.notes).toEqual([
       { text: 'in-line amplifier hut, no site of its own', device: 'AMP-1', layer: null },
       { text: 'PE1-PE2 core link rides ch 25; ch 26 is lit on ROADM-A only', device: null, layer: null },
     ]);
-    expect(imp.layout.method).toBe('ladder');
-    expect(imp.layout.core).toEqual(['AMP-1', 'PE1', 'PE2', 'ROADM-A', 'ROADM-B']);
+    // the routers laid out without the line system, the line system a row above them in path order
+    expect(imp.layout.core).toEqual(['PE1', 'PE2']);
+    expect(imp.layout.description).toMatch(/; line system ROADM-A - AMP-1 - ROADM-B in a row above$/);
+    const p = imp.layout.positions;
+    expect(new Set(['ROADM-A', 'AMP-1', 'ROADM-B'].map((id) => p[id].y)).size).toBe(1);
+    expect(p['ROADM-A'].x < p['AMP-1'].x && p['AMP-1'].x < p['ROADM-B'].x && p['ROADM-A'].y < p.PE1.y).toBe(true);
     expect(nodes.get('PE1').site).toBe('east');
   });
 
@@ -66,31 +70,41 @@ describe('import', () => {
 describe('frames and snapshot', () => {
   const group = (svg, id) => svg.split(/(?=<g class="frame[ a-z0-9]*")/).find((g) => g.includes(`id="f-${id}"`));
 
-  test('the optical frame: the line system (spans with captions, members tagged) and the routers at its ends', () => {
+  test('two frames: the line system on the optical frame with callouts, the routers on the physical frame', () => {
     const r = frames(text, { preset: 'card-frames' });
     expect(r.frames.map((x) => x.id)).toEqual(['optical', 'physical', 'role', 'igp', 'bgp', 'pw']);
+    // the start frame stays the signature one
+    expect(r.start).toBe('pw');
     const optical = group(r.svg, 'optical');
-    expect(optical.match(/class="link-optical"/g)).toHaveLength(5);
-    for (const caption of ['ch 25', 'ch 26 · dark', 'span 1 · 40 km', 'span 2 · 38 km']) expect(optical).toContain(`>${caption}</text>`);
-    // the routers at the spans' ends by their type (5164, 5162), as on the physical frame
-    for (const tag of ['ROADM', 'AMP', '5164', '5162']) expect(optical).toContain(`>${tag}</text>`);
+    // the members and the spans between them; no router, no router cable: a callout at each member port
+    // a router is cabled to, its channel the cable's label
+    expect(optical.match(/class="link-optical"/g)).toHaveLength(2);
+    for (const caption of ['span 1 · 40 km', 'span 2 · 38 km']) expect(optical).toContain(`>${caption}</text>`);
+    for (const tag of ['ROADM', 'AMP']) expect(optical).toContain(`>${tag}</text>`);
+    for (const tag of ['5164', '5162']) expect(optical).not.toContain(`>${tag}</text>`);
+    const callouts = [...optical.matchAll(/<g class="callout">[\s\S]*?<\/g>/g)].map((m) => [...m[0].matchAll(/>([^<>]+)<\/text>/g)].map((t) => t[1]));
+    expect(callouts).toEqual([['PE1 1 · ch 25', 'PE1 2 · ch 26 · dark'], ['PE2 1 · ch 25']]);
     expect(optical.match(/<g class="site">/g)).toHaveLength(2);
-    // the note on AMP-1 (no layer of its own) goes with AMP-1, on the optical frame
     expect(optical).toContain('>in-line amplifier hut, no</text>');
-    expect(r.svg).toMatch(/data-title="Optical · 3 line-system members, 5 spans · 2 sites"/);
-  });
-
-  test('the physical frame: the routers and the routed link over the line system; sites; the free note', () => {
-    const r = frames(text, { preset: 'card-frames' });
+    expect(r.svg).toMatch(/data-title="Optical · 3 line-system members, 2 spans · 2 sites"/);
+    // the physical frame: the routers and the facts' routed link over the line system, nothing derived;
+    // the routed link drawn as a connection over it: a rainbow of dashes captioned with its channel,
+    // the router port badged at each end
     const physical = group(r.svg, 'physical');
-    expect(physical).not.toContain('link-optical');
+    expect(physical).not.toContain('class="link-optical"');
     expect(physical).not.toContain('>ROADM</text>');
-    expect(physical).toContain('>over ch 25</text>');
+    expect(physical).toContain('>ch 25</text>');
+    expect(physical).not.toContain('>over ch 25</text>');
+    // (its router ports those its cables to the line system leave from, as a connection over it shows)
+    const core = physical.slice(physical.indexOf('<g><title>PE1 1 — PE2 1')).split('</g>')[0];
+    expect(new Set([...core.matchAll(/<line [^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dashoffset/g)].map((m) => m[1])).size).toBe(6);
+    expect([...core.matchAll(/<rect [^>]*stroke="#9aa4b1"[^>]*\/><text [^>]*>([^<]+)<\/text>/g)].map((m) => m[1])).toEqual(['1', '1']);
+    expect(physical).not.toContain('class="lightpath"');
     expect(physical.match(/<g class="site">/g)).toHaveLength(2);
-    expect(physical.match(/<g class="note">/g)).toHaveLength(1);
     expect(r.svg).toMatch(/data-title="Physical · 2 devices \(SAOS 10\), 1 link · 2 sites"/);
-    // the other frames leave the line system out too; notes only on their own frame
+    // the other frames leave the line system out
     expect(group(r.svg, 'igp')).not.toContain('ROADM-A');
+    expect(group(r.svg, 'role')).not.toContain('ROADM-A');
     expect(r.svg.match(/<g class="note">/g)).toHaveLength(2);
   });
 
@@ -122,9 +136,26 @@ describe('frames and snapshot', () => {
     expect(plane('optical')).toContain('>AMP-1  AMP</text>');
     expect(plane('physical')).not.toContain('link-optical');
     expect(plane('physical')).toContain('>over ch 25</text>');
+    // the routed link over the line system: a rainbow of dashes, as a connection over it
+    expect(new Set([...plane('physical').matchAll(/<line [^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dashoffset/g)].map((m) => m[1])).size).toBe(6);
     // members have no riser; the PEs rise from the optical plane
     expect(r.svg).not.toMatch(/class="pillar" data-layers="optical"/);
     expect(r.svg.match(/class="pillar" data-layers="physical optical/g)).toHaveLength(2);
+  });
+
+  test('the snapshot: routers joined only through the line system, a rainbow connection with their ports on physical', () => {
+    const file = JSON.parse(text);
+    for (const d of file.devices) if (d.device === 'PE1' || d.device === 'PE2') (d.status = 'skipped'), delete d.facts;
+    const r = snapshot(JSON.stringify(file));
+    expect(r.layers).toEqual(['optical', 'physical']);
+    // on the physical plane, over the optical plane's line system
+    const physical = r.svg.split(/(?=<g class="layer")/).find((g) => g.includes('data-layer="physical"'));
+    const lp = physical.slice(physical.indexOf('<g class="lightpath">')).split('</g>')[0];
+    expect(lp).toMatch(/<title>PE1 1 — PE2 1\nover ch 25<\/title><line [^>]*stroke-dasharray="4 20"/);
+    // a rainbow of dashes: a dash of each of six colours in turn
+    expect(new Set([...lp.matchAll(/<line [^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dashoffset/g)].map((m) => m[1])).size).toBe(6);
+    expect(lp.match(/>1<\/text>/g)).toHaveLength(2);
+    expect(lp).toContain('>over ch 25</text>');
   });
 });
 
