@@ -41,12 +41,10 @@ export function frameLayers(model, view) {
   return viewFrames(view, present.includes('pw') ? present.filter((id) => id !== 'mpls') : present);
 }
 
-// `opts.underlay`: how the physical frame draws a connection over the line system, 'dashed' (blue) or
-// 'rainbow' (a dash of each colour in turn, for a wavelength).
-export function frames(facts, view, params, opts = {}) {
+export function frames(facts, view, params, opts) {
   const p = prepare(facts, view, params, opts);
   const { frames: list, start } = frameLayers(p.model, p.view);
-  const out = renderFrames(p.model, p.positions, { frames: list.length ? list : ['physical'], start: start ?? 'physical', period: p.view.frames.period_s, cardPositions: p.cardPositions, underlay: opts.underlay });
+  const out = renderFrames(p.model, p.positions, { frames: list.length ? list : ['physical'], start: start ?? 'physical', period: p.view.frames.period_s, cardPositions: p.cardPositions });
   return { ...out, view: p.view, warnings: p.warnings, model: p.model };
 }
 

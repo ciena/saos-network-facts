@@ -94,20 +94,17 @@ describe('frames', () => {
     expect(r.start).toBe('physical');
     const [optical, physical] = r.svg.split('id="f-physical"');
     // physical: the two routers alone, joined by one connection over the line system, PE1 1 to PE2 1,
-    // labelled with its channel (the two cables' label, ch 25), dashed blue, the router port badged at
-    // each end; the dark ch 26 cable (PE1 2, no far end) none
+    // labelled with its channel (the two cables' label, ch 25), a rainbow of dashes (a dash of each of
+    // six colours in turn), the router port badged at each end; the dark ch 26 cable (PE1 2, no far end) none
     expect(r.svg).toMatch(/data-title="Physical · 2 devices \(SAOS 10, no facts\), 1 over the line system · 2 sites"/);
     expect(physical).not.toContain('class="link-optical"');
     expect(physical.match(/class="lightpath"/g)).toHaveLength(1);
     const lp = physical.slice(physical.indexOf('<g class="lightpath">')).split('</g>')[0];
     expect(lp.match(/<rect [^>]*stroke="#9aa4b1"[^>]*\/><text [^>]*>1<\/text>/g)).toHaveLength(2);
-    expect(lp).toMatch(/^<g class="lightpath"><title>PE1 1 — PE2 1\nover ch 25: through ROADM-A … ROADM-B<\/title><line [^>]*stroke="#3b5bdb"[^>]*stroke-dasharray/);
+    expect(lp).toMatch(/^<g class="lightpath"><title>PE1 1 — PE2 1\nover ch 25: through ROADM-A … ROADM-B<\/title><line [^>]*stroke-dasharray/);
+    expect(new Set([...lp.matchAll(/<line [^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dashoffset/g)].map((m) => m[1])).size).toBe(6);
     expect(lp).toContain('>ch 25</text>');
     expect(physical).not.toContain('>over ch 25</text>');
-    // the rainbow style: a dash of each of six colours in turn
-    const rainbow = frames(JSON.stringify(file), { preset: 'card-frames' }, undefined, { underlay: 'rainbow' }).svg.split('id="f-physical"')[1];
-    const rlp = rainbow.slice(rainbow.indexOf('<g class="lightpath">')).split('</g>')[0];
-    expect(new Set([...rlp.matchAll(/<line [^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dashoffset/g)].map((m) => m[1])).size).toBe(6);
     // optical: the line system, a callout at each ROADM port a router is cabled to
     const callouts = [...optical.matchAll(/<g class="callout">[\s\S]*?<\/g>/g)].map((m) => [...m[0].matchAll(/>([^<>]+)<\/text>/g)].map((t) => t[1]));
     expect(callouts).toEqual([['PE1 1 · ch 25', 'PE1 2 · ch 26 · dark'], ['PE2 1 · ch 25']]);

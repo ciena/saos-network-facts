@@ -12,6 +12,7 @@
 //   <img src="frames.svg">        the start frame (the view's frames.start, by default the signature layer)
 // A page that inlines the SVG can show one group at a time itself (a card that rotates).
 
+import { RAINBOW } from '../rainbow.js';
 import { cardLayer, deviceDetail, equipmentTag, hasLineSystem, isExpress, isRouter, layerModel, noteLayerOf, typeTag, wrapNote } from './model.js';
 
 const C = {
@@ -90,7 +91,7 @@ export function frameTitle(id, m) {
 }
 
 // frames: the layer ids in order (js/src/view.ts viewFrames), start: the one shown by the bare file.
-export function renderFrames(m, positions, { frames, start, period = 4, cardPositions = null, underlay = 'dashed' }) {
+export function renderFrames(m, positions, { frames, start, period = 4, cardPositions = null }) {
   // A lab with a line system (model.js hasLineSystem): the line system on an optical frame of its own,
   // at its places in `positions`, a callout at each member port a router is cabled to; the routers on
   // the other frames, at their places in `cardPositions` (laid out without the line system, each
@@ -155,7 +156,7 @@ export function renderFrames(m, positions, { frames, start, period = 4, cardPosi
     set.at = (id) => ({ x: r1(set.ox + mx + (P[id].x - set.minX) * U + (set.pull.get(id) ?? 0)), y: r1(myTop + (P[id].y - set.minY) * V) });
   }
   const nodes = new Map(m.nodes.map((n) => [n.id, n]));
-  const ctx = { model: m, full: m, at: sets[0]?.at, f, nodes, W, H, frames, notesH, underlay };
+  const ctx = { model: m, full: m, at: sets[0]?.at, f, nodes, W, H, frames, notesH };
   const order = start && frames.includes(start) ? [...frames.filter((x) => x !== start), start] : frames;
 
   const open = `<svg xmlns="http://www.w3.org/2000/svg" class="netfacts-frames" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" data-frames="${frames.join(' ')}" data-start="${start ?? ''}">`;
@@ -237,10 +238,8 @@ function outward(ctx, reg, p, gap, lines, opts = {}) {
   return block(ctx, reg, p.x, below ? p.y + gap : p.y - gap, lines, { ...opts, up: !below });
 }
 
-// A connection over the line system: dashed blue, or a rainbow (six colours, a dash each in turn).
-const RAINBOW = ['#e03131', '#f08c00', '#e6b800', '#2f9e44', '#1c7ed6', '#7048e8'];
-function underlayLine(a, b, f, style = 'dashed') {
-  if (style !== 'rainbow') return line(a, b, C.optical, r1(f * 0.16), ` stroke-dasharray="${r1(f * 0.5)} ${r1(f * 0.35)}"`);
+// A connection over the line system: a rainbow of dashes (six colours, a dash each in turn), a wavelength.
+function underlayLine(a, b, f) {
   const d = f * 0.6;
   return RAINBOW.map((c, i) => line(a, b, c, r1(f * 0.2), ` stroke-dasharray="${r1(d * 0.8)} ${r1(d * RAINBOW.length - d * 0.8)}" stroke-dashoffset="${r1(-i * d)}"`)).join('');
 }
@@ -372,12 +371,12 @@ function draw(id, ctx) {
       const caption = l.lightpath ? l.over.replace(/^over /, '') : l.caption ?? l.over;
       const tip = l.lightpath ? `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}\n${l.over}: through ${l.via.join(' … ')}` : `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium ? `\n${l.medium}${l.caption ? `: ${l.caption}` : ''}` : l.caption ? `\n${l.caption}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}`;
       // An optical span: a fibre, drawn as a blue double line (white core). A connection over the line
-      // system (not a cable, an underlay): a dashed line between its routers, blue or (`underlay`
-      // 'rainbow') a dash of each colour in turn, for a wavelength.
+      // system (not a cable, an underlay): a rainbow of dashes between its routers (a dash of
+      // each colour in turn), for a wavelength.
       const body = l.medium === 'optical'
         ? `${line(a, b, C.optical, f * 0.42, ' stroke-linecap="round"')}${line(a, b, '#fff', f * 0.14, ' stroke-linecap="round"')}`
         : l.lightpath
-          ? underlayLine(a, b, f, ctx.underlay)
+          ? underlayLine(a, b, f)
           : line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '');
       // The caption on the link, staggered along parallel links; the port pills only where they fit
       // between the device and the caption (else the ports are in the hover title only).

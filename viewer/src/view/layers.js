@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { hostPrefix } from '../engine/ip.js';
 import { prefixSidLabel } from '../engine/mpls.js';
+import { RAINBOW } from '../rainbow.js';
 import { DEFAULT_LABELS, bgpLabel, lagLabel, nodeLabel } from './labels.js';
 
 // One plane per layer, LAYER_GAP apart in this order, for the layers the network has something on.
@@ -223,6 +224,21 @@ function dashed(points, color, opacity = 1) {
   return line;
 }
 
+// A connection over the line system: a rainbow of dashes (src/rainbow.js), one dashed line per colour,
+// each starting a dash further along.
+function rainbow(points, dash = 0.6) {
+  const g = new THREE.Group();
+  RAINBOW.forEach((c, k) => {
+    const line = dashed(points, new THREE.Color(c).getHex(), 0.95);
+    const dist = line.geometry.getAttribute('lineDistance');
+    for (let i = 0; i < dist.count; i++) dist.setX(i, dist.getX(i) + (RAINBOW.length - k) * dash);
+    line.material.dashSize = dash;
+    line.material.gapSize = dash * (RAINBOW.length - 1);
+    g.add(line);
+  });
+  return g;
+}
+
 function solid(points, color, opacity = 1) {
   const geo = new THREE.BufferGeometry().setFromPoints(points);
   return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity }));
@@ -378,7 +394,7 @@ export class LayerView {
       }
     }
     // With an optical plane, the line system is drawn there, not here; here, the routers joined through it
-    // (dashed `over ch N`, the router port at each end). Without one, all of it is drawn here.
+    // (a rainbow of dashes, `over ch N`, the router port at each end). Without one, all of it is drawn here.
     const split = this.present.includes('optical');
     const members = new Set((net.topo.plain?.nodes ?? []).filter((n) => n.equipment).map((n) => n.id));
     const onOptical = (l) => members.has(l.a.node) || members.has(l.b.node) || l.medium === 'optical';
@@ -388,7 +404,7 @@ export class LayerView {
     for (const l of ls.lightpaths) {
       const a = this.pos(l.a.node).setY(Y + 0.6), b = this.pos(l.b.node).setY(Y + 0.6);
       const off = memberOffset(a, b, l.index, l.count, 1.2);
-      g.add(dashed([a.clone().add(off), b.clone().add(off)], OPTICAL, 0.95));
+      g.add(rainbow([a.clone().add(off), b.clone().add(off)]));
       // side by side connections: their captions staggered along the line, apart
       g.add(label(l.over, 'edge-label optical', new THREE.Vector3().lerpVectors(a, b, 0.5 + (l.index - (l.count - 1) / 2) * 0.16).add(off).setY(Y + 1.4)));
     }

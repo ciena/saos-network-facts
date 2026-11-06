@@ -51,10 +51,10 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   router is cabled to a callout naming what rides it, `PE-1 2/1 · ch 25` (the cable's label as its channel,
   else `ch N` for a numbered port), instead of the router and its cable. The physical frame draws the
   routers: two routers cabled to the same port of two members of one line system (a terminal's channel
-  port) are joined by a connection over it, a dashed line labelled with its channel (`ch 25`), the router
+  port) are joined by a connection over it, a rainbow of dashes (a dash of each of six colours in turn, for a
+  wavelength) labelled with its channel (`ch 25`), the router
   port badged at each end, derived from the cabling (`topology.lightpaths`, `lightpathsOf` in the
-  importer), drawn only, never on a protocol frame, not a link of the 3D view's network. `frames()` draws
-  it dashed blue, or with `underlay: 'rainbow'` as a dash of each of six colours in turn. Where the facts
+  importer), drawn only, never on a protocol frame, not a link of the 3D view's network. Where the facts
   give a routed link over the line system, its own `over` caption says so and nothing is derived. The
   frames other than optical lay their devices out without the line system, each connection over it an
   ordinary link (the importer's `cardLayout`), so the chain no longer pushes the routers apart; the
@@ -64,7 +64,7 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 - **3D view and snapshot: the physical plane shows the routers joined through the line system** — the 3D
   page and the snapshot keep their optical plane under the physical one (the members, the spans, the
   router cables, each router end now labelled with its port on the page), and their physical plane now
-  joins the routers too: each connection over the line system is a dashed blue line captioned
+  joins the routers too: each connection over the line system is a rainbow of dashes captioned
   `over ch 25`, with the router port at each end (`physicalLineSystem` in `view/layers.js`; the snapshot
   badges it as a cable). Without an optical plane (a view that leaves it out) the page's physical plane
   draws all of it. Two OADMs back to back share one label (`OADM-1 | OADM-2 oadm`) and their express span

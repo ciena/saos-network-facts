@@ -134,7 +134,7 @@ describe('frames and snapshot', () => {
     expect(r.svg.match(/class="pillar" data-layers="physical optical/g)).toHaveLength(2);
   });
 
-  test('the snapshot: routers joined only through the line system, a dashed connection with their ports on physical', () => {
+  test('the snapshot: routers joined only through the line system, a rainbow connection with their ports on physical', () => {
     const file = JSON.parse(text);
     for (const d of file.devices) if (d.device === 'PE1' || d.device === 'PE2') (d.status = 'skipped'), delete d.facts;
     const r = snapshot(JSON.stringify(file));
@@ -142,7 +142,9 @@ describe('frames and snapshot', () => {
     // on the physical plane, over the optical plane's line system
     const physical = r.svg.split(/(?=<g class="layer")/).find((g) => g.includes('data-layer="physical"'));
     const lp = physical.slice(physical.indexOf('<g class="lightpath">')).split('</g>')[0];
-    expect(lp).toMatch(/<title>PE1 1 — PE2 1\nover ch 25<\/title><line [^>]*stroke-dasharray="6 4"/);
+    expect(lp).toMatch(/<title>PE1 1 — PE2 1\nover ch 25<\/title><line [^>]*stroke-dasharray="4 20"/);
+    // a rainbow of dashes: a dash of each of six colours in turn
+    expect(new Set([...lp.matchAll(/<line [^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dashoffset/g)].map((m) => m[1])).size).toBe(6);
     expect(lp.match(/>1<\/text>/g)).toHaveLength(2);
     expect(lp).toContain('>over ch 25</text>');
   });

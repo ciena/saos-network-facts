@@ -81,7 +81,7 @@ so physical-plane code places things at `layerY('physical')`, not 0): the member
 them, and a disc for each router at a span's end, whose pillar starts there; the physical plane leaves them
 out, and a routed link whose ports are cabled by optical spans carries `over` (`over ch 25`) as its label.
 The physical plane joins two routers cabled to the same port of two members of one line system with a
-dashed `over ch N` connection (`topology.lightpaths`), the router port at each end; the optical plane
+`over ch N` connection drawn as a rainbow of dashes (`topology.lightpaths`), the router port at each end; the optical plane
 labels each router end of a cable with its port (`physicalLineSystem`, `buildPorts`).
 A view without `optical` keeps everything on the physical plane; devices and hosts get their
 `site`, and `topology.sites` (`[{ name, nodes }]`) is a dashed outline round each site's devices on the
@@ -92,8 +92,8 @@ another site) and lays a line system out as a chain on a row of its own above th
 terminal, two OADMs cabled back to back side by side with their express span left out. The frames draw
 the line system on an optical frame with a callout at each member port a router is cabled to
 (`render/model.js` `cardLayer`), and the routers on the physical frame, laid out without the line system
-(`cardLayout`), two routers cabled to the same channel port of its two terminals joined by a dashed `ch N`
-connection (blue, or `underlay: 'rainbow'`), each router's port badged.
+(`cardLayout`), two routers cabled to the same channel port of its two terminals joined by a `ch N`
+connection drawn as a rainbow of dashes (`src/rainbow.js`), each router's port badged.
 
 IPv6: a link may be an IPv6 subnet (link-local addresses never link), and a router whose IS-IS
 interfaces carry IPv6 only, or whose loopback has no IPv4 address, runs IS-IS, BGP and the label

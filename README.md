@@ -325,14 +325,14 @@ In the 3D view and the snapshot they are drawn on their own layer, `optical` (vi
 physical one: the line-system members as solid blue boxes tagged with their role (ROADM, AMP, OT), the
 optical spans as a blue double line with their label, and the routers at the spans' ends, whose risers
 start there; the physical layer keeps the routers and the links between them, and the connections over
-the line system described below (dashed, the router port at each end). The 2D frames draw the
+the line system described below (a rainbow of dashes, the router port at each end). The 2D frames draw the
 line system on an optical frame of its own, without the routers: at each member port a router is cabled
 to, a callout names what rides it (`PE-1 2/1 · ch 25`); their physical frame shows the routers, laid out
 without the line system (a view without `optical` keeps the line system with every cable on the physical
 frame). On both, a routed link whose two ports are cabled by optical spans says it rides the line system
 (`over ch 25`, the spans' label when both say the same); where the facts give no such link, two routers
 cabled to the same port of two members of one line system (a terminal's channel port: an ELS terminal's
-port 25 is channel 25) are joined by a connection over it, a dashed line with the router port badged at each end, `over ch 25` in 3D and `ch 25` on the frames (dashed blue, or a rainbow of dashes with `underlay: 'rainbow'`) (the two
+port 25 is channel 25) are joined by a connection over it, a rainbow of dashes (a dash of each of six colours in turn, for a wavelength) with the router port badged at each end, `over ch 25` in 3D and `ch 25` on the frames (the two
 cables' label when they have the same one, else `ch N` for a port that is a number), drawn only: it is
 not a link of the network the 3D view runs, and a protocol layer never shows it. Protocol frames leave
 the line system out. A view without `optical` in its `layers` draws the line system on the physical
