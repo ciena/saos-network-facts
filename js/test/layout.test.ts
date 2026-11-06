@@ -524,6 +524,14 @@ test("line systems: a router cabled only to the line system stands under its ter
   assert.deepEqual([p.PE1!.x, p.PE1!.y], [p["LS-T-1"]!.x, p["LS-T-1"]!.y + 1]);
   assert.deepEqual([p.PE2!.x, p.PE2!.y], [p["LS-T-2"]!.x, p["LS-T-2"]!.y + 1]);
   assert.equal(p["LS-O-1"]!.y, p["LS-T-1"]!.y);
+  // A connection over the line system between them (a lightpath, not a cable) keeps them there; as a
+  // cable it would not (they are no longer cabled only to the line system).
+  const over = (lightpath: boolean) => layoutFacts({ ...lab, links: [...lab.links, { a: "PE1", b: "PE2", lightpath }] }, { aspect: "card", max_columns: 4 }).positions;
+  const q = over(true);
+  assert.deepEqual([q.PE1!.x, q.PE1!.y], [q["LS-T-1"]!.x, q["LS-T-1"]!.y + 1]);
+  assert.deepEqual([q.PE2!.x, q.PE2!.y], [q["LS-T-2"]!.x, q["LS-T-2"]!.y + 1]);
+  const c = over(false);
+  assert.notDeepEqual([c.PE1!.x, c.PE2!.x], [c["LS-T-1"]!.x, c["LS-T-2"]!.x]);
 });
 
 // ---- sites ------------------------------------------------------------------------------------------

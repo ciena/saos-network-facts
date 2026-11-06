@@ -84,6 +84,10 @@ export interface LayoutLink {
   id?: string;
   a: LayoutEnd;
   b: LayoutEnd;
+  /** A connection over an optical line system, not a cable (two routers cabled to the same channel port
+   * of its two terminals): it joins its routers in the layout, but a router with nothing else is still
+   * "cabled only to the line system" and stands under its terminal. */
+  lightpath?: boolean;
 }
 
 /** A G.8032 ring: its members (names or { node }) and its links (link ids, or pairs of device names). */
@@ -151,6 +155,7 @@ export function layoutFacts(model: LayoutModel, layout: Layout | null = {}): Lay
 
   const known = new Set(ids);
   const adj = new Map(ids.map((id) => [id, new Set<string>()]));
+  const cabled = new Map(ids.map((id) => [id, new Set<string>()])); // without the lightpaths
   const raw: Array<[string, string]> = []; // every link, in the order given (the force layout's input)
   const linkEnds = new Map<string, [string, string]>();
   for (const l of model.links) {
@@ -161,6 +166,7 @@ export function layoutFacts(model: LayoutModel, layout: Layout | null = {}): Lay
     raw.push([a, b]);
     adj.get(a)!.add(b);
     adj.get(b)!.add(a);
+    if (!l.lightpath) (cabled.get(a)!.add(b), cabled.get(b)!.add(a));
   }
 
   if (algorithm === "force") {
@@ -196,7 +202,7 @@ export function layoutFacts(model: LayoutModel, layout: Layout | null = {}): Lay
     const inner = chooseLayout(rest, restIds, restAdj, linkEnds, limit);
     const pos = new Map(Object.entries(inner.positions).map(([id, p]) => [id, { ...p }]));
     const oadms = new Set(model.nodes.filter((n) => members.has(n.id) && isOadm(n)).map((n) => n.id));
-    const rows = lineSystems(pos, ids, adj, members, oadms, limit);
+    const rows = lineSystems(pos, ids, cabled, members, oadms, limit);
     const positions: Record<string, Point> = {};
     for (const id of ids) positions[id] = { x: round(pos.get(id)!.x), y: round(pos.get(id)!.y) };
     return { ...inner, positions: normalise(positions), description: `${inner.description}; ${rows.join("; ")}`, warnings };

@@ -11,7 +11,7 @@ import { resolveView, viewFrames } from '../../../js/src/index.ts';
 import { buildNetwork } from '../engine/network.js';
 import { importFacts } from '../import/facts.js';
 import { renderFrames } from './frames.js';
-import { layerModel, presentLayers, renderModel } from './model.js';
+import { presentLayers, renderModel } from './model.js';
 import { renderSnapshot } from './snapshot.js';
 
 export { presentLayers, renderModel } from './model.js';
@@ -33,13 +33,11 @@ export function prepare(facts, view, params, { name } = {}) {
 
 // The frames a card shows: the present layers, SR policies / MPLS-TP only when there is no
 // pseudowire frame (which shows the transport already), in the view's order, from its start frame.
-// A signature start on a physical frame without a link (every cable of the lab runs to the line
-// system, which the optical frame draws) is the optical frame instead: the card opens on the network.
+// No optical frame unless the view lists one (frames.rule list): the physical frame draws the line
+// system with every cable and the connections over it, so an optical frame would repeat part of it.
 export function frameLayers(model, view) {
-  const present = presentLayers(model);
-  const out = viewFrames(view, present.includes('pw') ? present.filter((id) => id !== 'mpls') : present);
-  if (view.frames.start === 'signature' && out.start === 'physical' && out.frames.includes('optical') && !layerModel(model, 'physical', true).links.length) out.start = 'optical';
-  return out;
+  const present = presentLayers(model).filter((id) => id !== 'optical' || view.frames.rule === 'list');
+  return viewFrames(view, present.includes('pw') ? present.filter((id) => id !== 'mpls') : present);
 }
 
 export function frames(facts, view, params, opts) {

@@ -30,8 +30,8 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   `siteIntruders` and `keepSites` in the layout code). A lab without sites, or whose sites are already apart,
   keeps its picture; the role tiers stay where the sites allow.
 - **Layout: a line system laid out as a chain** — the members of an optical line system (devices without facts
-  with an equipment role: terminals, OADMs, ROADMs, amplifiers) are drawn on the optical frame only, so the
-  other devices are now laid out without them, and each line system is then a row of its own above them, in
+  with an equipment role: terminals, OADMs, ROADMs, amplifiers) are now laid out after the other devices,
+  without them, and each line system is then a row of its own above them, in
   path order: a terminal, the OADMs or amplifiers, the other terminal, the end cabled to the router further
   left on the left, each member's label by its box, within `max_columns`. A router cabled only to the line
   system stands under its terminal. Before, the members joined the core and could fold back on themselves (an
@@ -42,12 +42,21 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   pair) take one place in the line system's row, side by side (`BACK_TO_BACK`, 0.3 columns, in the layout;
   the frames draw their boxes touching), and the frames and the snapshot leave the span between them out
   (`isExpress` in the viewer's render model): express traffic is implied by the two standing together. The
-  facts and the 3D model keep the link; the optical frame's title counts the spans it draws.
-- **Frames: a card whose physical frame has no link opens on the optical frame** — with a signature start
-  (the default), a lab whose every cable runs to the line system (two routers joined only over it) started on
-  a physical frame of unlinked devices; it now starts on the optical frame (`data-start="optical"`, the
-  bare file and its rotation start there). A view's own `frames.start` is kept, and every other card starts as
-  before.
+  facts and the 3D model keep the link; the frame titles count the spans they draw.
+- **Frames: the physical frame shows the line system and the routers joined through it** — the line system
+  was drawn on the optical frame only, so on the physical frame the routers at its ends looked unconnected
+  (and a lab cabled only through it had a physical frame without a link). The physical frame now draws the
+  line system with every cable (the row, the spans with their labels, the router to terminal cables with
+  their port badges), and two routers cabled to the same port of two members of one line system (a
+  terminal's channel port) are joined by a connection over it: a thin dashed blue line captioned
+  `over ch 25` (the two cables' label when they match, else `ch N` for a numbered port), derived from the
+  cabling (`topology.lightpaths`, `lightpathsOf` in the importer), drawn only, never on a protocol frame,
+  not a link of the 3D view's network. Where the facts give a routed link over the line system, its own
+  `over` caption says so and nothing is derived. The connection joins its routers in the layout
+  (`LayoutLink.lightpath`), which still puts a router cabled only to the line system under its terminal.
+  The frames have no optical frame unless the view lists one (`frames.rule` `list`): it would repeat part
+  of the physical frame. Protocol frames leave the line system out, with or without an optical frame. The
+  3D view and the snapshot keep their optical plane.
 
 ## [0.22.0] - 2026-11-05
 

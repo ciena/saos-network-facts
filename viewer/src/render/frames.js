@@ -12,7 +12,7 @@
 //   <img src="frames.svg">        the start frame (the view's frames.start, by default the signature layer)
 // A page that inlines the SVG can show one group at a time itself (a card that rotates).
 
-import { deviceDetail, equipmentTag, isExpress, isRouter, layerModel, noteLayerOf, typeTag, wrapNote } from './model.js';
+import { deviceDetail, equipmentTag, hasLineSystem, isExpress, isRouter, layerModel, noteLayerOf, typeTag, wrapNote } from './model.js';
 
 const C = {
   ink: '#1d2430', mute: '#5b6675', ghost: '#c3cad3', ghostInk: '#8a94a3',
@@ -49,7 +49,9 @@ export function frameTitle(id, m) {
       const bare = m.nodes.filter((n) => n.plain && !n.member).length;
       // a lab with no facts at all says so; in a mixed lab the dashed outline marks them (the card keeps its width)
       const said = [oses.length === 1 ? oses[0] : null, bare && bare === m.nodes.length ? 'no facts' : null].filter(Boolean);
-      return `Physical · ${plural(m.nodes.length, 'device')}${said.length ? ` (${said.join(', ')})` : ''}, ${plural(m.links.length, 'link')}${optical ? ` (${optical} optical)` : ''}${m.sites.length ? ` · ${plural(m.sites.length, 'site')}` : ''}`;
+      // the connections over the line system are not links (cables) of their own
+      const cables = m.links.filter((l) => !l.lightpath).length;
+      return `Physical · ${plural(m.nodes.length, 'device')}${said.length ? ` (${said.join(', ')})` : ''}, ${plural(cables, 'link')}${optical ? ` (${optical} optical)` : ''}${m.sites.length ? ` · ${plural(m.sites.length, 'site')}` : ''}`;
     }
     case 'role': {
       const count = (r) => m.nodes.filter((n) => n.net === r).length;
@@ -97,9 +99,11 @@ export function renderFrames(m, positions, { frames, start, period = 4 }) {
   const U = Math.max(160, f * 9.4), V = f * 7.6;
   // A site frame's name sits on its top edge, above the device labels: a line more at the top.
   const mx = f * 5.5, myTop = f * (m.sites.length ? 8.6 : 7.4), myBot = f * 6.6;
-  // An optical frame takes the line system off the others (render/model.js layerModel).
-  const split = frames.includes('optical');
-  const titles = Object.fromEntries(frames.map((id) => [id, frameTitle(id, layerModel(m, id, split))]));
+  // A line system is off the protocol frames and on the physical frame with every cable (and on an
+  // optical frame when the view lists one): render/model.js layerModel.
+  const split = hasLineSystem(m);
+  const layer = (id) => layerModel(m, id, split, { cabling: true });
+  const titles = Object.fromEntries(frames.map((id) => [id, frameTitle(id, layer(id))]));
   // Wide enough for the longest title, so a small lab keeps its titles whole.
   const W = Math.ceil(Math.max((maxX - minX) * U + 2 * mx, Math.max(...Object.values(titles).map((t) => t.length)) * f * 1.15 * 0.6 + f * 2.4));
   // Free notes (no device) sit along the bottom edge: room for the frame with the most of them.
@@ -129,7 +133,7 @@ export function renderFrames(m, positions, { frames, start, period = 4 }) {
   const background = `<rect id="still" width="${W}" height="${H}" fill="#fff"/>`;
   const groups = {};
   for (const id of order) {
-    const lm = layerModel(m, id, split);
+    const lm = layer(id);
     const g = draw(id, { ...ctx, model: lm, nodes: new Map(lm.nodes.map((n) => [n.id, n])) });
     g.push(`<rect width="${W}" height="${r1(f * 2.5)}" fill="#fff" fill-opacity="0.92"/><text x="${r1(f * 1.1)}" y="${r1(f * 1.7)}" font-size="${r1(f * 1.15)}" font-weight="700" fill="${id === 'physical' ? C.ink : C[id] ?? C.ink}">${esc(titles[id])}</text>`);
     groups[id] = `<g class="frame r${rotIndex(frames, start, id)}${id === start ? ' start' : ''}" id="f-${id}" data-title="${esc(titles[id])}">${g.join('')}</g>`;
@@ -327,11 +331,14 @@ function draw(id, ctx) {
       const [a, b] = ends.get(l.id);
       // A routed link over the line system says so (`over ch 25`) where it has no label of its own.
       const caption = l.caption ?? l.over;
-      const tip = `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium ? `\n${l.medium}${l.caption ? `: ${l.caption}` : ''}` : l.caption ? `\n${l.caption}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}`;
-      // An optical span: a fibre, drawn as a blue double line (white core).
+      const tip = l.lightpath ? `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}\n${l.over}: through ${l.via.join(' … ')}` : `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium ? `\n${l.medium}${l.caption ? `: ${l.caption}` : ''}` : l.caption ? `\n${l.caption}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}`;
+      // An optical span: a fibre, drawn as a blue double line (white core). A connection over the line
+      // system (not a cable): a thin dashed blue line between its routers, its caption `over ch 25`.
       const body = l.medium === 'optical'
         ? `${line(a, b, C.optical, f * 0.42, ' stroke-linecap="round"')}${line(a, b, '#fff', f * 0.14, ' stroke-linecap="round"')}`
-        : line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '');
+        : l.lightpath
+          ? line(a, b, C.optical, f * 0.12, ` stroke-dasharray="${r1(f * 0.5)} ${r1(f * 0.35)}"`)
+          : line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '');
       // The caption on the link, staggered along parallel links; the port pills only where they fit
       // between the device and the caption (else the ports are in the hover title only).
       const sibs = pairs.get(pair(l));
@@ -340,7 +347,8 @@ function draw(id, ctx) {
       const cw = caption ? pillW(caption) : 0;
       const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || !l.caption ? C.optical : '#9aa4b1') : '';
       if (caption) { const c = lerp(a, b, t); const r = { x: c.x - cw / 2, y: c.y - f * 0.55, w: cw, h: f * 1.1 }; reg.push(r); taken.push(r); }
-      linkDraw.push({ l, a, b, len, head: `<g${l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}`, cap });
+      const cls = l.lightpath ? 'lightpath' : l.medium ? `link-${esc(l.medium)}` : null;
+      linkDraw.push({ l, a, b, len, head: `<g${cls ? ` class="${cls}"` : ''}>${title(tip)}${body}`, cap });
     }
     const devices = [];
     const labels = [];
@@ -364,7 +372,8 @@ function draw(id, ctx) {
     // The port badges, link by link and end by end (a fixed order: the same facts, the same picture),
     // clear of the boxes, captions, labels and each other. Drawn with their link, under the boxes.
     taken.push(...reg.filter((r) => !taken.includes(r)));
-    const want = linkDraw.flatMap((d, i) => [[d.a, d.b, d.l.a], [d.b, d.a, d.l.b]].map(([from, to, end], e) => ({ i, e, from, to, len: d.len, text: end.port ?? '?', box: boxes.get(end.node), spot: null })));
+    // (none on a connection over the line system: its ports are its cables' own, badged there)
+    const want = linkDraw.flatMap((d, i) => (d.l.lightpath ? [] : [[d.a, d.b, d.l.a], [d.b, d.a, d.l.b]]).map(([from, to, end], e) => ({ i, e, from, to, len: d.len, text: end.port ?? '?', box: boxes.get(end.node), spot: null })));
     for (const step of BADGE_STEPS) {
       for (const b of want) {
         if (b.spot) continue;

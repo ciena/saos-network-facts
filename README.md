@@ -321,22 +321,30 @@ notes:                        # free text, on a device or not, on a view layer (
   labels written beside them, so they live in the facts; a view is a presentation that many labs share.
 - A link end or note on a name no input knows, or an unknown key, is an error before anything is extracted.
 
-Drawn on their own layer, `optical` (view schema 1.2), under the physical one: the line-system members
-as solid blue boxes tagged with their role (ROADM, AMP, OT), the optical spans as a blue double line with
-their label, and the routers at the spans' ends, whose risers start there. The physical layer then keeps
-the routers and the links between them; a routed link whose two ports are cabled by optical spans says it
-rides the line system (`over ch 25`, the spans' label when both say the same). A view without `optical` in
-its `layers` draws the line system on the physical layer instead. Sites are a dashed frame round their
+In the 3D view and the snapshot they are drawn on their own layer, `optical` (view schema 1.2), under the
+physical one: the line-system members as solid blue boxes tagged with their role (ROADM, AMP, OT), the
+optical spans as a blue double line with their label, and the routers at the spans' ends, whose risers
+start there; the physical layer keeps the routers and the links between them. The 2D frames draw the
+line system on the physical frame, with every cable, so the cabling is complete there; they have no
+optical frame unless the view lists one (`frames.rule` `list`), as it would repeat part of the physical
+frame. On both, a routed link whose two ports are cabled by optical spans says it rides the line system
+(`over ch 25`, the spans' label when both say the same); where the facts give no such link, two routers
+cabled to the same port of two members of one line system (a terminal's channel port: an ELS terminal's
+port 25 is channel 25) are joined by a connection over it, a thin dashed blue line `over ch 25` (the two
+cables' label when they have the same one, else `ch N` for a port that is a number), drawn only: it is
+not a link of the network the 3D view runs, and a protocol layer never shows it. Protocol frames leave
+the line system out. A view without `optical` in its `layers` draws the line system on the physical
+layer in 3D too. Sites are a dashed frame round their
 devices (on both layers); notes are yellow, beside their device (the snapshot numbers them and lists them
 in the plane's corner) or along the edge, on the note's `layer`, else with their device (a note on a
-line-system member is on the optical layer), else on physical. The layout lays the other devices out
+line-system member is on the optical layer when the drawing has one), else on physical. The layout lays the other devices out
 without the line system, then the line system as a chain on a row of its own above them: a terminal, the
 OADMs or amplifiers, the other terminal, the end cabled to the router further left on the left, each
 member's label by its box; two OADMs cabled back to back stand side by side, boxes touching, and the
 express span between them is not drawn (express traffic is implied); a router cabled only to the line
-system stands under its terminal. It keeps a
-site's devices together, so a site's frame takes in no device of another site or of none. A card whose
-physical frame has no link (every cable runs to the line system) opens on the optical frame.
+system stands under its terminal, and a connection over the line system joins its two routers in the
+layout. It keeps a site's devices together, so a site's frame takes in no device of another site or of
+none.
 
 ### Rings
 
@@ -494,7 +502,7 @@ Every property is optional:
 | `preset` | `card-frames` (rotating 2D frames for a lab card), `lab-snapshot` (the exploded 3D snapshot, full screen, iso camera, compact labels), `protocol-stack` (every layer as a stacked plane) |
 | `layers` | the layers that may be shown: `optical` (since 1.2: the optical line system, under physical; without it the line system is drawn on physical), `physical`, `role` (since 1.3: the network roles CE, PE and P, a 2D frame only, `f-role`), `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
 | `frames.rule` | `auto` (one frame per shown layer with content, in the order above), `list` (the layers of `frames.list`, in that order) |
-| `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport; `optical` instead of a physical frame without a link, when every cable runs to the line system), `first`, or a layer |
+| `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport), `first`, or a layer |
 | `frames.period_s` | `4`: seconds per frame, a hint (a consumer may pause offscreen or for reduced motion) |
 | `snapshot.variant` | `exploded`, `stacked` |
 | `layout.algorithm` | `auto` (computed from the facts, below), `force` (force-directed), `hints` |
@@ -570,14 +578,15 @@ scores better while none is; the score counts each one left as much as a link th
 (`foreign` in the candidate's score). A lab without sites, or whose sites are already apart, keeps its
 picture.
 
-**Line systems** (devices without facts with an equipment role, `plain` and `equipment`): drawn on the
-optical layer, off every other frame, so the other devices are laid out without them, and each line
+**Line systems** (devices without facts with an equipment role, `plain` and `equipment`): the other
+devices are laid out without them (a connection over the line system, a link with `lightpath`, joins
+its two routers there), and each line
 system is then a row of its own above them, in path order (a terminal, the OADMs or amplifiers, the
 other terminal), the end cabled to the router further left on the left, spread between the columns of
 the routers at its two ends or a column apart centred over them, within `max_columns`. Two OADMs cabled
 to each other (equipment `oadm`, any case: a back-to-back pair and its express span) take one place in
 the row, `BACK_TO_BACK` (0.3 columns) apart; the frames draw their boxes touching and leave the express
-span out. A router cabled only to the line system stands under the member it is cabled to. A plain box without an equipment role
+span out. A router cabled only to the line system (a `lightpath` link does not count) stands under the member it is cabled to. A plain box without an equipment role
 (a device without facts in the path) is still laid out with the core, as above.
 
 With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns (role tiers that follow the roles one more: `CE | PE | P | PE | CE` is five): outer devices hang sideways while there is room, a ring too long for the ladder runs
@@ -601,8 +610,9 @@ In Python, `saos_network_facts.schema.view_errors(view)` validates a view file.
 For a lab card or a page without WebGL, the viewer renders a facts file and a view to two SVG files,
 with the same layout as the 3D page:
 
-- **`frames.svg`**: one flat frame per layer the lab has content for: the optical line system (members,
-  spans, the routers at their ends); physical (each router, any Ciena SAOS device, as the common router symbol in Ciena red, its name and
+- **`frames.svg`**: one flat frame per layer the lab has content for (an optical frame, the line system and
+  the routers at its ends, only when the view lists it); physical (the line system too, with every cable
+  and the connections over it; each router, any Ciena SAOS device, as the common router symbol in Ciena red, its name and
   model beside it; any other device, a Waveserver, a third-party box, an ELS shelf, as a grey box tagged with
   its model; links and ports); roles (`f-role`, right after physical: CE, PE and P as the viewer derives them from the facts,
   or a record's `role` for a device without facts, a route reflector as P·RR; left out when no device has
@@ -612,8 +622,7 @@ with the same layout as the 3D page:
   Flex-Algo; BGP (sessions, route reflector, sessions not established); L3VPN VRFs; pseudowires over the
   IGP; EVPN instances; CFM MEGs. The view picks them (`layers`, `frames.rule` / `frames.list`) and the
   frame to start on (`frames.start`, by default the lab's signature layer: its services, else its
-  transport; the optical frame when the physical frame has no link, every cable running to the line
-  system, as with two routers joined only over it). Devices stay put from frame to frame; each object carries two or three short labels, each
+  transport). Devices stay put from frame to frame; each object carries two or three short labels, each
   frame a title (port badges and IGP metrics are placed clear of the device boxes and of each other; a port with no room is in its link's hover title), a device without facts is drawn as the same symbol or box with a dashed outline (one without a
   type a faint grey box; line-system members solid, with their role), and a lab whose devices all lack facts
   (none configured yet, or no extractor for their type) is drawn from its records and links: the physical frame,

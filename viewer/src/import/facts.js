@@ -39,7 +39,7 @@
 //   G.8032       rings[] (schema 1.5) joined across devices by ring id: the links whose two ends are ring ports
 //                of the ring, the RPL from the owner's and neighbour's port, a sub-ring's interconnection nodes
 
-import { ccmIntervalMs, devicesByName, evpnInstances, flexAlgorithms, hosts as factsHosts, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts, ringsOf, srv6Locators, staticRoutes, vrfInstances, vrfRouteTargets } from '../../../js/src/index.ts';
+import { ccmIntervalMs, compareNames, devicesByName, evpnInstances, flexAlgorithms, hosts as factsHosts, interfacesOnPort, isisArea, isisMetric, isRouted, loopbacks, parseFacts, ringsOf, srv6Locators, staticRoutes, vrfInstances, vrfRouteTargets } from '../../../js/src/index.ts';
 import { CCM_INTERVALS_MS } from '../engine/cfm.js';
 import { hostPrefix, ip6ToBig, isV6, networkOf } from '../engine/ip.js';
 import { BACKBONE, normArea } from '../engine/ospf.js';
@@ -1247,11 +1247,47 @@ function annotate(file, nodes, links, report) {
     }
   }
   const notes = (file.notes ?? []).map((x) => ({ text: x.text, device: byId.has(x.device) ? x.device : null, layer: x.layer ?? null }));
+  const lightpaths = lightpathsOf(nodes, links);
   const optical = links.filter((l) => l.medium === 'optical').length;
   if (marked) report.add('physical', 'facts', `${marked} links with a kind or label`, `from the file's links[] (the extractor's extra file)${optical ? `; ${optical} optical spans, drawn apart from the cables` : ''}`);
   if (sites.size) report.add('physical', 'facts', `${sites.size} sites`, `${[...sites].map(([s, ids]) => `${s}: ${ids.join(', ')}`).join('; ')}; a frame round each site's devices`);
   if (notes.length) report.add('physical', 'facts', `${notes.length} notes`, `from the file's notes[]: ${notes.filter((x) => x.device).length} on a device, the rest free`);
-  return { sites: [...sites].map(([name, ids]) => ({ name, nodes: ids })), notes };
+  if (lightpaths.length) report.add('physical', 'derived', `${lightpaths.length} connections over the line system`, `${lightpaths.map((x) => `${x.a.node} ${x.a.port} - ${x.b.node} ${x.b.port} (${x.over})`).join('; ')}: two routers cabled to the same port of two members of one line system`);
+  return { sites: [...sites].map(([name, ids]) => ({ name, nodes: ids })), notes, lightpaths };
+}
+
+// The connections over a line system the cabling implies: two routers (devices that are not members)
+// cabled to the same port of two different members of one line system (a terminal's channel port: an
+// ELS terminal's port 25 is channel 25) are joined through it, one connection per such port. `over`
+// says how: the two cables' label when they have the same one, else `ch N` for a port that is a number,
+// else `the line system`. None where a routed link from the facts already joins the two routers over
+// the line system (its own `over` says so). -> [{ id, a: { node, port }, b: { node, port }, over, via }]
+function lightpathsOf(nodes, links) {
+  const members = new Set(nodes.filter((n) => n.plain && n.equipment).map((n) => n.id));
+  if (!members.size) return [];
+  const optical = links.filter((l) => l.medium === 'optical' && l.a.port != null && l.b.port != null);
+  // The line systems: members joined by optical spans, each member named by its system's first member.
+  const system = new Map([...members].map((id) => [id, id]));
+  const find = (id) => (system.get(id) === id ? id : find(system.get(id)));
+  for (const l of optical) if (members.has(l.a.node) && members.has(l.b.node)) system.set(find(l.a.node), find(l.b.node));
+  // The cables from a router to a member, by line system and member port.
+  const byPort = new Map();
+  for (const l of optical) {
+    const [m, r] = members.has(l.a.node) && !members.has(l.b.node) ? [l.a, l.b] : members.has(l.b.node) && !members.has(l.a.node) ? [l.b, l.a] : [];
+    if (!m) continue;
+    const key = `${find(m.node)}|${m.port}`;
+    byPort.set(key, [...(byPort.get(key) ?? []), { member: m.node, port: String(m.port), router: r, label: l.caption ?? null }]);
+  }
+  const routed = new Set(links.filter((l) => l.over).map((l) => [l.a.node, l.b.node].sort().join('|')));
+  const out = [];
+  for (const cables of byPort.values()) {
+    if (cables.length !== 2 || cables[0].member === cables[1].member || cables[0].router.node === cables[1].router.node) continue;
+    const [x, y] = [...cables].sort((p, q) => compareNames(p.router.node, q.router.node));
+    if (routed.has([x.router.node, y.router.node].sort().join('|'))) continue;
+    const over = x.label && x.label === y.label ? x.label : /^\d+$/.test(x.port) ? `ch ${x.port}` : 'the line system';
+    out.push({ id: `${x.router.node}~${y.router.node}~${x.port}`, a: { node: x.router.node, port: x.router.port }, b: { node: y.router.node, port: y.router.port }, over: `over ${over}`, via: [x.member, y.member], lightpath: true });
+  }
+  return out.sort((p, q) => compareNames(p.id, q.id));
 }
 
 // facts file (JSON text or value) -> { topology, file, devices, services, labelMode, layout, report }
@@ -1316,7 +1352,8 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
   const extras = annotate(file, [...nodes, ...plain.nodes], [...links, ...plain.links], report);
   // The IGP area of each router, so the layout keeps the routers of one area together.
   const areaOf = (n) => (n.role === 'ce' ? null : igp === 'isis' ? (devices.get(n.id)?.isis?.instances?.[0] ? isisArea(devices.get(n.id).isis.instances[0]) : null) : n.loopbackArea ?? null);
-  const placed = placeNodes(nodes, links, rings, positions, layout, report, plain, new Map(nodes.map((n) => [n.id, areaOf(n)])));
+  // The connections over a line system join their routers in the layout too (not cabled: lightpath).
+  const placed = placeNodes(nodes, [...links, ...extras.lightpaths], rings, positions, layout, report, plain, new Map(nodes.map((n) => [n.id, areaOf(n)])));
   for (const n of [...nodes, ...plain.nodes]) n.pos = placed.pos[n.id];
 
   const recipe = file.devices.find((r) => r.recipe)?.recipe;
@@ -1344,6 +1381,8 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
     plain,
     sites: extras.sites,
     notes: extras.notes,
+    // Drawn only (the frames' physical layer): not links of the engine's network.
+    lightpaths: extras.lightpaths,
   };
   return {
     topology,
