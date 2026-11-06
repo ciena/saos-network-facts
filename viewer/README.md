@@ -75,16 +75,19 @@ places it by that role and the role frame shows it.
 What the extractor's `--extra` file adds (schema 1.9) is drawn, never simulated: a drawn link whose two
 ports match a `links[]` entry gets its `kind` as `medium` and its `label` as `caption` (an optical span is a
 blue tube with its label); a plain box whose record has a `role` (a line-system member: `roadm`,
-`amplifier`) is a solid blue box with no warning, its `role` as `equipment`. The physical plane draws the
-line system: the members, the spans and the cables to them, each router end labelled with its port; two
-routers cabled to the same port of two members of one line system are joined by a dashed `over ch N`
-connection (`topology.lightpaths`), the router port at each end (`physicalLineSystem`); a routed link
-whose ports are cabled by optical spans carries `over` (`over ch 25`) as its label. The page has no
-optical plane (`optical` is a 2D frame a view may list, `FRAME_ONLY`). Devices and hosts get their
+`amplifier`) is a solid blue box with no warning, its `role` as `equipment`. With such members or
+optical spans the page has an `optical` layer under the physical one (`LAYERS`; physical moves up one gap,
+so physical-plane code places things at `layerY('physical')`, not 0): the members, the spans and links to
+them, and a disc for each router at a span's end, whose pillar starts there; the physical plane leaves them
+out, and a routed link whose ports are cabled by optical spans carries `over` (`over ch 25`) as its label.
+The physical plane joins two routers cabled to the same port of two members of one line system with a
+dashed `over ch N` connection (`topology.lightpaths`), the router port at each end; the optical plane
+labels each router end of a cable with its port (`physicalLineSystem`, `buildPorts`).
+A view without `optical` keeps everything on the physical plane; devices and hosts get their
 `site`, and `topology.sites` (`[{ name, nodes }]`) is a dashed outline round each site's devices on the
 physical plane; `topology.notes` (`[{ text, device, layer }]`) are yellow labels on their layer (physical
-when the page does not show it), above their device or just in front of the plane's corner. The frames
-and the snapshot draw the same (the snapshot has no optical plane either). The layout keeps a site's devices together (no site's outline takes in a device of
+when the page does not show it), above their device or just in front of the plane's corner. The frames and the snapshot
+draw the same. The layout keeps a site's devices together (no site's outline takes in a device of
 another site) and lays a line system out as a chain on a row of its own above the routers, terminal to
 terminal, two OADMs cabled back to back side by side with their express span left out. The frames draw
 the line system on the physical frame with every cable, and two routers cabled to the same channel port

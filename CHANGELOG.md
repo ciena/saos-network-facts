@@ -56,15 +56,15 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   (`LayoutLink.lightpath`), which still puts a router cabled only to the line system under its terminal.
   The frames have no optical frame unless the view lists one (`frames.rule` `list`): it would repeat part
   of the physical frame. Protocol frames leave the line system out, with or without an optical frame.
-- **3D view and snapshot: the physical plane shows the line system and the routers joined through it** — the
-  3D page drew the line system on an optical plane under the physical one, so its physical plane, like the
-  2D one, showed the routers at the line system's ends unconnected. The page and the snapshot now have no
-  optical plane (`optical` is a 2D frame only, as `role` is: `FRAME_ONLY`); their physical plane draws the
-  members, the spans with their labels and the router cables, each router end labelled with its port, and
-  each connection over the line system as a dashed blue line captioned `over ch 25` with the router port
-  at each end (`physicalLineSystem` in `view/layers.js`). Two OADMs back to back share one label
-  (`OADM-1 | OADM-2 oadm`) and their express span is not drawn, as on the frames. A free note hangs just
-  in front of the plane's front right corner instead of over the devices there.
+- **3D view and snapshot: the physical plane shows the routers joined through the line system** — the 3D
+  page and the snapshot keep their optical plane under the physical one (the members, the spans, the
+  router cables, each router end now labelled with its port on the page), and their physical plane now
+  joins the routers too: each connection over the line system is a dashed blue line captioned
+  `over ch 25`, with the router port at each end (`physicalLineSystem` in `view/layers.js`; the snapshot
+  badges it as a cable). Without an optical plane (a view that leaves it out) the page's physical plane
+  draws all of it. Two OADMs back to back share one label (`OADM-1 | OADM-2 oadm`) and their express span
+  is not drawn, as on the frames. A free note hangs just in front of the plane's front right corner
+  instead of over the devices there.
 
 ## [0.22.0] - 2026-11-05
 

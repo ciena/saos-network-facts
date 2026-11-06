@@ -26,9 +26,9 @@ function page(search, { aspect = 600 / 800 } = {}) {
 const round = (xyz) => xyz.map((v) => Math.round(v * 100) / 100);
 
 describe('view properties on the page', () => {
-  test('every view layer is a layer of the page, but the frame-only optical and role layers', () => {
+  test('every view layer is a layer of the page, but the frame-only role layer', () => {
     const pageIds = LAYERS.map((l) => l.id);
-    expect(FRAME_ONLY).toEqual(['optical', 'role']);
+    expect(FRAME_ONLY).toEqual(['role']);
     expect(LAYER_IDS.filter((id) => !FRAME_ONLY.includes(id)).map(pageLayerId).sort()).toEqual([...pageIds].sort());
   });
 

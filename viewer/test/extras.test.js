@@ -123,25 +123,30 @@ describe('frames and snapshot', () => {
     expect(frameOf('ring note')).toEqual(['physical']);
   });
 
-  test('the snapshot: no optical plane; physical draws the line system, its note and the link over it', () => {
+  test('the snapshot: the optical plane under physical, with the line system and its note; physical with the link over it', () => {
     const r = snapshot(text);
-    expect(r.layers).toEqual(['physical', 'igp', 'mpls', 'bgp', 'pw']);
+    expect(r.layers).toEqual(['optical', 'physical', 'igp', 'mpls', 'bgp', 'pw']);
     const plane = (id) => r.svg.split(/(?=<g class="layer")/).find((g) => g.includes(`data-layer="${id}"`));
-    expect(r.svg).not.toContain('data-layer="optical"');
-    expect(plane('physical').match(/class="link-optical"/g)).toHaveLength(5);
-    expect(plane('physical').match(/<g class="site">/g)).toHaveLength(2);
-    expect(plane('physical')).toContain('class="note-marker"');
-    expect(plane('physical')).toContain('>1 · AMP-1</text>');
-    expect(plane('physical')).toContain('>AMP-1  AMP</text>');
+    expect(plane('optical').match(/class="link-optical"/g)).toHaveLength(5);
+    expect(plane('optical').match(/<g class="site">/g)).toHaveLength(2);
+    expect(plane('optical')).toContain('class="note-marker"');
+    expect(plane('optical')).toContain('>1 · AMP-1</text>');
+    expect(plane('optical')).toContain('>AMP-1  AMP</text>');
+    expect(plane('physical')).not.toContain('link-optical');
     expect(plane('physical')).toContain('>over ch 25</text>');
+    // members have no riser; the PEs rise from the optical plane
+    expect(r.svg).not.toMatch(/class="pillar" data-layers="optical"/);
+    expect(r.svg.match(/class="pillar" data-layers="physical optical/g)).toHaveLength(2);
   });
 
-  test('the snapshot: routers joined only through the line system, a dashed connection with their ports', () => {
+  test('the snapshot: routers joined only through the line system, a dashed connection with their ports on physical', () => {
     const file = JSON.parse(text);
     for (const d of file.devices) if (d.device === 'PE1' || d.device === 'PE2') (d.status = 'skipped'), delete d.facts;
     const r = snapshot(JSON.stringify(file));
-    expect(r.layers).toEqual(['physical']);
-    const lp = r.svg.slice(r.svg.indexOf('<g class="lightpath">')).split('</g>')[0];
+    expect(r.layers).toEqual(['optical', 'physical']);
+    // on the physical plane, over the optical plane's line system
+    const physical = r.svg.split(/(?=<g class="layer")/).find((g) => g.includes('data-layer="physical"'));
+    const lp = physical.slice(physical.indexOf('<g class="lightpath">')).split('</g>')[0];
     expect(lp).toMatch(/<title>PE1 1 — PE2 1\nover ch 25<\/title><line [^>]*stroke-dasharray="6 4"/);
     expect(lp.match(/>1<\/text>/g)).toHaveLength(2);
     expect(lp).toContain('>over ch 25</text>');

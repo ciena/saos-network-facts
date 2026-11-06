@@ -321,21 +321,24 @@ notes:                        # free text, on a device or not, on a view layer (
   labels written beside them, so they live in the facts; a view is a presentation that many labs share.
 - A link end or note on a name no input knows, or an unknown key, is an error before anything is extracted.
 
-The 3D view, the snapshot and the 2D physical frame draw the line system on the physical layer, with
-every cable, so the cabling is complete there: the line-system members as solid blue boxes tagged with
-their role (ROADM, AMP, OT), the optical spans as a blue double line with their label, and the routers'
-cables to them, each router end with its port. The view layer `optical` (view schema 1.2) is a 2D frame
-of its own only when the view lists it (`frames.rule` `list`), as it would repeat part of the physical
-frame. On all of them, a routed link whose two ports are cabled by optical spans says it rides the line system
+In the 3D view and the snapshot they are drawn on their own layer, `optical` (view schema 1.2), under the
+physical one: the line-system members as solid blue boxes tagged with their role (ROADM, AMP, OT), the
+optical spans as a blue double line with their label, and the routers at the spans' ends, whose risers
+start there; the physical layer keeps the routers and the links between them, and the connections over
+the line system described below (dashed, the router port at each end). The 2D frames draw the
+line system on the physical frame, with every cable, so the cabling is complete there; they have no
+optical frame unless the view lists one (`frames.rule` `list`), as it would repeat part of the physical
+frame. On both, a routed link whose two ports are cabled by optical spans says it rides the line system
 (`over ch 25`, the spans' label when both say the same); where the facts give no such link, two routers
 cabled to the same port of two members of one line system (a terminal's channel port: an ELS terminal's
 port 25 is channel 25) are joined by a connection over it, a thin dashed blue line `over ch 25` with the router port badged at each end (the two
 cables' label when they have the same one, else `ch N` for a port that is a number), drawn only: it is
 not a link of the network the 3D view runs, and a protocol layer never shows it. Protocol frames leave
-the line system out. Sites are a dashed frame round their
-devices; notes are yellow, beside their device (the snapshot numbers them and lists them
+the line system out. A view without `optical` in its `layers` draws the line system on the physical
+layer in 3D too. Sites are a dashed frame round their
+devices (on both layers); notes are yellow, beside their device (the snapshot numbers them and lists them
 in the plane's corner) or along the edge, on the note's `layer`, else with their device (a note on a
-line-system member is on the optical frame when the frames have one), else on physical. The layout lays the other devices out
+line-system member is on the optical layer when the drawing has one), else on physical. The layout lays the other devices out
 without the line system, then the line system as a chain on a row of its own above them: a terminal, the
 OADMs or amplifiers, the other terminal, the end cabled to the router further left on the left, each
 member's label by its box; two OADMs cabled back to back stand side by side, boxes touching, and the
@@ -498,7 +501,7 @@ Every property is optional:
 | Property | Values (default first) |
 |---|---|
 | `preset` | `card-frames` (rotating 2D frames for a lab card), `lab-snapshot` (the exploded 3D snapshot, full screen, iso camera, compact labels), `protocol-stack` (every layer as a stacked plane) |
-| `layers` | the layers that may be shown: `optical` (since 1.2: the optical line system as a 2D frame of its own, only when `frames.rule` is `list`; the 3D page, the snapshot and the physical frame draw the line system on physical), `physical`, `role` (since 1.3: the network roles CE, PE and P, a 2D frame only, `f-role`), `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
+| `layers` | the layers that may be shown: `optical` (since 1.2: the optical line system, under physical; without it the line system is drawn on physical), `physical`, `role` (since 1.3: the network roles CE, PE and P, a 2D frame only, `f-role`), `ring`, `igp`, `mpls`, `srv6`, `bgp`, `vrf`, `pw`, `evpn`, `cfm` (all); a layer the facts have nothing for is left out anyway |
 | `frames.rule` | `auto` (one frame per shown layer with content, in the order above), `list` (the layers of `frames.list`, in that order) |
 | `frames.start` | `signature` (the first frame of `pw`, `evpn`, `vrf`, `mpls`, `srv6`, `ring`, `igp`, `bgp`, `cfm`, `physical`: the lab's services, else its transport), `first`, or a layer |
 | `frames.period_s` | `4`: seconds per frame, a hint (a consumer may pause offscreen or for reduced motion) |

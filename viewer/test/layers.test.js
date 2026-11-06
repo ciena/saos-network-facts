@@ -24,7 +24,7 @@ describe('every published lab lists only the layers it has', () => {
     'g8032-by-name': ['physical', 'ring'],
     'srv6-evpn': ['physical', 'isis', 'mpls', 'srv6', 'bgp', 'vrf', 'evpn'],
     'l3vpn-hosts': ['physical', 'isis', 'mpls', 'bgp', 'vrf'],
-    'line-system': ['physical', 'isis', 'mpls', 'bgp', 'pw'],
+    'line-system': ['optical', 'physical', 'isis', 'mpls', 'bgp', 'pw'],
     // no device has facts: its plain boxes on the physical plane, nothing else
     'config-less': ['physical'],
   };
@@ -126,7 +126,7 @@ describe('toggle state', () => {
   });
 });
 
-describe('the physical plane shows the routers joined through a line system (as the 2D physical frame)', () => {
+describe('a line system on the page: router ports on the optical plane, the routers joined through it on physical', () => {
   test('the line-system lab: the router ports of the cables to the ROADMs; no connection over it (the core link has facts)', () => {
     const ls = physicalLineSystem(netOf(read(LABS.find((l) => l.id === 'line-system').source)));
     expect(ls.lightpaths).toEqual([]);

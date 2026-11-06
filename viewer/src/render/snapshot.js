@@ -31,11 +31,9 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const r1 = (v) => Math.round(v * 10) / 10;
 
 // The planes a snapshot draws: the present layers the view shows (physical always), bottom first. The
-// role and optical layers are frames only: the snapshot's physical plane colours its devices by role
-// already, and draws the line system with the routers joined through it (as the page and the 2D
-// physical frame do).
+// role layer is a frame only: the snapshot's physical plane colours its devices by role already.
 export function snapshotLayers(model, viewLayers = LAYER_IDS) {
-  const present = new Set(presentLayers(model).filter((id) => id !== 'role' && id !== 'optical'));
+  const present = new Set(presentLayers(model).filter((id) => id !== 'role'));
   return LAYER_IDS.filter((id) => present.has(id) && (id === 'physical' || viewLayers.includes(id)));
 }
 
