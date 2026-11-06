@@ -332,7 +332,9 @@ in the plane's corner) or along the edge, on the note's `layer`, else with their
 line-system member is on the optical layer), else on physical. The layout lays the other devices out
 without the line system, then the line system as a chain on a row of its own above them: a terminal, the
 OADMs or amplifiers, the other terminal, the end cabled to the router further left on the left, each
-member's label by its box; a router cabled only to the line system stands under its terminal. It keeps a
+member's label by its box; two OADMs cabled back to back stand side by side, boxes touching, and the
+express span between them is not drawn (express traffic is implied); a router cabled only to the line
+system stands under its terminal. It keeps a
 site's devices together, so a site's frame takes in no device of another site or of none. A card whose
 physical frame has no link (every cable runs to the line system) opens on the optical frame.
 
@@ -572,8 +574,10 @@ picture.
 optical layer, off every other frame, so the other devices are laid out without them, and each line
 system is then a row of its own above them, in path order (a terminal, the OADMs or amplifiers, the
 other terminal), the end cabled to the router further left on the left, spread between the columns of
-the routers at its two ends or a column apart centred over them, within `max_columns`. A router cabled
-only to the line system stands under the member it is cabled to. A plain box without an equipment role
+the routers at its two ends or a column apart centred over them, within `max_columns`. Two OADMs cabled
+to each other (equipment `oadm`, any case: a back-to-back pair and its express span) take one place in
+the row, `BACK_TO_BACK` (0.3 columns) apart; the frames draw their boxes touching and leave the express
+span out. A router cabled only to the line system stands under the member it is cabled to. A plain box without an equipment role
 (a device without facts in the path) is still laid out with the core, as above.
 
 With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns (role tiers that follow the roles one more: `CE | PE | P | PE | CE` is five): outer devices hang sideways while there is room, a ring too long for the ladder runs

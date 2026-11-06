@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { forceLayout, layoutFacts, longestCycle, resolveView, type LayoutModel, type Point } from "../src/index.ts";
+import { BACK_TO_BACK, forceLayout, layoutFacts, longestCycle, resolveView, type LayoutModel, type Point } from "../src/index.ts";
 import { siteIntruders } from "../src/layout-shapes.ts";
 
 // A ring of `n` routers R1..Rn (role pe or p), each PE with a CE hung off it.
@@ -499,10 +499,17 @@ test("line systems: the other devices laid out without them, then the line syste
   const row = ["LS-T-2", "LS-O-2", "LS-O-1", "LS-T-1"];
   const order = p.PE1!.x < p.PE2!.x ? row : [...row].reverse();
   assert.equal(new Set(row.map((id) => p[id]!.y)).size, 1);
-  for (let i = 1; i < order.length; i++) assert.ok(p[order[i]!]!.x - p[order[i - 1]!]!.x >= 0.99, `${order[i]} right of ${order[i - 1]}`);
+  // The two OADMs, cabled back to back, side by side as one place; the terminals a column off.
+  const gaps = order.slice(1).map((id, i) => r2(p[id]!.x - p[order[i]!]!.x));
+  assert.deepEqual(gaps.map((g) => g >= 0.99), [true, false, true], `gaps ${gaps}`);
+  assert.equal(gaps[1], BACK_TO_BACK);
   assert.ok(row.every((id) => p[id]!.y < Math.min(p.PE1!.y, p.PE2!.y, p.CE1!.y, p.CE2!.y)));
   assert.ok(spanX(p) <= 3 + 1e-9, "within max_columns");
-  assert.match(r.description, /line system LS-T-\d - LS-O-\d - LS-O-\d - LS-T-\d in a row above$/);
+  assert.match(r.description, /line system LS-T-\d - LS-O-\d \+ LS-O-\d back to back - LS-T-\d in a row above$/);
+  // Members that are not OADMs (ROADMs) keep a column between them.
+  const roadm = layoutFacts({ ...lab, nodes: lab.nodes.map((n) => (n.equipment === "oadm" ? { ...n, equipment: "roadm" } : n)) }, { aspect: "card", max_columns: 4 }).positions;
+  const rorder = order.map((id) => roadm[id]!.x).sort((a, b) => a - b);
+  assert.ok(rorder.slice(1).every((x, i) => x - rorder[i]! >= 0.99), "roadms a column apart");
   // A plain box without an equipment role (a device without facts in the path) is laid out as before.
   const box = layoutFacts({ nodes: lab.nodes.map((n) => ({ ...n, equipment: undefined })), links: lab.links });
   assert.ok(box.core.includes("LS-O-1"));

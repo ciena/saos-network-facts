@@ -191,19 +191,28 @@ export function wrapNote(text, width = 34, max = 3) {
 // The part of the model a layer draws. With an optical layer (`split`: the drawing has one), line-system
 // members and the links to them, and the optical spans, are on it, with the routers at their ends; the
 // other layers leave the members and their links out (a link between two routers stays, an optical one
-// too). Without one, every layer has everything, as before.
+// too). Without one, every layer has everything, as before. Never an express span (isExpress).
 export function layerModel(m, id, split) {
-  if (!split) return m;
+  const shown = m.links.filter((l) => !isExpress(m, l));
+  if (!split) return shown.length === m.links.length ? m : { ...m, links: shown };
   const members = new Set(m.nodes.filter((n) => n.member).map((n) => n.id));
   const toMember = (l) => members.has(l.a.node) || members.has(l.b.node);
   if (id === 'optical') {
-    const links = m.links.filter((l) => toMember(l) || l.medium === 'optical');
+    const links = shown.filter((l) => toMember(l) || l.medium === 'optical');
     const ends = new Set(links.flatMap((l) => [l.a.node, l.b.node]));
     const nodes = m.nodes.filter((n) => n.member || ends.has(n.id));
     return { ...m, nodes, links, sites: sitesOf(m, nodes) };
   }
   const nodes = m.nodes.filter((n) => !n.member);
   return { ...m, nodes, links: m.links.filter((l) => !toMember(l)), sites: sitesOf(m, nodes) };
+}
+
+// The express span of two OADMs cabled back to back (both line-system members with the equipment role
+// `oadm`, any case): left out of the drawings, where the two stand side by side (js/src/layout.ts
+// BACK_TO_BACK) and express traffic is implied. The facts and the model keep the link.
+export function isExpress(m, l) {
+  const oadm = (id) => { const n = m.nodes.find((x) => x.id === id); return !!n?.member && /^oadm$/i.test(n.equipment ?? ''); };
+  return l.a.node !== l.b.node && oadm(l.a.node) && oadm(l.b.node);
 }
 
 const sitesOf = (m, nodes) => {

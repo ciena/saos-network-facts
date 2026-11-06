@@ -12,7 +12,7 @@
 //   <img src="frames.svg">        the start frame (the view's frames.start, by default the signature layer)
 // A page that inlines the SVG can show one group at a time itself (a card that rotates).
 
-import { deviceDetail, equipmentTag, isRouter, layerModel, noteLayerOf, typeTag, wrapNote } from './model.js';
+import { deviceDetail, equipmentTag, isExpress, isRouter, layerModel, noteLayerOf, typeTag, wrapNote } from './model.js';
 
 const C = {
   ink: '#1d2430', mute: '#5b6675', ghost: '#c3cad3', ghostInk: '#8a94a3',
@@ -107,7 +107,19 @@ export function renderFrames(m, positions, { frames, start, period = 4 }) {
   const notesH = freeLines ? freeLines * f * 1.0 + f * 1.4 : 0;
   const H = Math.ceil((maxY - minY) * V + myTop + myBot + notesH);
   const ox = (W - ((maxX - minX) * U + 2 * mx)) / 2;
-  const at = (id) => ({ x: r1(ox + mx + (P[id].x - minX) * U), y: r1(myTop + (P[id].y - minY) * V) });
+  // Two OADMs cabled back to back (model.js isExpress) stand side by side in the layout: drawn with
+  // their boxes touching, each moved halfway toward the other.
+  const pull = new Map();
+  for (const l of m.links) {
+    const [a, b] = [l.a.node, l.b.node];
+    if (!isExpress(m, l) || !P[a] || !P[b] || Math.abs(P[a].y - P[b].y) > 1e-9) continue;
+    const gap = (Math.abs(P[a].x - P[b].x) * U - 2 * f * 1.3) / 2;
+    if (gap <= 0) continue;
+    const s = Math.sign(P[b].x - P[a].x);
+    pull.set(a, (pull.get(a) ?? 0) + s * gap);
+    pull.set(b, (pull.get(b) ?? 0) - s * gap);
+  }
+  const at = (id) => ({ x: r1(ox + mx + (P[id].x - minX) * U + (pull.get(id) ?? 0)), y: r1(myTop + (P[id].y - minY) * V) });
   const nodes = new Map(m.nodes.map((n) => [n.id, n]));
   const ctx = { model: m, full: m, at, f, nodes, W, H, frames, notesH };
   const order = start && frames.includes(start) ? [...frames.filter((x) => x !== start), start] : frames;

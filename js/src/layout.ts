@@ -34,8 +34,9 @@
 // frame. The other devices are laid out without them; then each line system is a row of its own above
 // them, in path order (a terminal, the OADMs or amplifiers, the other terminal), the end cabled to the
 // router further left on the left, spread between its two routers' columns when they are far enough
-// apart, else a column apart centred over them, within max_columns. A router cabled only to the line
-// system stands under the member it is cabled to.
+// apart, else a column apart centred over them, within max_columns. OADMs cabled to each other (back to
+// back, the express span between them) stand side by side, BACK_TO_BACK apart, one place in the chain.
+// A router cabled only to the line system stands under the member it is cabled to.
 // aspect card: a landscape card, at most `max_columns` columns and wider than tall where it can be. A
 // ladder too long for that runs round a rectangle that wide instead (its rows use the full width; its
 // sides and rotation chosen like the ladder's); a triangle that is the whole core is a V; a column
@@ -194,7 +195,8 @@ export function layoutFacts(model: LayoutModel, layout: Layout | null = {}): Lay
     const restAdj = new Map(restIds.map((id) => [id, new Set([...adj.get(id)!].filter((x) => !members.has(x)))]));
     const inner = chooseLayout(rest, restIds, restAdj, linkEnds, limit);
     const pos = new Map(Object.entries(inner.positions).map(([id, p]) => [id, { ...p }]));
-    const rows = lineSystems(pos, ids, adj, members, limit);
+    const oadms = new Set(model.nodes.filter((n) => members.has(n.id) && isOadm(n)).map((n) => n.id));
+    const rows = lineSystems(pos, ids, adj, members, oadms, limit);
     const positions: Record<string, Point> = {};
     for (const id of ids) positions[id] = { x: round(pos.get(id)!.x), y: round(pos.get(id)!.y) };
     return { ...inner, positions: normalise(positions), description: `${inner.description}; ${rows.join("; ")}`, warnings };
@@ -202,14 +204,22 @@ export function layoutFacts(model: LayoutModel, layout: Layout | null = {}): Lay
   return { ...chooseLayout(model, ids, adj, linkEnds, limit), warnings };
 }
 
+// An OADM: a line-system member whose equipment role is `oadm` (any case).
+export const isOadm = (n: LayoutNode) => /^oadm$/i.test(n.equipment ?? "");
+
+/** How far apart (in columns) two OADMs cabled back to back stand: their boxes (2.6 font units wide, a
+ * column at least 9.4) touch or nearly so. */
+export const BACK_TO_BACK = 0.3;
+
 // Each line system (a connected piece of `members`) as a row of its own above everything placed, the
 // next one above that: in path order from one end to the other (a piece that is not a path: breadth
-// first from its first name), the end cabled to the router further left on the left; spread evenly
-// between the columns of the routers at its two ends when they are at least a column a member apart,
-// else a column apart centred over them (closer on a card too narrow for that), then shifted to stay
-// within max_columns of the layout. A router cabled to nothing but line systems stands under the member
-// it is cabled to, when that spot is free. Returns what it did, a phrase per line system.
-function lineSystems(pos: Map<string, Point>, ids: string[], adj: Map<string, Set<string>>, members: Set<string>, maxColumns: number): string[] {
+// first from its first name), the end cabled to the router further left on the left. Consecutive
+// `oadms` cabled to each other are one place in the row, side by side BACK_TO_BACK apart. The places
+// are spread evenly between the columns of the routers at the two ends when they are at least a column
+// a place apart, else a column apart centred over them (closer on a card too narrow for that), then
+// shifted to stay within max_columns of the layout. A router cabled to nothing but line systems stands
+// under the member it is cabled to, when that spot is free. Returns what it did, a phrase per line system.
+function lineSystems(pos: Map<string, Point>, ids: string[], adj: Map<string, Set<string>>, members: Set<string>, oadms: Set<string>, maxColumns: number): string[] {
   const memberIds = ids.filter((id) => members.has(id));
   const memberAdj = new Map(memberIds.map((id) => [id, new Set([...adj.get(id)!].filter((x) => members.has(x)))]));
   // Routers cabled to line systems only: they move under their member, so they do not set the row.
@@ -242,21 +252,34 @@ function lineSystems(pos: Map<string, Point>, ids: string[], adj: Map<string, Se
       order.reverse();
       [xa, xb] = [xb, xa];
     }
+    // The places: OADMs cabled back to back share one.
+    const places: string[][] = [];
+    for (const id of order) {
+      const last = places.at(-1)?.at(-1);
+      if (last && oadms.has(id) && oadms.has(last) && memberAdj.get(last)!.has(id)) places.at(-1)!.push(id);
+      else places.push([id]);
+    }
+    const inner = places.reduce((t, pl) => t + (pl.length - 1) * BACK_TO_BACK, 0);
     const xs = placed().map((p) => p.x);
     const mid = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 0;
     const lo = xa ?? xb ?? mid, hi = xb ?? xa ?? mid;
-    const k = order.length;
-    let step = k > 1 ? Math.max(1, (hi - lo) / (k - 1)) : 0;
-    if (Number.isFinite(maxColumns) && k > 1 && step * (k - 1) > maxColumns - 1) step = (maxColumns - 1) / (k - 1);
-    let start = (lo + hi) / 2 - (step * (k - 1)) / 2;
+    const k = places.length;
+    let step = k > 1 ? Math.max(1, (hi - lo - inner) / (k - 1)) : 0;
+    if (Number.isFinite(maxColumns) && k > 1 && step * (k - 1) + inner > maxColumns - 1) step = Math.max(BACK_TO_BACK, (maxColumns - 1 - inner) / (k - 1));
+    const width = step * (k - 1) + inner;
+    let start = (lo + hi) / 2 - width / 2;
     if (Number.isFinite(maxColumns) && xs.length) {
       // Within max_columns of the layout: shifted toward it as far as needed.
-      const end = start + step * (k - 1);
+      const end = start + width;
       const over = Math.max(Math.max(...xs), end) - Math.min(Math.min(...xs), start) - (maxColumns - 1);
       if (over > 1e-9) start += start < Math.min(...xs) ? Math.min(over, Math.min(...xs) - start) : -Math.min(over, end - Math.max(...xs));
     }
-    order.forEach((id, i) => pos.set(id, { x: round(start + i * step), y }));
-    out.push(`line system ${order.join(" - ")} in a row above`);
+    let x = start;
+    for (const pl of places) {
+      pl.forEach((id, j) => pos.set(id, { x: round(x + j * BACK_TO_BACK), y }));
+      x += (pl.length - 1) * BACK_TO_BACK + step;
+    }
+    out.push(`line system ${places.map((pl) => (pl.length > 1 ? `${pl.join(" + ")} back to back` : pl[0])).join(" - ")} in a row above`);
     y -= 1;
   }
   // A router cabled only to line systems: under the member it is cabled to, when no device is there.

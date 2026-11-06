@@ -37,6 +37,12 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   system stands under its terminal. Before, the members joined the core and could fold back on themselves (an
   OADM site's frame round a terminal). A plain box without an equipment role is laid out as before.
   `LayoutNode` takes `site` and `equipment` (the importer's nodes carry both already).
+- **Frames: two OADMs back to back drawn as one, their express span implied** — two OADMs cabled to each
+  other (both line-system members with the equipment role `oadm`, any case: the express span of a back-to-back
+  pair) take one place in the line system's row, side by side (`BACK_TO_BACK`, 0.3 columns, in the layout;
+  the frames draw their boxes touching), and the frames and the snapshot leave the span between them out
+  (`isExpress` in the viewer's render model): express traffic is implied by the two standing together. The
+  facts and the 3D model keep the link; the optical frame's title counts the spans it draws.
 - **Frames: a card whose physical frame has no link opens on the optical frame** — with a signature start
   (the default), a lab whose every cable runs to the line system (two routers joined only over it) started on
   a physical frame of unlinked devices; it now starts on the optical frame (`data-start="optical"`, the

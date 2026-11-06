@@ -99,6 +99,24 @@ describe('frames', () => {
     expect(frames(read(LABS['line-system']), { preset: 'card-frames' }).start).toBe('pw');
   });
 
+  test('two OADMs cabled back to back stand side by side and their express span is not drawn', () => {
+    // the line-system lab with ROADM-A and AMP-1 made OADMs: the span between them is their express span
+    const file = JSON.parse(read(LABS['line-system']));
+    for (const r of file.devices) if (r.device === 'ROADM-A' || r.device === 'AMP-1') r.role = 'oadm';
+    const r = frames(JSON.stringify(file), { preset: 'card-frames' });
+    const optical = r.svg.match(/<g class="frame[^"]*" id="f-optical"[^]*?<\/g>\s*(?=<g class="frame|<\/svg>)/)?.[0] ?? r.svg;
+    expect(optical).not.toContain('span 1 · 40 km');
+    expect(optical).toContain('span 2 · 38 km');
+    expect(r.svg).toMatch(/data-title="Optical · 3 line-system members, 4 spans/);
+    // the facts keep the link; the layout puts the two a box apart, the rest of the chain a column apart
+    expect(r.model.links.some((l) => [l.a.node, l.b.node].sort().join() === 'AMP-1,ROADM-A')).toBe(true);
+    const { positions: p } = prepare(JSON.stringify(file), { preset: 'card-frames' });
+    expect(Math.abs(p['ROADM-A'].x - p['AMP-1'].x)).toBeCloseTo(0.3, 5);
+    expect(Math.abs(p['AMP-1'].x - p['ROADM-B'].x)).toBeGreaterThanOrEqual(0.99);
+    // as given (ROADMs and an amplifier), every span is drawn
+    expect(frames(read(LABS['line-system']), { preset: 'card-frames' }).svg).toContain('span 1 · 40 km');
+  });
+
   test('the view picks frames and the start frame; empty layers make none', () => {
     const text = read(LABS['adaptive-sr-cfm']);
     const listed = frames(text, { frames: { rule: 'list', list: ['cfm', 'igp', 'evpn'], start: 'first' } });
