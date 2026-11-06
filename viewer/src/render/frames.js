@@ -364,10 +364,23 @@ function draw(id, ctx) {
     }
     // The device labels next, at their usual place beside the device; the badges then keep clear of
     // them too (a label pushed away by a badge would leave its device).
+    // Two OADMs back to back (their boxes touching) share one label over the pair, names left to right.
+    const subOf = (n) => (n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null]).filter(Boolean).join(' · ');
+    const drawn = new Set(model.nodes.map((n) => n.id));
+    const partner = new Map();
+    for (const l of ctx.full.links) {
+      if (!isExpress(ctx.full, l) || !drawn.has(l.a.node) || !drawn.has(l.b.node) || partner.has(l.a.node) || partner.has(l.b.node)) continue;
+      const [a, b] = at(l.a.node).x <= at(l.b.node).x ? [l.a.node, l.b.node] : [l.b.node, l.a.node];
+      if (Math.abs(at(a).y - at(b).y) > 0.5) continue;
+      partner.set(a, b);
+      partner.set(b, null);
+    }
     for (const n of model.nodes) {
-      const p = at(n.id);
-      const sub = n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null];
-      labels.push(outward(ctx, reg, p, f * 1.0, [n.id, sub.filter(Boolean).join(' · ')], { color: physicalLook(n).name }));
+      if (partner.get(n.id) === null) continue;
+      const mate = partner.get(n.id) ? ctx.nodes.get(partner.get(n.id)) : null;
+      const p = mate ? { x: r1((at(n.id).x + at(mate.id).x) / 2), y: at(n.id).y } : at(n.id);
+      const sub = mate && subOf(mate) !== subOf(n) ? `${subOf(n)} | ${subOf(mate)}` : subOf(n);
+      labels.push(outward(ctx, reg, p, f * 1.0, [mate ? `${n.id} | ${mate.id}` : n.id, sub], { color: physicalLook(n).name }));
     }
     // The port badges, link by link and end by end (a fixed order: the same facts, the same picture),
     // clear of the boxes, captions, labels and each other. Drawn with their link, under the boxes.

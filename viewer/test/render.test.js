@@ -123,6 +123,9 @@ describe('frames', () => {
     const file = JSON.parse(read(LABS['line-system']));
     for (const r of file.devices) if (r.device === 'ROADM-A' || r.device === 'AMP-1') r.role = 'oadm';
     const r = frames(JSON.stringify(file), { preset: 'card-frames' });
+    // one label over the pair, names left to right
+    expect(r.svg).toMatch(/>(ROADM-A \| AMP-1|AMP-1 \| ROADM-A)<\/text>/);
+    expect(r.svg).not.toMatch(/>AMP-1<\/text>/);
     expect(r.svg).not.toContain('span 1 · 40 km');
     expect(r.svg).toContain('span 2 · 38 km');
     expect(r.svg).toMatch(/data-title="Physical · 5 devices [^"]*, 5 links \(4 optical\)/);

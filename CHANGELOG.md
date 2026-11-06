@@ -40,7 +40,7 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 - **Frames: two OADMs back to back drawn as one, their express span implied** — two OADMs cabled to each
   other (both line-system members with the equipment role `oadm`, any case: the express span of a back-to-back
   pair) take one place in the line system's row, side by side (`BACK_TO_BACK`, 0.3 columns, in the layout;
-  the frames draw their boxes touching), and the frames and the snapshot leave the span between them out
+  the frames draw their boxes touching, under one label `OADM-1 | OADM-2`, names left to right), and the frames and the snapshot leave the span between them out
   (`isExpress` in the viewer's render model): express traffic is implied by the two standing together. The
   facts and the 3D model keep the link; the frame titles count the spans they draw.
 - **Frames: the physical frame shows the line system and the routers joined through it** — the line system
