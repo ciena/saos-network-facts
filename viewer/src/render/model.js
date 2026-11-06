@@ -214,6 +214,33 @@ export function layerModel(m, id, split, { cabling = false } = {}) {
   return { ...m, nodes, links: shown.filter((l) => !toMember(l)), sites: sitesOf(m, nodes) };
 }
 
+// The part of the model a 2D card's frame draws in a lab with a line system (frames.js; the 3D page and
+// the snapshot use layerModel). The optical frame: the line system alone, its members and the spans
+// between them (an optical link between two routers too, with them), and a callout for each router
+// cable to a member: `PE-1 2/1 · ch 25` at the member, the cable's label as its channel, else `ch N`
+// for a port that is a number, else the port. Every other frame: the devices off the line system, and on
+// the physical frame each connection over it (lightpath) between its routers. Never an express span.
+export function cardLayer(m, id) {
+  const members = new Set(m.nodes.filter((n) => n.member).map((n) => n.id));
+  const toMember = (l) => members.has(l.a.node) || members.has(l.b.node);
+  const shown = m.links.filter((l) => !isExpress(m, l) && (id === 'physical' || !l.lightpath));
+  if (id === 'optical') {
+    const links = shown.filter((l) => !l.lightpath && (members.has(l.a.node) && members.has(l.b.node) || (l.medium === 'optical' && !toMember(l))));
+    const ends = new Set(links.flatMap((l) => [l.a.node, l.b.node]));
+    const nodes = m.nodes.filter((n) => n.member || ends.has(n.id));
+    const callouts = [];
+    for (const l of shown) {
+      if (l.lightpath || members.has(l.a.node) === members.has(l.b.node)) continue;
+      const [mem, rtr] = members.has(l.a.node) ? [l.a, l.b] : [l.b, l.a];
+      const channel = l.caption ?? (/^\d+$/.test(String(mem.port ?? '')) ? `ch ${mem.port}` : mem.port ?? '?');
+      callouts.push({ member: mem.node, port: mem.port ?? null, router: rtr.node, routerPort: rtr.port ?? null, text: `${rtr.node} ${rtr.port ?? '?'} · ${channel}` });
+    }
+    return { ...m, nodes, links, sites: sitesOf(m, nodes), callouts };
+  }
+  const nodes = m.nodes.filter((n) => !n.member);
+  return { ...m, nodes, links: shown.filter((l) => !toMember(l)), sites: sitesOf(m, nodes) };
+}
+
 // A lab with an optical line system: its members are off the protocol layers.
 export const hasLineSystem = (m) => m.nodes.some((n) => n.member) || m.links.some((l) => l.medium === 'optical');
 

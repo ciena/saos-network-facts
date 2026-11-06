@@ -1353,8 +1353,18 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
   // The IGP area of each router, so the layout keeps the routers of one area together.
   const areaOf = (n) => (n.role === 'ce' ? null : igp === 'isis' ? (devices.get(n.id)?.isis?.instances?.[0] ? isisArea(devices.get(n.id).isis.instances[0]) : null) : n.loopbackArea ?? null);
   // The connections over a line system join their routers in the layout too (not cabled: lightpath).
-  const placed = placeNodes(nodes, [...links, ...extras.lightpaths], rings, positions, layout, report, plain, new Map(nodes.map((n) => [n.id, areaOf(n)])));
+  const areas = new Map(nodes.map((n) => [n.id, areaOf(n)]));
+  const placed = placeNodes(nodes, [...links, ...extras.lightpaths], rings, positions, layout, report, plain, areas);
   for (const n of [...nodes, ...plain.nodes]) n.pos = placed.pos[n.id];
+  // The 2D cards of a lab with a line system draw it on an optical frame of its own and the routers on
+  // the others, so those are laid out without it: the routers (and other devices) alone, each connection
+  // over the line system an ordinary link between its routers (render/frames.js). The 3D page and the
+  // snapshot keep the layout above, line system and all.
+  const members = new Set(plain.nodes.filter((n) => n.equipment).map((n) => n.id));
+  const rest = { nodes: plain.nodes.filter((n) => !members.has(n.id)), links: plain.links.filter((l) => !members.has(l.a.node) && !members.has(l.b.node)) };
+  const cardLayout = members.size && placed.layout && nodes.length + rest.nodes.length
+    ? placeNodes(nodes, [...links, ...extras.lightpaths.map(({ lightpath, ...l }) => l)], rings, null, layout, { add() {}, warn() {} }, rest, areas).layout
+    : null;
 
   const recipe = file.devices.find((r) => r.recipe)?.recipe;
   // Labels: SR-MPLS with an SRGB; static only when MPLS-TP tunnels carry every pseudowire; else LDP.
@@ -1391,6 +1401,8 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
     services: buildServices(pseudowires, megs),
     labelMode,
     layout: placed.layout,
+    // a lab with a line system: the 2D cards' layout of the devices that are not its members, or null
+    cardLayout,
     report: { topology, gaps: report.gaps, warnings: report.warnings },
   };
 }

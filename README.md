@@ -326,12 +326,13 @@ physical one: the line-system members as solid blue boxes tagged with their role
 optical spans as a blue double line with their label, and the routers at the spans' ends, whose risers
 start there; the physical layer keeps the routers and the links between them, and the connections over
 the line system described below (dashed, the router port at each end). The 2D frames draw the
-line system on the physical frame, with every cable, so the cabling is complete there; they have no
-optical frame unless the view lists one (`frames.rule` `list`), as it would repeat part of the physical
-frame. On both, a routed link whose two ports are cabled by optical spans says it rides the line system
+line system on an optical frame of its own, without the routers: at each member port a router is cabled
+to, a callout names what rides it (`PE-1 2/1 · ch 25`); their physical frame shows the routers, laid out
+without the line system (a view without `optical` keeps the line system with every cable on the physical
+frame). On both, a routed link whose two ports are cabled by optical spans says it rides the line system
 (`over ch 25`, the spans' label when both say the same); where the facts give no such link, two routers
 cabled to the same port of two members of one line system (a terminal's channel port: an ELS terminal's
-port 25 is channel 25) are joined by a connection over it, a thin dashed blue line `over ch 25` with the router port badged at each end (the two
+port 25 is channel 25) are joined by a connection over it, a dashed line with the router port badged at each end, `over ch 25` in 3D and `ch 25` on the frames (dashed blue, or a rainbow of dashes with `underlay: 'rainbow'`) (the two
 cables' label when they have the same one, else `ch N` for a port that is a number), drawn only: it is
 not a link of the network the 3D view runs, and a protocol layer never shows it. Protocol frames leave
 the line system out. A view without `optical` in its `layers` draws the line system on the physical
@@ -611,9 +612,9 @@ In Python, `saos_network_facts.schema.view_errors(view)` validates a view file.
 For a lab card or a page without WebGL, the viewer renders a facts file and a view to two SVG files,
 with the same layout as the 3D page:
 
-- **`frames.svg`**: one flat frame per layer the lab has content for (an optical frame, the line system and
-  the routers at its ends, only when the view lists it); physical (the line system too, with every cable
-  and the connections over it; each router, any Ciena SAOS device, as the common router symbol in Ciena red, its name and
+- **`frames.svg`**: one flat frame per layer the lab has content for (optical: the line system, with a
+  callout for what rides each port a router is cabled to); physical (the routers, joined by the connections
+  over the line system; each router, any Ciena SAOS device, as the common router symbol in Ciena red, its name and
   model beside it; any other device, a Waveserver, a third-party box, an ELS shelf, as a grey box tagged with
   its model; links and ports); roles (`f-role`, right after physical: CE, PE and P as the viewer derives them from the facts,
   or a record's `role` for a device without facts, a route reflector as P·RR; left out when no device has

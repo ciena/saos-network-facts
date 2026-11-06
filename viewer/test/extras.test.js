@@ -70,40 +70,35 @@ describe('import', () => {
 describe('frames and snapshot', () => {
   const group = (svg, id) => svg.split(/(?=<g class="frame[ a-z0-9]*")/).find((g) => g.includes(`id="f-${id}"`));
 
-  test('the physical frame: the line system with every cable, the routers and the routed link over it; sites; the notes', () => {
+  test('two frames: the line system on the optical frame with callouts, the routers on the physical frame', () => {
     const r = frames(text, { preset: 'card-frames' });
-    // no optical frame: the physical frame draws the line system with every cable
-    expect(r.frames.map((x) => x.id)).toEqual(['physical', 'role', 'igp', 'bgp', 'pw']);
+    expect(r.frames.map((x) => x.id)).toEqual(['optical', 'physical', 'role', 'igp', 'bgp', 'pw']);
+    // the start frame stays the signature one
+    expect(r.start).toBe('pw');
+    const optical = group(r.svg, 'optical');
+    // the members and the spans between them; no router, no router cable: a callout at each member port
+    // a router is cabled to, its channel the cable's label
+    expect(optical.match(/class="link-optical"/g)).toHaveLength(2);
+    for (const caption of ['span 1 · 40 km', 'span 2 · 38 km']) expect(optical).toContain(`>${caption}</text>`);
+    for (const tag of ['ROADM', 'AMP']) expect(optical).toContain(`>${tag}</text>`);
+    for (const tag of ['5164', '5162']) expect(optical).not.toContain(`>${tag}</text>`);
+    const callouts = [...optical.matchAll(/<g class="callout">[\s\S]*?<\/g>/g)].map((m) => [...m[0].matchAll(/>([^<>]+)<\/text>/g)].map((t) => t[1]));
+    expect(callouts).toEqual([['PE1 1 · ch 25', 'PE1 2 · ch 26 · dark'], ['PE2 1 · ch 25']]);
+    expect(optical.match(/<g class="site">/g)).toHaveLength(2);
+    expect(optical).toContain('>in-line amplifier hut, no</text>');
+    expect(r.svg).toMatch(/data-title="Optical · 3 line-system members, 2 spans · 2 sites"/);
+    // the physical frame: the routers and the facts' routed link over the line system, nothing derived
     const physical = group(r.svg, 'physical');
-    expect(physical.match(/class="link-optical"/g)).toHaveLength(5);
-    for (const caption of ['ch 25', 'ch 26 · dark', 'span 1 · 40 km', 'span 2 · 38 km', 'over ch 25']) expect(physical).toContain(`>${caption}</text>`);
-    for (const tag of ['ROADM', 'AMP', '5164', '5162']) expect(physical).toContain(`>${tag}</text>`);
-    // the facts' routed link over the line system says so; no connection is derived beside it
+    expect(physical).not.toContain('class="link-optical"');
+    expect(physical).not.toContain('>ROADM</text>');
+    expect(physical).toContain('>over ch 25</text>');
     expect(physical).not.toContain('class="lightpath"');
     expect(physical.match(/<g class="site">/g)).toHaveLength(2);
-    // the note on AMP-1 (no layer of its own) goes with AMP-1, on the physical frame, with the free note
-    expect(physical).toContain('>in-line amplifier hut, no</text>');
-    expect(physical.match(/<g class="note">/g)).toHaveLength(2);
-    expect(r.svg).toMatch(/data-title="Physical · 5 devices \(SAOS 10\), 6 links \(5 optical\) · 2 sites"/);
+    expect(r.svg).toMatch(/data-title="Physical · 2 devices \(SAOS 10\), 1 link · 2 sites"/);
     // the other frames leave the line system out
     expect(group(r.svg, 'igp')).not.toContain('ROADM-A');
     expect(group(r.svg, 'role')).not.toContain('ROADM-A');
     expect(r.svg.match(/<g class="note">/g)).toHaveLength(2);
-  });
-
-  test('a view that lists the optical frame keeps it: the line system and the routers at its ends', () => {
-    const r = frames(text, { preset: 'card-frames', frames: { rule: 'list', list: ['optical', 'physical', 'igp'] } });
-    expect(r.frames.map((x) => x.id)).toEqual(['optical', 'physical', 'igp']);
-    const optical = group(r.svg, 'optical');
-    expect(optical.match(/class="link-optical"/g)).toHaveLength(5);
-    for (const caption of ['ch 25', 'ch 26 · dark', 'span 1 · 40 km', 'span 2 · 38 km']) expect(optical).toContain(`>${caption}</text>`);
-    for (const tag of ['ROADM', 'AMP', '5164', '5162']) expect(optical).toContain(`>${tag}</text>`);
-    expect(optical).not.toContain('>over ch 25</text>');
-    expect(optical.match(/<g class="site">/g)).toHaveLength(2);
-    expect(optical).toContain('>in-line amplifier hut, no</text>');
-    expect(r.svg).toMatch(/data-title="Optical · 3 line-system members, 5 spans · 2 sites"/);
-    // the physical frame still draws it all
-    expect(group(r.svg, 'physical').match(/class="link-optical"/g)).toHaveLength(5);
   });
 
   test('a view without the optical layer draws the line system on the physical frame', () => {

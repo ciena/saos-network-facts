@@ -43,19 +43,24 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   the frames draw their boxes touching, under one label `OADM-1 | OADM-2`, names left to right), and the frames and the snapshot leave the span between them out
   (`isExpress` in the viewer's render model): express traffic is implied by the two standing together. The
   facts and the 3D model keep the link; the frame titles count the spans they draw.
-- **Frames: the physical frame shows the line system and the routers joined through it** — the line system
-  was drawn on the optical frame only, so on the physical frame the routers at its ends looked unconnected
-  (and a lab cabled only through it had a physical frame without a link). The physical frame now draws the
-  line system with every cable (the row, the spans with their labels, the router to terminal cables with
-  their port badges), and two routers cabled to the same port of two members of one line system (a
-  terminal's channel port) are joined by a connection over it: a thin dashed blue line captioned
-  `over ch 25`, the router port badged at each end like a cable's (the two cables' label when they match, else `ch N` for a numbered port), derived from the
-  cabling (`topology.lightpaths`, `lightpathsOf` in the importer), drawn only, never on a protocol frame,
-  not a link of the 3D view's network. Where the facts give a routed link over the line system, its own
-  `over` caption says so and nothing is derived. The connection joins its routers in the layout
-  (`LayoutLink.lightpath`), which still puts a router cabled only to the line system under its terminal.
-  The frames have no optical frame unless the view lists one (`frames.rule` `list`): it would repeat part
-  of the physical frame. Protocol frames leave the line system out, with or without an optical frame.
+- **Frames: an optical frame for the line system, the routers joined through it on the physical frame** —
+  the line system was drawn on the optical frame with the routers at its ends, so the physical frame showed
+  those routers unconnected (and a lab cabled only through it had a physical frame without a link). A lab
+  with a line system now has two frames for it. The optical frame draws the line system alone: its row
+  (terminal, the OADMs side by side, terminal), the spans with their labels, and at each member port a
+  router is cabled to a callout naming what rides it, `PE-1 2/1 · ch 25` (the cable's label as its channel,
+  else `ch N` for a numbered port), instead of the router and its cable. The physical frame draws the
+  routers: two routers cabled to the same port of two members of one line system (a terminal's channel
+  port) are joined by a connection over it, a dashed line labelled with its channel (`ch 25`), the router
+  port badged at each end, derived from the cabling (`topology.lightpaths`, `lightpathsOf` in the
+  importer), drawn only, never on a protocol frame, not a link of the 3D view's network. `frames()` draws
+  it dashed blue, or with `underlay: 'rainbow'` as a dash of each of six colours in turn. Where the facts
+  give a routed link over the line system, its own `over` caption says so and nothing is derived. The
+  frames other than optical lay their devices out without the line system, each connection over it an
+  ordinary link (the importer's `cardLayout`), so the chain no longer pushes the routers apart; the
+  optical frame keeps the line system's places. A view without the optical layer keeps the line system
+  with every cable on the physical frame. The start frame is unchanged; protocol frames leave the line
+  system out.
 - **3D view and snapshot: the physical plane shows the routers joined through the line system** — the 3D
   page and the snapshot keep their optical plane under the physical one (the members, the spans, the
   router cables, each router end now labelled with its port on the page), and their physical plane now
