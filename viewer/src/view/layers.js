@@ -19,10 +19,10 @@ const SITE = 0x8b98a8;
 const PAGE_LAYER_OF = { igp: 'isis' }; // a note's view layer id -> the page's layer id
 
 export const LAYERS = [
-  // Under the physical plane: optical line-system members and the spans to and between them (schema 1.9).
-  { id: 'optical', name: 'Optical line system', color: 0x5c7cfa, has: (net) => (net.topo.plain?.nodes ?? []).some((n) => n.equipment) || [...net.topo.links, ...(net.topo.plain?.links ?? [])].some((l) => l.medium === 'optical') },
-  // A lab with no facts at all still has its plain boxes (devices without facts, not line-system members) here.
-  { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8, has: (net) => net.topo.nodes.length > 0 || (net.topo.plain?.nodes ?? []).some((n) => !n.equipment) },
+  // The bottom plane: the devices and their links, with a line system and the routers joined through it
+  // (schema 1.9; no optical plane under it, as the 2D cards have no optical frame). A lab with no facts at
+  // all still has its plain boxes here.
+  { id: 'physical', name: 'Physical / LAG', color: 0x8b98a8, has: (net) => net.topo.nodes.length > 0 || (net.topo.plain?.nodes ?? []).length > 0 },
   { id: 'ring', name: 'G.8032 rings', color: 0xe3b341, has: (net) => (net.g8032?.rings.length ?? 0) > 0 },
   { id: 'isis', name: 'IGP (IS-IS / OSPF)', color: 0x3fb950, has: (net) => net.igp.routers.length > 0 },
   { id: 'mpls', name: 'MPLS: SR policies / LSPs / MPLS-TP', color: 0xd29922, has: (net) => net.tp.tunnels.length > 0 || net.sr.policies.length > 0 || mplsRouters(net).length > 0 },
@@ -97,6 +97,46 @@ export function transportLsps(net) {
     }
   }
   return out;
+}
+
+// An express span: a link between two OADMs of a line system, back to back at one site (as render/model.js
+// isExpress, over the plain boxes: { nodes }).
+export function isExpress(plain, l) {
+  const oadm = (id) => /^oadm$/i.test(plain.nodes.find((n) => n.id === id)?.equipment ?? '');
+  return oadm(l.a.node) && oadm(l.b.node);
+}
+
+// What the physical plane adds for a line system (as the 2D physical frame does): each connection over
+// it (import/facts.js lightpathsOf) as a dashed line with its caption, and the router port at each router
+// (a device that is not a member, with facts or a plain box) end of a cable to a line-system member and of each such connection. A line drawn beside others between
+// the same two devices carries its index and their count (memberOffset), as buildPlain spreads them.
+export function physicalLineSystem(net) {
+  const plain = net.topo.plain ?? { nodes: [], links: [] };
+  const members = new Set(plain.nodes.filter((n) => n.equipment).map((n) => n.id));
+  const key = (l) => [l.a.node, l.b.node].sort().join('|');
+  const spread = (list) => {
+    const count = new Map(), seen = new Map();
+    for (const l of list) count.set(key(l), (count.get(key(l)) ?? 0) + 1);
+    return list.map((l) => {
+      const index = seen.get(key(l)) ?? 0;
+      seen.set(key(l), index + 1);
+      return { l, index, count: count.get(key(l)) };
+    });
+  };
+  const lightpaths = spread(net.topo.lightpaths ?? []).map(({ l, index, count }) => ({ ...l, index, count }));
+  const ports = [];
+  // the cables as buildPlain draws them (plain links, spread among themselves)
+  for (const { l, index, count } of spread(plain.links.filter((l) => !isExpress(plain, l)))) {
+    for (const [end, far] of [[l.a, l.b], [l.b, l.a]]) {
+      if (!members.has(end.node) && members.has(far.node) && end.port != null) ports.push({ node: end.node, port: String(end.port), toward: far.node, index, count, lightpath: false });
+    }
+  }
+  for (const l of lightpaths) {
+    for (const [end, far] of [[l.a, l.b], [l.b, l.a]]) {
+      if (end.port != null) ports.push({ node: end.node, port: String(end.port), toward: far.node, index: l.index, count: l.count, lightpath: true });
+    }
+  }
+  return { members: [...members], lightpaths, ports };
 }
 
 // The outline every plane shares: the drawn devices (plain boxes too) with a 6-unit margin, in xz.
@@ -252,7 +292,6 @@ export class LayerView {
     this.groups = {};
     this.pickables = [];
     this.linkMeshes = {};
-    this.opticalEnds = null;
     const box = planeBox(net.topo);
     this.box = box;
 
@@ -290,13 +329,12 @@ export class LayerView {
     for (const n of net.topo.nodes) {
       const core = ['srv6', 'mpls', 'isis'].find((id) => this.present.includes(id)) ?? 'physical';
       const top = n.role === 'ce' ? (vrfHosts.has(n.id) && this.present.includes('vrf') ? layerY('vrf') : layerY('physical')) : n.role === 'pe' || vrfRouters.has(n.id) ? layerY(shown.at(-1).id) : layerY(core);
-      const bottom = this.opticalEnds?.has(n.id) ? layerY('optical') : layerY('physical');
-      const pillar = new THREE.Line(new THREE.BufferGeometry().setFromPoints([this.pos(n.id).setY(bottom), this.pos(n.id).setY(top)]), pillarMat);
+      const pillar = new THREE.Line(new THREE.BufferGeometry().setFromPoints([this.pos(n.id).setY(layerY('physical')), this.pos(n.id).setY(top)]), pillarMat);
       this.root.add(pillar);
     }
   }
 
-  // The physical plane (at layerY('physical'): 0, or one gap up when the optical plane is under it).
+  // The physical plane (the bottom one, at y 0).
   build_physical(g, net, L) {
     const Y = L.y;
     const colors = { ce: 0x6e7681, pe: 0x4aa8ff, p: 0x2f81f7 };
@@ -336,33 +374,24 @@ export class LayerView {
         if (text) g.add(label(text, 'edge-label', mid.clone().setY(Y + 2)));
       }
     }
-    // With an optical plane, the line system is drawn there, not here.
-    const split = this.present.includes('optical');
-    const members = new Set((net.topo.plain?.nodes ?? []).filter((n) => n.equipment).map((n) => n.id));
-    const onOptical = (l) => members.has(l.a.node) || members.has(l.b.node) || l.medium === 'optical';
-    const plain = net.topo.plain ?? { nodes: [], links: [] };
-    this.buildPlain(g, split ? { nodes: plain.nodes.filter((n) => !members.has(n.id)), links: plain.links.filter((l) => !onOptical(l)) } : plain, Y);
-    this.buildSites(g, net, Y);
-  }
-
-  // The optical plane, under the physical one: the line-system members (schema 1.9 devices[].role), the
-  // optical spans and links to them, and each router at a span's end as a disc with its name; the
-  // router's pillar starts here.
-  build_optical(g, net, L) {
-    const Y = L.y;
-    const plain = net.topo.plain ?? { nodes: [], links: [] };
-    const members = new Set(plain.nodes.filter((n) => n.equipment).map((n) => n.id));
-    const onOptical = (l) => members.has(l.a.node) || members.has(l.b.node) || l.medium === 'optical';
-    const links = [...plain.links.filter(onOptical), ...net.topo.links.filter((l) => l.medium === 'optical').map((l) => ({ ...l, a: { node: l.a.node, port: l.a.port }, b: { node: l.b.node, port: l.b.port } }))];
-    const ends = new Set(links.flatMap((l) => [l.a.node, l.b.node]).filter((id) => !members.has(id)));
-    this.opticalEnds = ends;
-    for (const id of ends) {
-      const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.25, 24), new THREE.MeshStandardMaterial({ color: 0x9aa7b8, roughness: 0.6 }));
-      disc.position.copy(this.pos(id)).setY(Y + 0.12);
-      g.add(disc);
-      g.add(label(id, 'node-label', this.pos(id).setY(Y - 1.3)));
+    // The line system is drawn here too (as on the 2D physical frame), with the routers joined through it.
+    const ls = physicalLineSystem(net);
+    this.buildPlain(g, net.topo.plain ?? { nodes: [], links: [] }, Y);
+    for (const l of ls.lightpaths) {
+      const a = this.pos(l.a.node).setY(Y + 0.6), b = this.pos(l.b.node).setY(Y + 0.6);
+      const off = memberOffset(a, b, l.index, l.count, 1.2);
+      g.add(dashed([a.clone().add(off), b.clone().add(off)], OPTICAL, 0.95));
+      // side by side connections: their captions staggered along the line, apart
+      g.add(label(l.over, 'edge-label optical', new THREE.Vector3().lerpVectors(a, b, 0.5 + (l.index - (l.count - 1) / 2) * 0.16).add(off).setY(Y + 1.4)));
     }
-    this.buildPlain(g, { nodes: plain.nodes.filter((n) => members.has(n.id)), links }, Y);
+    for (const p of ls.ports) {
+      const a = this.pos(p.node).setY(Y + 0.6), b = this.pos(p.toward).setY(Y + 0.6);
+      const off = memberOffset(a, b, p.index, p.count, 1.2);
+      // a fifth of the way along (at least 2.2 units out, clear of the device box), so a router's ports
+      // spread out along its lines rather than stack on it; side by side lines' ports staggered along them
+      const t = Math.min(0.45, Math.max(0.2, 2.2 / Math.max(a.distanceTo(b), 0.001))) + p.index * 0.1;
+      g.add(label(p.port, 'port-label', new THREE.Vector3().lerpVectors(a, b, t).add(off).setY(Y + 0.9)));
+    }
     this.buildSites(g, net, Y);
   }
 
@@ -383,14 +412,15 @@ export class LayerView {
   }
 
   // Notes (schema 1.9): on their layer (physical when the page does not show it), so they follow its
-  // toggle; one on a device above the device, a free one at the plane's front right corner.
+  // toggle; one on a device above the device, a free one hanging from just in front of the plane's front
+  // right corner (style.css: off the devices there).
   buildNotes(net) {
     let free = 0;
     for (const note of net.topo.notes ?? []) {
       const id = noteLayer(note, this.present, net.topo);
       const g = this.groups[id];
       if (!g) continue;
-      const at = note.device ? this.pos(note.device, id).setY(layerY(id) + 2.6) : new THREE.Vector3(this.box.x1 - 2, layerY(id), this.box.z1 - 1.5 - 1.6 * free++);
+      const at = note.device ? this.pos(note.device, id).setY(layerY(id) + 2.6) : new THREE.Vector3(this.box.x1 - 2, layerY(id), this.box.z1 + 1 + 1.6 * free++);
       g.add(label(note.text, note.device ? 'note-label' : 'note-label free', at));
     }
   }
@@ -398,8 +428,11 @@ export class LayerView {
   // Plain boxes (import/facts.js plainNodes): a device without facts as a dim box with an outline, its
   // name and type, and the file's links[] to it as thin dashed lines. Nothing runs on them, so they
   // have no link state (a failure cannot be set on them). `plain`: the boxes and links to draw at height Y
-  // (the physical plane, or the optical plane for a line system).
+  // (the physical plane). Two OADMs back to back (isExpress) share one label, `A | B`, and their express
+  // span is implied, not drawn (as on the 2D physical frame).
   buildPlain(g, plain, Y) {
+    const mates = new Map();
+    for (const l of plain.links) if (isExpress(plain, l)) mates.set(l.b.node, l.a.node).set(l.a.node, l.b.node);
     for (const n of plain.nodes) {
       // A line-system member (a role from the extra file, no facts by design): solid, in the optical colour.
       const geo = new THREE.BoxGeometry(2.4, 1.2, 2.4);
@@ -413,13 +446,21 @@ export class LayerView {
       const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: PLAIN_EDGE }));
       edges.position.copy(mesh.position);
       g.add(edges);
-      g.add(label(nodeLabel(n, this.labels), `node-label ${n.equipment ? 'optical' : 'plain'}`, this.pos(n.id).setY(Y - 1.3)));
+      const mate = mates.get(n.id);
+      // labelled once over the pair, left to right, from its left box
+      if (mate && (this.pos(mate).x < this.pos(n.id).x || (this.pos(mate).x === this.pos(n.id).x && mate < n.id))) continue;
+      // the pair's names, then what they share once (`ELS-O-1 | ELS-O-2 oadm · ELS-OADM`)
+      const [own, other] = [nodeLabel(n, this.labels), mate && nodeLabel(plain.nodes.find((x) => x.id === mate), this.labels)];
+      const tail = own.slice(n.id.length);
+      const text = !mate ? own : other.slice(mate.length) === tail ? `${n.id} | ${mate}${tail}` : `${own} | ${other}`;
+      g.add(label(text, `node-label ${n.equipment ? 'optical' : 'plain'}`, (mate ? this.pos(n.id).lerp(this.pos(mate), 0.5) : this.pos(n.id)).setY(Y - 1.3)));
     }
     // An optical span (links[].kind) as a solid tube in the optical colour with its caption; the rest dashed.
     const key = (l) => [l.a.node, l.b.node].sort().join('|');
     const count = new Map(), seen = new Map();
-    for (const l of plain.links) count.set(key(l), (count.get(key(l)) ?? 0) + 1);
-    for (const l of plain.links) {
+    const links = plain.links.filter((l) => !isExpress(plain, l));
+    for (const l of links) count.set(key(l), (count.get(key(l)) ?? 0) + 1);
+    for (const l of links) {
       const a = this.pos(l.a.node).setY(Y + 0.6), b = this.pos(l.b.node).setY(Y + 0.6);
       const i = seen.get(key(l)) ?? 0;
       seen.set(key(l), i + 1);

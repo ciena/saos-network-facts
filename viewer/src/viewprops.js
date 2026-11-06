@@ -10,9 +10,10 @@ import { labelOptions } from './view/labels.js';
 // The page's layer ids that differ from the view's (view.ts LAYER_IDS): the IGP plane is "isis".
 const PAGE_LAYER = { igp: 'isis' };
 export const pageLayerId = (viewId) => PAGE_LAYER[viewId] ?? viewId;
-// The view layers the page has no plane for: role is a 2D frame only (render/frames.js); the page shows
-// the roles as its devices' colours, on every plane.
-export const FRAME_ONLY = ['role'];
+// The view layers the page has no plane for, 2D frames only (render/frames.js): role (the page shows the
+// roles as its devices' colours, on every plane) and optical (a frame a view lists; the page draws the line
+// system on its physical plane, as the 2D physical frame does).
+export const FRAME_ONLY = ['optical', 'role'];
 
 // { view, warnings } for a view file's text (or null) and why it could not be fetched (or null).
 export function pageView(viewText, viewError, search) {

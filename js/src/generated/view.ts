@@ -10,7 +10,7 @@
  */
 export type PresetName = "card-frames" | "lab-snapshot" | "protocol-stack";
 /**
- * A layer: optical (since 1.2: optical line-system members and the optical spans to and between them, under the physical layer; a view without it draws them on the physical layer), physical (devices by type, links, LAGs), role (since 1.3: the network roles, CE, PE and P, over the physical layer; a lab with no device in a role has none), ring (G.8032 rings), igp (IS-IS / OSPF adjacencies), mpls (SR policies, LSPs, MPLS-TP tunnels), srv6 (SRv6 locators, Flex-Algo), bgp (BGP sessions), vrf (VRFs / L3VPN), pw (VPWS pseudowires), evpn (EVPN instances), cfm (CFM MEGs and MEPs).
+ * A layer: optical (since 1.2: optical line-system members and the optical spans to and between them, as a 2D frame of its own when the frames rule is list; the physical layer draws them in any case), physical (devices by type, links, LAGs), role (since 1.3: the network roles, CE, PE and P, over the physical layer; a lab with no device in a role has none), ring (G.8032 rings), igp (IS-IS / OSPF adjacencies), mpls (SR policies, LSPs, MPLS-TP tunnels), srv6 (SRv6 locators, Flex-Algo), bgp (BGP sessions), vrf (VRFs / L3VPN), pw (VPWS pseudowires), evpn (EVPN instances), cfm (CFM MEGs and MEPs).
  *
  * This interface was referenced by `ViewFile`'s JSON-Schema
  * via the `definition` "LayerId".
