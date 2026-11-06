@@ -200,13 +200,15 @@ function layerObjects(id, model, at, S, cam, { uv, layers, planeU, planeV, full 
       const nx = (-(b0.y - a0.y) / d) * off, ny = ((b0.x - a0.x) / d) * off;
       const a = { x: r1(a0.x + nx), y: r1(a0.y + ny) }, b = { x: r1(b0.x + nx), y: r1(b0.y + ny) };
       const optical = l.medium === 'optical';
-      // A routed link over the line system says so (`over ch 25`) where it has no label of its own.
-      const caption = l.caption ?? l.over;
+      // A link over the line system (a connection over it, or a routed link with `over`) is captioned
+      // `over ch 25`.
+      const caption = l.over ?? l.caption;
       const tip = `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium || l.caption ? `\n${[l.medium, l.caption].filter(Boolean).join(': ')}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}${l.plain && !optical ? '\ncabled (links[]), no facts on one end' : ''}`;
       // An optical span: a blue double line (white core), its caption in the middle.
-      // a connection over the line system (import/facts.js lightpathsOf): thin, a rainbow of dashes
-      const body = l.lightpath ? RAINBOW.map((c, k) => line(a, b, c, 1.8, ` stroke-dasharray="4 20" stroke-dashoffset="${-k * 4}"`)).join('') : optical ? `${line(a, b, C.optical, 5, ' stroke-linecap="round"')}${line(a, b, '#fff', 1.6, ' stroke-linecap="round"')}` : line(a, b, l.plain ? C.plain : '#69768a', 2, l.plain ? ' stroke-dasharray="5 4"' : '');
-      g.push(`<g${l.lightpath ? ' class="lightpath"' : l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}${pill(lerp(a, b, 0.2), l.a.port ?? '?', '#9aa4b1')}${pill(lerp(a, b, 0.8), l.b.port ?? '?', '#9aa4b1')}${caption ? pill(lerp(a, b, 0.5), caption, optical || !l.caption ? C.optical : '#9aa4b1') : ''}</g>`);
+      // a link over the line system (import/facts.js lightpathsOf, or a routed link with `over`): thin, a
+      // rainbow of dashes
+      const body = l.over ? RAINBOW.map((c, k) => line(a, b, c, 1.8, ` stroke-dasharray="4 20" stroke-dashoffset="${-k * 4}"`)).join('') : optical ? `${line(a, b, C.optical, 5, ' stroke-linecap="round"')}${line(a, b, '#fff', 1.6, ' stroke-linecap="round"')}` : line(a, b, l.plain ? C.plain : '#69768a', 2, l.plain ? ' stroke-dasharray="5 4"' : '');
+      g.push(`<g${l.lightpath ? ' class="lightpath"' : l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}${pill(lerp(a, b, 0.2), l.a.port ?? '?', '#9aa4b1')}${pill(lerp(a, b, 0.8), l.b.port ?? '?', '#9aa4b1')}${caption ? pill(lerp(a, b, 0.5), caption, optical || l.over || !l.caption ? C.optical : '#9aa4b1') : ''}</g>`);
     }
     for (const nd of model.nodes) {
       const p = at(nd.id);

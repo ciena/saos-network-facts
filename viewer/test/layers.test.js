@@ -127,10 +127,12 @@ describe('toggle state', () => {
 });
 
 describe('a line system on the page: router ports on the optical plane, the routers joined through it on physical', () => {
-  test('the line-system lab: the router ports of the cables to the ROADMs; no connection over it (the core link has facts)', () => {
+  test('the line-system lab: the router ports of the cables to the ROADMs; no connection over it (the core link has facts), its routed link over it drawn alike', () => {
     const ls = physicalLineSystem(netOf(read(LABS.find((l) => l.id === 'line-system').source)));
     expect(ls.lightpaths).toEqual([]);
-    expect(ls.ports.map((p) => [p.node, p.port, p.toward])).toEqual([['PE1', '1', 'ROADM-A'], ['PE1', '2', 'ROADM-A'], ['PE2', '1', 'ROADM-B']]);
+    expect(ls.ports.filter((p) => !p.lightpath).map((p) => [p.node, p.port, p.toward])).toEqual([['PE1', '1', 'ROADM-A'], ['PE1', '2', 'ROADM-A'], ['PE2', '1', 'ROADM-B']]);
+    // the routed core link (over ch 25) on the physical plane: the router port its cable leaves from at each end
+    expect(ls.ports.filter((p) => p.lightpath).map((p) => [p.node, p.port, p.toward])).toEqual([['PE1', '1', 'PE2'], ['PE2', '1', 'PE1']]);
   });
   test('routers joined only through it: a dashed connection with its caption, the router port at each end', () => {
     const file = JSON.parse(read(LABS.find((l) => l.id === 'line-system').source));

@@ -79,7 +79,9 @@ blue tube with its label); a plain box whose record has a `role` (a line-system 
 optical spans the page has an `optical` layer under the physical one (`LAYERS`; physical moves up one gap,
 so physical-plane code places things at `layerY('physical')`, not 0): the members, the spans and links to
 them, and a disc for each router at a span's end, whose pillar starts there; the physical plane leaves them
-out, and a routed link whose ports are cabled by optical spans carries `over` (`over ch 25`) as its label.
+out, and a routed link whose ports are cabled by optical spans (`over`, `over ch 25`) is drawn as a
+connection over the line system: a rainbow of dashes over a thin core (which carries the walk's highlight;
+red when it is down), the router port its cable leaves from at each end.
 The physical plane joins two routers cabled to the same port of two members of one line system with a
 `over ch N` connection drawn as a rainbow of dashes (`topology.lightpaths`), the router port at each end; the optical plane
 labels each router end of a cable with its port (`physicalLineSystem`, `buildPorts`).

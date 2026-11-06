@@ -108,7 +108,8 @@ export function isExpress(plain, l) {
 }
 
 // The router ports a line system's drawing shows: each connection over it (import/facts.js lightpathsOf,
-// drawn on the physical plane as a dashed line with its caption) with the router port at each end, and the
+// drawn on the physical plane as a rainbow of dashes with its caption) and each routed link over it (a link
+// with `over`, drawn alike) with the router port at each end, and the
 // router port (a device that is not a member, with facts or a plain box) at the router end of each cable
 // to a line-system member (on the optical plane, or on physical without one). A line drawn beside others
 // between the same two devices carries its index and their count (memberOffset), as buildPlain spreads them.
@@ -136,6 +137,13 @@ export function physicalLineSystem(net) {
   for (const l of lightpaths) {
     for (const [end, far] of [[l.a, l.b], [l.b, l.a]]) {
       if (end.port != null) ports.push({ node: end.node, port: String(end.port), toward: far.node, index: l.index, count: l.count, lightpath: true });
+    }
+  }
+  // a routed link over the line system (the facts' link, `over`): drawn alike, the router port at each end
+  for (const l of net.topo.links.filter((x) => x.over)) {
+    for (const [end, far] of [[l.a, l.b], [l.b, l.a]]) {
+      const port = l.cables?.find((c) => c.node === end.node)?.port ?? end.port ?? end.if;
+      if (port != null) ports.push({ node: end.node, port: String(port), toward: far.node, index: 0, count: 1, lightpath: true });
     }
   }
   return { members: [...members], lightpaths, ports };
@@ -374,15 +382,19 @@ export class LayerView {
       l.members.forEach((m, i) => {
         const up = st.members[i].up;
         const off = memberOffset(a, b, i, l.members.length);
-        const mat = new THREE.MeshStandardMaterial({ color: up ? (l.medium === 'optical' ? OPTICAL : l.kind === 'access' ? 0x6e7681 : 0x9aa7b8) : RED, transparent: !up, opacity: up ? 1 : 0.5 });
+        // a link over the line system (`over`), up: a rainbow of dashes, as a connection over it, round a
+        // thin faint core that carries the walk's highlight; down, red as any link
+        const rides = l.over && up;
+        const mat = new THREE.MeshStandardMaterial({ color: up ? (l.medium === 'optical' ? OPTICAL : l.kind === 'access' ? 0x6e7681 : 0x9aa7b8) : RED, transparent: !up || rides, opacity: rides ? 0.3 : up ? 1 : 0.5 });
         mats.push(mat);
-        g.add(cylinder(a.clone().add(off), b.clone().add(off), 0.13, mat));
+        g.add(cylinder(a.clone().add(off), b.clone().add(off), rides ? 0.05 : 0.13, mat));
+        if (rides) g.add(rainbow([a.clone().add(off), b.clone().add(off)]));
       });
       this.linkMeshes[l.id] = mats;
       const mid = new THREE.Vector3().lerpVectors(a, b, 0.5);
-      // A routed link over the line system says so (`over ch 25`) where it has no label of its own.
-      const caption = l.caption ?? l.over;
-      if (caption) g.add(label(caption, `edge-label${l.medium === 'optical' || !l.caption ? ' optical' : ''}`, mid.clone().setY(Y + 1.4)));
+      // A routed link over the line system is captioned as a connection over it (`over ch 25`).
+      const caption = l.over ?? l.caption;
+      if (caption) g.add(label(caption, `edge-label${l.medium === 'optical' || l.over || !l.caption ? ' optical' : ''}`, mid.clone().setY(Y + 1.4)));
       if (l.lag) {
         const ring = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.08, 8, 24), new THREE.MeshStandardMaterial({ color: st.up ? 0xf0b429 : RED }));
         ring.position.copy(mid);

@@ -55,7 +55,9 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
   wavelength) labelled with its channel (`ch 25`), the router
   port badged at each end, derived from the cabling (`topology.lightpaths`, `lightpathsOf` in the
   importer), drawn only, never on a protocol frame, not a link of the 3D view's network. Where the facts
-  give a routed link over the line system, its own `over` caption says so and nothing is derived. The
+  give a routed link over the line system, nothing is derived and that link is drawn the same way: a
+  rainbow of dashes captioned with its channel, badged with the router ports its cables to the line
+  system leave from (not its interface names), on the frames, the snapshot and the 3D page. The
   frames other than optical lay their devices out without the line system, each connection over it an
   ordinary link (the importer's `cardLayout`), so the chain no longer pushes the routers apart; the
   optical frame keeps the line system's places. A view without the optical layer keeps the line system

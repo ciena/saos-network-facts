@@ -8,6 +8,13 @@ import { isisArea } from '../../../js/src/index.ts';
 import { nodeSid } from '../engine/mpls.js';
 import { drawnLinks, drawnNodes } from '../import/facts.js';
 
+// The router port of a link's cable to a line system (import/facts.js: a routed link over it lists its
+// `cables`), or null.
+const cablePort = (l, node) => {
+  const port = l.cables?.find((c) => c.node === node)?.port;
+  return port == null ? null : String(port);
+};
+
 const OS = { saos10: 'SAOS 10', saos6: 'SAOS 6/8' };
 
 const ringRoleName = (m) => (m.rpl === 'owner' ? 'RPL owner' : m.rpl === 'neighbor' || m.rpl === 'neighbour' ? 'RPL neighbour' : m.terminates ? 'interconnection' : 'member');
@@ -81,10 +88,13 @@ export function renderModel(imp, net) {
       ringOf.set(l, { ring: r.name ?? r.id, type: r.type, rpl: rpl?.node ?? null });
     }
   }
+  // a routed link over the line system shows the router port its cable to the line system leaves from
+  // (as a connection over it does), not the interface name
+  const portOf = (l, end) => (l.over ? cablePort(l, end.node) : null) ?? end.port ?? end.if ?? null;
   const links = drawnLinks(topo).map((l) => ({
     id: l.id,
-    a: { node: l.a.node, port: l.a.port ?? l.a.if ?? null },
-    b: { node: l.b.node, port: l.b.port ?? l.b.if ?? null },
+    a: { node: l.a.node, port: portOf(l, l.a) },
+    b: { node: l.b.node, port: portOf(l, l.b) },
     subnet: l.subnet ?? null,
     metric: l.metric ?? null,
     adj: adj.get(l.id)?.state ?? null,

@@ -366,16 +366,16 @@ function draw(id, ctx) {
     const linkDraw = [];
     for (const l of model.links) {
       const [a, b] = ends.get(l.id);
-      // A routed link over the line system says so (`over ch 25`) where it has no label of its own; a
-      // connection over it (no link of its own) is labelled with its channel (`ch 25`).
-      const caption = l.lightpath ? l.over.replace(/^over /, '') : l.caption ?? l.over;
+      // A link over the line system, a connection over it (no link of its own) or a routed link from the
+      // facts (`over`), is labelled with its channel (`ch 25`).
+      const caption = l.over ? l.over.replace(/^over /, '') : l.caption;
       const tip = l.lightpath ? `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}\n${l.over}: through ${l.via.join(' … ')}` : `${l.a.node} ${l.a.port} — ${l.b.node} ${l.b.port}${l.medium ? `\n${l.medium}${l.caption ? `: ${l.caption}` : ''}` : l.caption ? `\n${l.caption}` : ''}${l.over ? `\n${l.over}` : ''}${l.subnet ? `\n${l.subnet}` : ''}`;
-      // An optical span: a fibre, drawn as a blue double line (white core). A connection over the line
-      // system (not a cable, an underlay): a rainbow of dashes between its routers (a dash of
-      // each colour in turn), for a wavelength.
+      // An optical span: a fibre, drawn as a blue double line (white core). A link over the line system
+      // (a connection over it, or a routed link with `over`): a rainbow of dashes between its routers (a
+      // dash of each colour in turn), for a wavelength.
       const body = l.medium === 'optical'
         ? `${line(a, b, C.optical, f * 0.42, ' stroke-linecap="round"')}${line(a, b, '#fff', f * 0.14, ' stroke-linecap="round"')}`
-        : l.lightpath
+        : l.over
           ? underlayLine(a, b, f)
           : line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '');
       // The caption on the link, staggered along parallel links; the port pills only where they fit
@@ -383,10 +383,10 @@ function draw(id, ctx) {
       const sibs = pairs.get(pair(l));
       const t = 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3;
       const len = Math.hypot(b.x - a.x, b.y - a.y);
-      // a connection over the line system's channel chip is smaller, leaving more of the line to show
-      const ck = l.lightpath ? 0.8 : 1;
+      // a link over the line system's channel chip is smaller, leaving more of the line to show
+      const ck = l.over ? 0.8 : 1;
       const cw = caption ? pillW(caption) * ck : 0;
-      const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || !l.caption ? C.optical : '#9aa4b1', ck) : '';
+      const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || l.over || !l.caption ? C.optical : '#9aa4b1', ck) : '';
       if (caption) { const c = lerp(a, b, t); const r = { x: c.x - cw / 2, y: c.y - f * 0.55 * ck, w: cw, h: f * 1.1 * ck }; reg.push(r); taken.push(r); }
       const cls = l.lightpath ? 'lightpath' : l.medium ? `link-${esc(l.medium)}` : null;
       linkDraw.push({ l, a, b, len, head: `<g${cls ? ` class="${cls}"` : ''}>${title(tip)}${body}`, cap });

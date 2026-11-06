@@ -87,11 +87,18 @@ describe('frames and snapshot', () => {
     expect(optical.match(/<g class="site">/g)).toHaveLength(2);
     expect(optical).toContain('>in-line amplifier hut, no</text>');
     expect(r.svg).toMatch(/data-title="Optical · 3 line-system members, 2 spans · 2 sites"/);
-    // the physical frame: the routers and the facts' routed link over the line system, nothing derived
+    // the physical frame: the routers and the facts' routed link over the line system, nothing derived;
+    // the routed link drawn as a connection over it: a rainbow of dashes captioned with its channel,
+    // the router port badged at each end
     const physical = group(r.svg, 'physical');
     expect(physical).not.toContain('class="link-optical"');
     expect(physical).not.toContain('>ROADM</text>');
-    expect(physical).toContain('>over ch 25</text>');
+    expect(physical).toContain('>ch 25</text>');
+    expect(physical).not.toContain('>over ch 25</text>');
+    // (its router ports those its cables to the line system leave from, as a connection over it shows)
+    const core = physical.slice(physical.indexOf('<g><title>PE1 1 — PE2 1')).split('</g>')[0];
+    expect(new Set([...core.matchAll(/<line [^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dashoffset/g)].map((m) => m[1])).size).toBe(6);
+    expect([...core.matchAll(/<rect [^>]*stroke="#9aa4b1"[^>]*\/><text [^>]*>([^<]+)<\/text>/g)].map((m) => m[1])).toEqual(['1', '1']);
     expect(physical).not.toContain('class="lightpath"');
     expect(physical.match(/<g class="site">/g)).toHaveLength(2);
     expect(r.svg).toMatch(/data-title="Physical · 2 devices \(SAOS 10\), 1 link · 2 sites"/);
@@ -129,6 +136,8 @@ describe('frames and snapshot', () => {
     expect(plane('optical')).toContain('>AMP-1  AMP</text>');
     expect(plane('physical')).not.toContain('link-optical');
     expect(plane('physical')).toContain('>over ch 25</text>');
+    // the routed link over the line system: a rainbow of dashes, as a connection over it
+    expect(new Set([...plane('physical').matchAll(/<line [^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dashoffset/g)].map((m) => m[1])).size).toBe(6);
     // members have no riser; the PEs rise from the optical plane
     expect(r.svg).not.toMatch(/class="pillar" data-layers="optical"/);
     expect(r.svg.match(/class="pillar" data-layers="physical optical/g)).toHaveLength(2);
