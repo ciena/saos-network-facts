@@ -2,7 +2,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BACK_TO_BACK, forceLayout, layoutFacts, longestCycle, resolveView, type LayoutModel, type Point } from "../src/index.ts";
-import { siteIntruders } from "../src/layout-shapes.ts";
 
 // A ring of `n` routers R1..Rn (role pe or p), each PE with a CE hung off it.
 function ringLab(n: number, { roles = "p", ces = [] as number[] } = {}): LayoutModel {
@@ -532,24 +531,4 @@ test("line systems: a router cabled only to the line system stands under its ter
   assert.deepEqual([q.PE2!.x, q.PE2!.y], [q["LS-T-2"]!.x, q["LS-T-2"]!.y + 1]);
   const c = over(false);
   assert.notDeepEqual([c.PE1!.x, c.PE2!.x], [c["LS-T-1"]!.x, c["LS-T-2"]!.x]);
-});
-
-// ---- sites ------------------------------------------------------------------------------------------
-
-test("sites: a site's devices are kept together, its frame takes in no other device", () => {
-  // A chain CE1a, CE1b - PE1 - P - PE2 - CE2a, CE2b where site A holds CE1a, CE1b and CE2a (the two
-  // ends of the chain) and site B holds P and CE2b: in a plain chain site A's frame would span it all.
-  const nodes = [
-    { id: "PE1", role: "pe" }, { id: "PE2", role: "pe" }, { id: "P", role: "p", site: "B" },
-    { id: "CE1a", role: "ce", site: "A" }, { id: "CE1b", role: "ce", site: "A" }, { id: "CE2a", role: "ce", site: "A" }, { id: "CE2b", role: "ce", site: "B" },
-  ];
-  const links = [{ a: "PE1", b: "P" }, { a: "P", b: "PE2" }, { a: "PE1", b: "CE1a" }, { a: "PE1", b: "CE1b" }, { a: "PE2", b: "CE2a" }, { a: "PE2", b: "CE2b" }];
-  const r = layoutFacts({ nodes, links }, { aspect: "card", max_columns: 4 });
-  const sites = new Map(nodes.filter((n) => n.site).map((n) => [n.id, n.site!]));
-  assert.equal(siteIntruders(new Map(Object.entries(r.positions)), sites), 0);
-  assert.equal(r.candidates![0]!.foreign, 0);
-  // Without the sites, the same lab is laid out as before (a plain chain would hold the foreign devices).
-  const bare = layoutFacts({ nodes: nodes.map(({ site: _, ...n }) => n), links }, { aspect: "card", max_columns: 4 });
-  assert.ok(siteIntruders(new Map(Object.entries(bare.positions)), sites) > 0);
-  assert.ok(through({ nodes, links }, r.positions).length === 0);
 });

@@ -346,8 +346,7 @@ OADMs or amplifiers, the other terminal, the end cabled to the router further le
 member's label by its box; two OADMs cabled back to back stand side by side, boxes touching, and the
 express span between them is not drawn (express traffic is implied); a router cabled only to the line
 system stands under its terminal, and a connection over the line system joins its two routers in the
-layout. It keeps a site's devices together, so a site's frame takes in no device of another site or of
-none.
+layout.
 
 ### Rings
 
@@ -572,14 +571,6 @@ wins, with two adjustments: in a lab with both P and PE routers, a candidate tha
 (every P between the outer PEs, no CE between them) counts 2 less, and a candidate that is not the
 ladder (radial and stress always) must beat the ladder by 3. `layoutFacts` returns every candidate
 with its score (`candidates`, the chosen one first) so a page can show why.
-
-**Sites** (a device's `site`): a site's frame is drawn round its devices wherever they are, so a site
-split across the layout would take in the devices between. Each candidate with a device inside the frame
-of a site it is not at, or with two site frames overlapping, has devices moved (one to a spare spot, or
-two swapped: the move that leaves fewer out of place and scores best) until none is, then any move that
-scores better while none is; the score counts each one left as much as a link through a device
-(`foreign` in the candidate's score). A lab without sites, or whose sites are already apart, keeps its
-picture.
 
 **Line systems** (devices without facts with an equipment role, `plain` and `equipment`): the other
 devices are laid out without them (a connection over the line system, a link with `lightpath`, joins

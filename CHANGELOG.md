@@ -21,22 +21,13 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ### Changed
 
-- **Layout: a site's devices kept together** — a site's frame is drawn round its devices wherever they land, so a
-  site whose devices were laid out apart took in the devices between them (a site frame round devices of
-  another site, or of none). Every layout candidate with a device inside the frame of a site it is not at, or
-  with two site frames overlapping, now has devices moved (one to a spare spot, or two swapped: the move that
-  leaves fewer out of place and scores best) until none is, then any move that scores better while none is;
-  the score counts each one left as much as a link through a device (`foreign` in the candidate's score,
-  `siteIntruders` and `keepSites` in the layout code). A lab without sites, or whose sites are already apart,
-  keeps its picture; the role tiers stay where the sites allow.
 - **Layout: a line system laid out as a chain** — the members of an optical line system (devices without facts
   with an equipment role: terminals, OADMs, ROADMs, amplifiers) are now laid out after the other devices,
   without them, and each line system is then a row of its own above them, in
   path order: a terminal, the OADMs or amplifiers, the other terminal, the end cabled to the router further
   left on the left, each member's label by its box, within `max_columns`. A router cabled only to the line
-  system stands under its terminal. Before, the members joined the core and could fold back on themselves (an
-  OADM site's frame round a terminal). A plain box without an equipment role is laid out as before.
-  `LayoutNode` takes `site` and `equipment` (the importer's nodes carry both already).
+  system stands under its terminal. Before, the members joined the core and could fold back on themselves. A plain box without an equipment role is laid out as before.
+  `LayoutNode` takes `equipment` (the importer's nodes carry it already).
 - **Frames: two OADMs back to back drawn as one, their express span implied** — two OADMs cabled to each
   other (both line-system members with the equipment role `oadm`, any case: the express span of a back-to-back
   pair) take one place in the line system's row, side by side (`BACK_TO_BACK`, 0.3 columns, in the layout;

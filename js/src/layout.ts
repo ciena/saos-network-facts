@@ -26,9 +26,6 @@
 //      links cross none is preferred. A last pass swaps devices, or moves one to a spare spot, while
 //      that removes crossings or links through devices (the cycle's devices stay put).
 //   6. Islands (linked to nothing placed) go in a row underneath.
-// Sites: a site's frame is drawn round its devices wherever they are, so every candidate is scored for
-// devices inside the frame of a site they are not at, and while one is, devices are moved apart
-// (layout-shapes.ts keepSites) before the candidates are compared.
 // Line systems: the members of an optical line system (devices without facts the facts give an
 // equipment role: terminals, OADMs, ROADMs, amplifiers) are drawn on the optical layer, off every other
 // frame. The other devices are laid out without them; then each line system is a row of its own above
@@ -58,7 +55,7 @@
 // sit at fractions). A renderer scales them to its own frame.
 
 import type { Layout } from "./generated/view.ts";
-import { clearLinks, keepSites, radial, scoreLayout, stress, tierRole, tiers, type LayoutScore, type ShapeGraph } from "./layout-shapes.ts";
+import { clearLinks, radial, scoreLayout, stress, tierRole, tiers, type LayoutScore, type ShapeGraph } from "./layout-shapes.ts";
 
 /** A device to place. `role` as the 3D importer gives it: p and pe are the IGP routers. */
 export interface LayoutNode {
@@ -70,8 +67,6 @@ export interface LayoutNode {
   host?: boolean;
   /** The IGP area the device is in: the tiers keep the devices of one area together. */
   group?: string | null;
-  /** The site the device is at (schema 1.9): the layout keeps a site's devices together. */
-  site?: string | null;
   /** The equipment role a device without facts has (schema 1.9 devices[].role: terminal, oadm, roadm,
    * amplifier): with `plain`, a line-system member, laid out as a chain on a row of its own. */
   equipment?: string | null;
@@ -330,8 +325,6 @@ function chooseLayout(
     .filter(([a, b]) => a && b && a !== b && known.has(a) && known.has(b))
     .sort((p, q) => compareNames(p[0], q[0]) || compareNames(p[1], q[1]));
   const node = new Map(model.nodes.map((n) => [n.id, n]));
-  // Sites: every candidate keeps them together (keepSites) and is scored for devices out of place.
-  const sites = new Map(ids.filter((id) => node.get(id)?.site).map((id) => [id, node.get(id)!.site!]));
   // Groups the tiers keep together: IGP areas, else G.8032 rings.
   const groups = new Map<string, string>();
   for (const id of ids) if (node.get(id)?.group) groups.set(id, `area ${node.get(id)!.group}`);
@@ -355,20 +348,11 @@ function chooseLayout(
     return normalise(positions);
   };
   const tierText = both ? "tiers by role: CE | PE | P | PE | CE" : roles.has("p") || roles.has("pe") ? "tiers by role and hops" : "tiers by hops (no IGP router)";
-  // A candidate with a device inside the frame of a site it is not at: devices moved until none is (or
-  // no move helps), on positions from 0, 0.
-  const apart = (positions: Record<string, Point> | null) => {
-    if (!positions || !sites.size) return positions;
-    const pos = keepSites(new Map(Object.entries(positions).map(([id, p]) => [id, { ...p }])), links, sites, maxColumns);
-    const out: Record<string, Point> = {};
-    for (const id of ids) out[id] = { x: round(pos.get(id)!.x), y: round(pos.get(id)!.y) };
-    return normalise(out);
-  };
   const list: Array<{ method: LayoutResult["method"]; description: string; positions: Record<string, Point> | null; bonus: number }> = [
-    { method: legacy.method, description: legacy.description, positions: apart(legacy.positions), bonus: 0 },
-    { method: "tiers", description: tierText, positions: apart(finish(tiers(g, maxColumns))), bonus: -MARGIN },
-    { method: "radial", description: "radial round the hub", positions: apart(finish(radial(g, maxColumns))), bonus: -MARGIN },
-    { method: "stress", description: "stress majorisation (no tiering fits)", positions: apart(finish(stress(g, maxColumns))), bonus: -MARGIN },
+    { method: legacy.method, description: legacy.description, positions: legacy.positions, bonus: 0 },
+    { method: "tiers", description: tierText, positions: finish(tiers(g, maxColumns)), bonus: -MARGIN },
+    { method: "radial", description: "radial round the hub", positions: finish(radial(g, maxColumns)), bonus: -MARGIN },
+    { method: "stress", description: "stress majorisation (no tiering fits)", positions: finish(stress(g, maxColumns)), bonus: -MARGIN },
   ];
   if (both) {
     const of = (r: string) => ids.filter((id) => tierRole(node.get(id)) === r);
@@ -385,7 +369,7 @@ function chooseLayout(
   const scored = list
     .filter((c): c is typeof c & { positions: Record<string, Point> } => !!c.positions)
     .filter((c) => c === list[0] || span(c.positions) <= maxColumns - 1 + (c.bonus > 0 ? 1 : 0) + 1e-9)
-    .map((c, i) => ({ ...c, i, s: scoreLayout(new Map(Object.entries(c.positions)), links, maxColumns, true, sites) }));
+    .map((c, i) => ({ ...c, i, s: scoreLayout(new Map(Object.entries(c.positions)), links, maxColumns) }));
   const ranked = [...scored].sort((p, q) => p.s.score - p.bonus - (q.s.score - q.bonus) || p.i - q.i);
   const best = ranked[0]!;
   return {

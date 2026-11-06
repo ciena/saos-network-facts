@@ -89,8 +89,7 @@ A view without `optical` keeps everything on the physical plane; devices and hos
 `site`, and `topology.sites` (`[{ name, nodes }]`) is a dashed outline round each site's devices on the
 physical plane; `topology.notes` (`[{ text, device, layer }]`) are yellow labels on their layer (physical
 when the page does not show it), above their device or just in front of the plane's corner. The frames and the snapshot
-draw the same. The layout keeps a site's devices together (no site's outline takes in a device of
-another site) and lays a line system out as a chain on a row of its own above the routers, terminal to
+draw the same. The layout lays a line system out as a chain on a row of its own above the routers, terminal to
 terminal, two OADMs cabled back to back side by side with their express span left out. The frames draw
 the line system on an optical frame with a callout at each member port a router is cabled to
 (`render/model.js` `cardLayer`), and the routers on the physical frame, laid out without the line system
