@@ -383,9 +383,11 @@ function draw(id, ctx) {
       const sibs = pairs.get(pair(l));
       const t = 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3;
       const len = Math.hypot(b.x - a.x, b.y - a.y);
-      const cw = caption ? pillW(caption) : 0;
-      const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || !l.caption ? C.optical : '#9aa4b1') : '';
-      if (caption) { const c = lerp(a, b, t); const r = { x: c.x - cw / 2, y: c.y - f * 0.55, w: cw, h: f * 1.1 }; reg.push(r); taken.push(r); }
+      // a connection over the line system's channel chip is smaller, leaving more of the line to show
+      const ck = l.lightpath ? 0.8 : 1;
+      const cw = caption ? pillW(caption) * ck : 0;
+      const cap = caption ? pill(lerp(a, b, t), caption, l.medium === 'optical' || !l.caption ? C.optical : '#9aa4b1', ck) : '';
+      if (caption) { const c = lerp(a, b, t); const r = { x: c.x - cw / 2, y: c.y - f * 0.55 * ck, w: cw, h: f * 1.1 * ck }; reg.push(r); taken.push(r); }
       const cls = l.lightpath ? 'lightpath' : l.medium ? `link-${esc(l.medium)}` : null;
       linkDraw.push({ l, a, b, len, head: `<g${cls ? ` class="${cls}"` : ''}>${title(tip)}${body}`, cap });
     }
