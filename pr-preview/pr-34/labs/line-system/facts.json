@@ -573,7 +573,7 @@
       "site": "east",
       "status": "skipped",
       "templates": [],
-      "type": "roadm-2d"
+      "type": "roadm-1d"
     },
     {
       "device": "AMP-1",
@@ -596,7 +596,7 @@
       "site": "west",
       "status": "skipped",
       "templates": [],
-      "type": "roadm-2d"
+      "type": "roadm-1d"
     }
   ],
   "generator": {

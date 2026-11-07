@@ -32,6 +32,11 @@
       "facts": "line-system/facts.json"
     },
     {
+      "id": "els-line-system",
+      "title": "ELS line system: terminals and an OADM pair over an express link (fixture, plain boxes from --extra)",
+      "facts": "els-line-system/facts.json"
+    },
+    {
       "id": "config-less",
       "title": "Lab without configurations: devices by type, roles from --extra (fixture)",
       "facts": "config-less/facts.json"
