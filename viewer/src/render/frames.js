@@ -131,7 +131,7 @@ export function renderFrames(m, positions, { frames, start, period = 4, cardPosi
   // Wide enough for the longest title, so a small lab keeps its titles whole.
   const W = Math.ceil(Math.max(...sets.map((x) => (x.maxX - x.minX) * U + 2 * mx), Math.max(...Object.values(titles).map((t) => t.length)) * f * 1.15 * 0.6 + f * 2.4));
   // Free notes (no device) sit along the bottom edge: room for the frame with the most of them.
-  const freeLines = Math.max(0, ...frames.map((id) => notesOn(m, id, frames).filter((x) => !x.device).reduce((k, x) => k + wrapNote(x.text, 60).length, 0)));
+  const freeLines = Math.max(0, ...frames.map((id) => notesOn(m, id, frames).filter((x) => !x.device).reduce((k, x) => k + wrapNote(x.text, 60, Infinity).length, 0)));
   const notesH = freeLines ? freeLines * f * 1.0 + f * 1.4 : 0;
   // The optical frame: its labels above the row, its callouts below (room for the tallest block), and
   // room under them for a note on a member.
@@ -250,18 +250,20 @@ function line(a, b, color, w, extra = '') {
 const lerp = (a, b, t) => ({ x: r1(a.x + (b.x - a.x) * t), y: r1(a.y + (b.y - a.y) * t) });
 const title = (t) => `<title>${esc(t)}</title>`;
 
-// Parallel links between one pair get a sideways offset.
+// Parallel links between one pair get a sideways offset; wider where one of them rides the line system
+// (a rainbow beside a cable: both must read), as wide as the router symbol allows, so both still meet it.
 function linkEnds(ctx) {
-  const n = new Map(), seen = new Map();
+  const n = new Map(), seen = new Map(), wide = new Set();
   const key = (l) => [l.a.node, l.b.node].sort().join('|');
   for (const l of ctx.model.links) n.set(key(l), (n.get(key(l)) ?? 0) + 1);
+  for (const l of ctx.model.links) if (l.over) wide.add(key(l));
   const ends = new Map();
   for (const l of ctx.model.links) {
     const i = seen.get(key(l)) ?? 0;
     seen.set(key(l), i + 1);
     const a = ctx.at(l.a.node), b = ctx.at(l.b.node);
     const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    const off = (i - (n.get(key(l)) - 1) / 2) * ctx.f * 0.9;
+    const off = (i - (n.get(key(l)) - 1) / 2) * ctx.f * (wide.has(key(l)) && n.get(key(l)) > 1 ? 1.25 : 0.9);
     const ox = (-(b.y - a.y) / d) * off, oy = ((b.x - a.x) / d) * off;
     ends.set(l.id, [{ x: r1(a.x + ox), y: r1(a.y + oy) }, { x: r1(b.x + ox), y: r1(b.y + oy) }]);
   }
@@ -380,8 +382,10 @@ function draw(id, ctx) {
           : line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '');
       // The caption on the link, staggered along parallel links; the port pills only where they fit
       // between the device and the caption (else the ports are in the hover title only).
-      const sibs = pairs.get(pair(l));
-      const t = 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3;
+      // (staggered among the captioned ones only: a caption beside an uncaptioned cable stays in the
+      // middle, leaving both ends free for the port badges)
+      const sibs = pairs.get(pair(l)).filter((x) => { const o = model.links.find((y) => y.id === x); return o.over || o.caption; });
+      const t = sibs.length > 1 ? 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3 : 0.5;
       const len = Math.hypot(b.x - a.x, b.y - a.y);
       // a link over the line system's channel chip is smaller, leaving more of the line to show
       const ck = l.over ? 0.8 : 1;
@@ -391,22 +395,8 @@ function draw(id, ctx) {
       const cls = l.lightpath ? 'lightpath' : l.medium ? `link-${esc(l.medium)}` : null;
       linkDraw.push({ l, a, b, len, head: `<g${cls ? ` class="${cls}"` : ''}>${title(tip)}${body}`, cap });
     }
-    const devices = [];
-    const labels = [];
-    for (const n of model.nodes) {
-      const p = at(n.id);
-      const look = physicalLook(n);
-      const s = f * 1.3;
-      const body = look.router
-        ? routerIcon(p, f, look.dash)
-        : `<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}"${look.dash ? ` fill-opacity="${look.typed ? 1 : 0.35}" stroke-dasharray="${r1(f * 0.3)} ${r1(f * 0.22)}"` : ''} stroke="${look.dash ? (look.typed ? C.ink : C.plain) : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.3)}" font-size="${r1(f * (look.tag.length > 5 ? 0.5 : look.tag.length > 4 ? 0.58 : look.tag.length > 3 ? 0.68 : 0.8))}" font-weight="700" text-anchor="middle" fill="${look.text}">${esc(look.tag)}</text>`;
-      devices.push(`<g>${title(deviceDetail(n, model))}${body}</g>`);
-      reg.push(boxes.get(n.id));
-    }
-    // The device labels next, at their usual place beside the device; the badges then keep clear of
-    // them too (a label pushed away by a badge would leave its device).
-    // Two OADMs back to back (their boxes touching) share one label over the pair, names left to right.
-    const subOf = (n) => (n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null]).filter(Boolean).join(' · ');
+    // Two OADMs back to back on one row (model.js isExpress): partner maps the left one to the right one,
+    // the right one to null.
     const drawn = new Set(model.nodes.map((n) => n.id));
     const partner = new Map();
     for (const l of ctx.full.links) {
@@ -416,6 +406,31 @@ function draw(id, ctx) {
       partner.set(a, b);
       partner.set(b, null);
     }
+    const devices = [];
+    const labels = [];
+    for (const n of model.nodes) {
+      const p = at(n.id);
+      const look = physicalLook(n);
+      const s = f * 1.3;
+      const tagOf = (q, lk) => `<text x="${q.x}" y="${r1(q.y + f * 0.3)}" font-size="${r1(f * (lk.tag.length > 5 ? 0.5 : lk.tag.length > 4 ? 0.58 : lk.tag.length > 3 ? 0.68 : 0.8))}" font-weight="700" text-anchor="middle" fill="${lk.text}">${esc(lk.tag)}</text>`;
+      const tag = tagOf(p, look);
+      // The OADM pair, its boxes touching, is one block: one outline round both, a faint line between
+      // them and the two tags, drawn with the left box (the right one draws nothing of its own).
+      const mate = partner.get(n.id);
+      const q = mate && at(mate), mid = mate && r1((p.x + q.x) / 2);
+      const body = partner.has(n.id)
+        ? mate ? `<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(q.x - p.x + 2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}" stroke="#fff" stroke-width="${r1(f * 0.1)}"/>${line({ x: mid, y: r1(p.y - s * 0.6) }, { x: mid, y: r1(p.y + s * 0.6) }, '#fff', r1(f * 0.05), ' stroke-opacity="0.5"')}${tag}${tagOf(q, physicalLook(ctx.nodes.get(mate)))}` : ''
+        : look.router
+          ? routerIcon(p, f, look.dash)
+          : `<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}"${look.dash ? ` fill-opacity="${look.typed ? 1 : 0.35}" stroke-dasharray="${r1(f * 0.3)} ${r1(f * 0.22)}"` : ''} stroke="${look.dash ? (look.typed ? C.ink : C.plain) : '#fff'}" stroke-width="${r1(f * 0.1)}"/>${tag}`;
+      // (the pair's block: both devices in its hover title)
+      if (body) devices.push(`<g>${title(mate ? `${deviceDetail(n, model)}\n\n${deviceDetail(ctx.nodes.get(mate), model)}` : deviceDetail(n, model))}${body}</g>`);
+      reg.push(boxes.get(n.id));
+    }
+    // The device labels next, at their usual place beside the device; the badges then keep clear of
+    // them too (a label pushed away by a badge would leave its device).
+    // Two OADMs back to back (their boxes touching) share one label over the pair, names left to right.
+    const subOf = (n) => (n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null]).filter(Boolean).join(' · ');
     for (const n of model.nodes) {
       if (partner.get(n.id) === null) continue;
       const mate = partner.get(n.id) ? ctx.nodes.get(partner.get(n.id)) : null;
@@ -713,8 +728,9 @@ function drawNotes(id, ctx, reg) {
     g.push(`<g class="note">${title(`${x.device}: ${x.text}`)}${line(p, q, C.noteEdge, f * 0.08, ` stroke-dasharray="${r1(f * 0.25)} ${r1(f * 0.2)}"`)}${b}</g>`);
   }
   let y = H - notesH + f * 0.6;
+  // (a free note in full: the bottom edge has room for it, H counts its lines)
   for (const x of mine.filter((n) => !n.device)) {
-    const lines = wrapNote(x.text, 60);
+    const lines = wrapNote(x.text, 60, Infinity);
     const w = Math.max(...lines.map((l) => l.length)) * f * 0.85 * 0.58 + f * 0.8;
     const h = lines.length * f * 1.0 + f * 0.4;
     g.push(`<g class="note">${title(x.text)}<rect x="${r1(f)}" y="${r1(y)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(f * 0.3)}" fill="${C.note}" stroke="${C.noteEdge}" stroke-width="${r1(f * 0.08)}"/>${lines.map((l, i) => `<text x="${r1(f * 1.4)}" y="${r1(y + f * 0.95 + i * f)}" font-size="${r1(f * 0.85)}" fill="${C.ink}">${esc(l)}</text>`).join('')}</g>`);

@@ -29,7 +29,8 @@
 // Line systems: the members of an optical line system (devices without facts the facts give an
 // equipment role: terminals, OADMs, ROADMs, amplifiers) are drawn on the optical layer, off every other
 // frame. The other devices are laid out without them; then each line system is a row of its own above
-// them, in path order (a terminal, the OADMs or amplifiers, the other terminal), the end cabled to the
+// them, in path order (a terminal, the members between: OADM pairs for ELS, a fixed-filter system with no
+// in-line amplifiers; ROADMs or in-line amplifiers for a ROADM system; the other terminal), the end cabled to the
 // router further left on the left, spread between its two routers' columns when they are far enough
 // apart, else a column apart centred over them, within max_columns. OADMs cabled to each other (back to
 // back, the express span between them) stand side by side, BACK_TO_BACK apart, one place in the chain.

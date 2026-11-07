@@ -1,0 +1,20 @@
+# What the configurations do not say about the ELS lab, as a consumer writes it from its own inventory
+# (synthetic). An ELS line system is amplified and actively controlled, with fixed filters on a 100 GHz
+# grid: two terminals and, between them, OADM pairs only (no in-line amplifier). Each terminal's channel
+# ports are named by channel (25 is channel 25); the OADM site adds and drops channel 16 and expresses
+# channels 25 and 26 from one OADM chassis to the other over the express link.
+devices:
+  ELS-T-1: {type: els-terminal, role: terminal}
+  ELS-O-1: {type: els-oadm, role: oadm}
+  ELS-O-2: {type: els-oadm, role: oadm}
+  ELS-T-2: {type: els-terminal, role: terminal}
+links:
+  - {a: "PE1:1", b: "ELS-T-1:25", kind: optical, label: "ch 25"}
+  - {a: "PE1:2", b: "ELS-T-1:26", kind: optical, label: "ch 26 · dark"}
+  - {a: "ELS-T-1:line", b: "ELS-O-1:line", kind: optical, label: "ch 16, 25, 26"}
+  - {a: "ELS-O-1:express", b: "ELS-O-2:express", kind: optical, label: "express · ch 25, 26"}
+  - {a: "ELS-O-2:line", b: "ELS-T-2:line", kind: optical, label: "ch 16, 25, 26"}
+  - {a: "ELS-T-2:25", b: "PE2:1", kind: optical, label: "ch 25"}
+notes:
+  - {text: "OADM site: the pair back to back, ch 16 added and dropped", device: ELS-O-1}
+  - text: "PE1-PE2 core link rides ch 25; ch 26 is lit on ELS-T-1 only"

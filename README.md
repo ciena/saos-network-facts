@@ -301,7 +301,7 @@ snapshot draw them.
 ```yaml
 devices:                      # a known device gets its site (and role); a new name is a record with no facts
   PE1: {site: east}
-  ROADM-A: {type: roadm-2d, role: roadm, site: east}
+  ROADM-A: {type: roadm-1d, role: roadm, site: east}
   AMP-1: {type: ila, role: amplifier}
 links:                        # ends DEVICE:PORT or {device, port}, or endpoints: [A, B] as in containerlab
   - {a: "PE1:1", b: "ROADM-A:add-1", kind: optical, label: "ch 25"}
@@ -322,7 +322,7 @@ notes:                        # free text, on a device or not, on a view layer (
 - A link end or note on a name no input knows, or an unknown key, is an error before anything is extracted.
 
 In the 3D view and the snapshot they are drawn on their own layer, `optical` (view schema 1.2), under the
-physical one: the line-system members as solid blue boxes tagged with their role (ROADM, AMP, OT), the
+physical one: the line-system members as solid blue boxes tagged with their role (ROADM, AMP, TERM, OADM), the
 optical spans as a blue double line with their label, and the routers at the spans' ends, whose risers
 start there; the physical layer keeps the routers and the links between them, and the connections over
 the line system described below (a rainbow of dashes, the router port at each end). The 2D frames draw the
@@ -341,12 +341,21 @@ layer in 3D too. Sites are a dashed frame round their
 devices (on both layers); notes are yellow, beside their device (the snapshot numbers them and lists them
 in the plane's corner) or along the edge, on the note's `layer`, else with their device (a note on a
 line-system member is on the optical layer when the drawing has one), else on physical. The layout lays the other devices out
-without the line system, then the line system as a chain on a row of its own above them: a terminal, the
-OADMs or amplifiers, the other terminal, the end cabled to the router further left on the left, each
-member's label by its box; two OADMs cabled back to back stand side by side, boxes touching, and the
-express span between them is not drawn (express traffic is implied); a router cabled only to the line
+without the line system, then the line system as a chain on a row of its own above them: a terminal, what
+lies between (for ELS, OADM pairs only; for a ROADM system, ROADMs or in-line amplifiers), the other
+terminal, the end cabled to the router further left on the left, each member's label by its box; two OADMs cabled back to back stand side by side, boxes touching, and the
+express link between them is not drawn (express traffic is implied); a router cabled only to the line
 system stands under its terminal, and a connection over the line system joins its two routers in the
 layout.
+
+The roles the drawings act on: `terminal` (the end of a line system, channel mux/demux and amplifiers: an
+ELS terminal, or a terminal ROADM), `oadm` (a fixed-filter add/drop: an ELS OADM, two chassis back to back
+over an express link at an add/drop site), `roadm` (a reconfigurable add/drop on a WSS, flexgrid, one or
+more degrees, as on 6500 or RLS) and `amplifier` (a line or in-line amplifier). An ELS line system is
+amplified and actively controlled, not passive: every chassis is a powered filtered line amplifier under
+photonic control over the OSC, with fixed filters on a fixed 100 GHz grid (channels 14 to 61) and no
+in-line amplifier sites, so between its terminals there are only OADM pairs. A ROADM system has
+reconfigurable WSS degrees with separate amplifiers and in-line amplifier sites.
 
 ### Rings
 
@@ -575,12 +584,12 @@ with its score (`candidates`, the chosen one first) so a page can show why.
 **Line systems** (devices without facts with an equipment role, `plain` and `equipment`): the other
 devices are laid out without them (a connection over the line system, a link with `lightpath`, joins
 its two routers there), and each line
-system is then a row of its own above them, in path order (a terminal, the OADMs or amplifiers, the
-other terminal), the end cabled to the router further left on the left, spread between the columns of
+system is then a row of its own above them, in path order (a terminal, the members between: OADM pairs for
+ELS, ROADMs or in-line amplifiers for a ROADM system, the other terminal), the end cabled to the router further left on the left, spread between the columns of
 the routers at its two ends or a column apart centred over them, within `max_columns`. Two OADMs cabled
 to each other (equipment `oadm`, any case: a back-to-back pair and its express span) take one place in
-the row, `BACK_TO_BACK` (0.3 columns) apart; the frames draw their boxes touching and leave the express
-span out. A router cabled only to the line system (a `lightpath` link does not count) stands under the member it is cabled to. A plain box without an equipment role
+the row, `BACK_TO_BACK` (0.3 columns) apart; the frames, the snapshot and the 3D page draw their boxes
+touching and leave the express link out. A router cabled only to the line system (a `lightpath` link does not count) stands under the member it is cabled to. A plain box without an equipment role
 (a device without facts in the path) is still laid out with the core, as above.
 
 With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns (role tiers that follow the roles one more: `CE | PE | P | PE | CE` is five): outer devices hang sideways while there is room, a ring too long for the ladder runs
@@ -607,7 +616,7 @@ with the same layout as the 3D page:
 - **`frames.svg`**: one flat frame per layer the lab has content for (optical: the line system, with a
   callout for what rides each port a router is cabled to); physical (the routers, joined by the connections
   over the line system; each router, any Ciena SAOS device, as the common router symbol in Ciena red, its name and
-  model beside it; any other device, a Waveserver, a third-party box, an ELS shelf, as a grey box tagged with
+  model beside it; any other device, a Waveserver, a third-party box, an ELS chassis without a role, as a grey box tagged with
   its model; links and ports); roles (`f-role`, right after physical: CE, PE and P as the viewer derives them from the facts,
   or a record's `role` for a device without facts, a route reflector as P·RR; left out when no device has
   a role); G.8032 rings over the

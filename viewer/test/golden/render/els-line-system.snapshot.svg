@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="netfacts-snapshot" data-variant="exploded" data-gap="196" data-full-h="1296" viewBox="0 0 1196 1296" width="1196" height="1296" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<title>els-line-system</title>
+<rect class="bg" x="0" y="-4000" width="1196" height="9296" fill="#ffffff"/>
+<g class="pillars">
+<line class="pillar" data-layers="physical optical igp mpls bgp pw" x1="525.4" y1="1186.7" x2="525.4" y2="1186.7" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+<line class="pillar" data-layers="physical optical igp mpls bgp pw" x1="755.4" y1="1186.7" x2="755.4" y2="1186.7" stroke="#7f8a99" stroke-width="1.2" stroke-dasharray="2 3" stroke-opacity="0.8"/>
+</g>
+<g class="layer" data-layer="pw" transform="translate(0,-980)"><polygon points="40,1076 914,1076 1135.3,1225.9 261.3,1225.9" fill="#d63384" fill-opacity="0.07" stroke="#d63384" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1217.9" font-size="12" font-weight="700" fill="#d63384">Pseudowires</text><g><title>VPWS-100 PE1-PE2
+SR-MPLS LSP
+PW labels 201000/202000</title><path d="M525.4,1186.7 Q640.4,1089.1 755.4,1186.7" fill="none" stroke="#d63384" stroke-width="2.4"/><rect x="576.4" y="1102.9" width="128" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="581.4" y="1113.9" font-size="12" font-weight="700" fill="#d63384">VPWS VPWS-100</text><text x="581.4" y="1126.9" font-size="10.5" fill="#5b6675">SR-MPLS LSP</text><text x="581.4" y="1139.9" font-size="10.5" fill="#5b6675">labels 201000/202000</text></g><ellipse cx="525.4" cy="1186.7" rx="9" ry="5" fill="#d63384" stroke="#fff"/><rect x="482.4" y="1187.7" width="31" height="18" rx="4" fill="#fff" fill-opacity="0.88"/><text x="487.4" y="1198.7" font-size="12" font-weight="700" fill="#d63384">PE1</text><ellipse cx="755.4" cy="1186.7" rx="9" ry="5" fill="#d63384" stroke="#fff"/><rect x="712.4" y="1187.7" width="31" height="18" rx="4" fill="#fff" fill-opacity="0.88"/><text x="717.4" y="1198.7" font-size="12" font-weight="700" fill="#d63384">PE2</text></g>
+<g class="layer" data-layer="bgp" transform="translate(0,-784)"><polygon points="40,1076 914,1076 1135.3,1225.9 261.3,1225.9" fill="#7d4cc2" fill-opacity="0.07" stroke="#7d4cc2" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1217.9" font-size="12" font-weight="700" fill="#7d4cc2">BGP</text><text x="269.3" y="1239.9" font-size="10.5" fill="#5b6675">AS 65000</text><g><title>BGP PE1 — PE2: Established (PE2 is a route reflector client)</title><line x1="525.4" y1="1186.7" x2="755.4" y2="1186.7" stroke="#7d4cc2" stroke-width="1.8" stroke-dasharray="7 4"/></g><g><title>PE1
+5164 · cn5164 · SAOS 10
+loopback 192.0.2.1
+prefix SID 16001 (index 1)
+IS-IS 49.0001 L2 · 1920.0000.2001
+BGP AS 65000 · route reflector</title><ellipse cx="525.4" cy="1186.7" rx="14" ry="8" fill="#7d4cc2" stroke="#fff"/><rect x="539.4" y="1152.7" width="98.5" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="544.4" y="1163.7" font-size="12" font-weight="700" fill="#7d4cc2">PE1</text><text x="544.4" y="1176.7" font-size="10.5" fill="#5b6675">route reflector</text></g><g><title>PE2
+5162 · cn5162 · SAOS 10
+loopback 192.0.2.2
+prefix SID 16002 (index 2)
+IS-IS 49.0001 L2 · 1920.0000.2002
+BGP AS 65000</title><ellipse cx="755.4" cy="1186.7" rx="9" ry="5" fill="#7d4cc2" stroke="#fff"/><rect x="769.4" y="1165.7" width="31" height="18" rx="4" fill="#fff" fill-opacity="0.88"/><text x="774.4" y="1176.7" font-size="12" font-weight="700" fill="#7d4cc2">PE2</text></g></g>
+<g class="layer" data-layer="mpls" transform="translate(0,-588)"><polygon points="40,1076 914,1076 1135.3,1225.9 261.3,1225.9" fill="#b7791f" fill-opacity="0.07" stroke="#b7791f" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1217.9" font-size="12" font-weight="700" fill="#b7791f">MPLS (SR policies / TP)</text><polyline points="525.4,1186.7 755.4,1186.7" fill="none" stroke="#b7791f" stroke-width="1.6" stroke-dasharray="6 4" stroke-opacity="0.75"/><g><title>to-PE2
+SR policy, color 100, segments 16002
+path PE1 → PE2</title><path d="M525.4,1186.7 Q640.4,1103.7 755.4,1186.7" fill="none" stroke="#b7791f" stroke-width="2.4"/><rect x="608.9" y="1123.2" width="63.1" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="613.9" y="1134.2" font-size="12" font-weight="700" fill="#b7791f">to-PE2</text><text x="613.9" y="1147.2" font-size="10.5" fill="#5b6675">color 100</text></g></g>
+<g class="layer" data-layer="igp" transform="translate(0,-392)"><polygon points="40,1076 914,1076 1135.3,1225.9 261.3,1225.9" fill="#2e9e5b" fill-opacity="0.07" stroke="#2e9e5b" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1217.9" font-size="12" font-weight="700" fill="#2e9e5b">IGP</text><text x="269.3" y="1239.9" font-size="10.5" fill="#5b6675">IS-IS area 49.0001 L2 · SRGB 16000–23999 · labels SR</text><g><title>PE1 — PE2: adjacency Up, metric 100
+198.51.100.0/31</title><line x1="525.4" y1="1186.7" x2="755.4" y2="1186.7" stroke="#2e9e5b" stroke-width="2.6"/><rect x="627.7" y="1179.7" width="25.4" height="14" rx="7" fill="#fff" stroke="#2e9e5b"/><text x="640.4" y="1190.2" font-size="9.5" text-anchor="middle" fill="#1d2430">100</text></g><g><title>PE1
+5164 · cn5164 · SAOS 10
+loopback 192.0.2.1
+prefix SID 16001 (index 1)
+IS-IS 49.0001 L2 · 1920.0000.2001
+BGP AS 65000 · route reflector</title><ellipse cx="525.4" cy="1186.7" rx="12" ry="7" fill="#2e9e5b" stroke="#fff"/><rect x="446.3" y="1137.7" width="63.1" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="451.3" y="1148.7" font-size="12" font-weight="700" fill="#2e9e5b">PE1</text><text x="451.3" y="1161.7" font-size="10.5" fill="#5b6675">192.0.2.1</text><text x="451.3" y="1174.7" font-size="10.5" fill="#5b6675">SID 16001</text></g><g><title>PE2
+5162 · cn5162 · SAOS 10
+loopback 192.0.2.2
+prefix SID 16002 (index 2)
+IS-IS 49.0001 L2 · 1920.0000.2002
+BGP AS 65000</title><ellipse cx="755.4" cy="1186.7" rx="12" ry="7" fill="#2e9e5b" stroke="#fff"/><rect x="676.3" y="1137.7" width="63.1" height="44" rx="4" fill="#fff" fill-opacity="0.88"/><text x="681.3" y="1148.7" font-size="12" font-weight="700" fill="#2e9e5b">PE2</text><text x="681.3" y="1161.7" font-size="10.5" fill="#5b6675">192.0.2.2</text><text x="681.3" y="1174.7" font-size="10.5" fill="#5b6675">SID 16002</text></g></g>
+<g class="layer" data-layer="physical" transform="translate(0,-196)"><polygon points="40,1076 914,1076 1135.3,1225.9 261.3,1225.9" fill="#8b98a8" fill-opacity="0.07" stroke="#8b98a8" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1217.9" font-size="12" font-weight="700" fill="#8b98a8">Physical</text><g><title>PE1 1 — PE2 1
+over ch 25
+198.51.100.0/31</title><line x1="525.4" y1="1186.7" x2="755.4" y2="1186.7" stroke="#e03131" stroke-width="1.8" stroke-dasharray="4 20" stroke-dashoffset="0"/><line x1="525.4" y1="1186.7" x2="755.4" y2="1186.7" stroke="#f08c00" stroke-width="1.8" stroke-dasharray="4 20" stroke-dashoffset="-4"/><line x1="525.4" y1="1186.7" x2="755.4" y2="1186.7" stroke="#e6b800" stroke-width="1.8" stroke-dasharray="4 20" stroke-dashoffset="-8"/><line x1="525.4" y1="1186.7" x2="755.4" y2="1186.7" stroke="#2f9e44" stroke-width="1.8" stroke-dasharray="4 20" stroke-dashoffset="-12"/><line x1="525.4" y1="1186.7" x2="755.4" y2="1186.7" stroke="#1c7ed6" stroke-width="1.8" stroke-dasharray="4 20" stroke-dashoffset="-16"/><line x1="525.4" y1="1186.7" x2="755.4" y2="1186.7" stroke="#7048e8" stroke-width="1.8" stroke-dasharray="4 20" stroke-dashoffset="-20"/><rect x="564.5" y="1179.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="571.4" y="1190.2" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="702.5" y="1179.7" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="709.4" y="1190.2" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="607.4" y="1179.7" width="66" height="14" rx="7" fill="#fff" stroke="#3b5bdb"/><text x="640.4" y="1190.2" font-size="9.5" text-anchor="middle" fill="#1d2430">over ch 25</text></g><g class="device"><title>PE1
+5164 · cn5164 · SAOS 10
+loopback 192.0.2.1
+prefix SID 16001 (index 1)
+IS-IS 49.0001 L2 · 1920.0000.2001
+BGP AS 65000 · route reflector</title><polygon points="545.8,1159.5 573,1177.9 573,1195.9 545.8,1177.5" fill="#c8202f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="505,1177.9 573,1177.9 573,1195.9 505,1195.9" fill="#c8202f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="477.8,1159.5 545.8,1159.5 573,1177.9 505,1177.9" fill="#c8202f" stroke="#fff" stroke-width="0.8"/><rect x="477.8" y="1129.5" width="94" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="482.8" y="1140.5" font-size="12" font-weight="700" fill="#c8202f">PE1  PE · RR</text><text x="482.8" y="1153.5" font-size="10.5" fill="#5b6675">5164 · SAOS 10</text></g><g class="device"><title>PE2
+5162 · cn5162 · SAOS 10
+loopback 192.0.2.2
+prefix SID 16002 (index 2)
+IS-IS 49.0001 L2 · 1920.0000.2002
+BGP AS 65000</title><polygon points="775.8,1159.5 803,1177.9 803,1195.9 775.8,1177.5" fill="#c8202f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="735,1177.9 803,1177.9 803,1195.9 735,1195.9" fill="#c8202f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="707.8,1159.5 775.8,1159.5 803,1177.9 735,1177.9" fill="#c8202f" stroke="#fff" stroke-width="0.8"/><rect x="707.8" y="1129.5" width="92.6" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="712.8" y="1140.5" font-size="12" font-weight="700" fill="#c8202f">PE2  PE</text><text x="712.8" y="1153.5" font-size="10.5" fill="#5b6675">5162 · SAOS 10</text></g><g class="note"><title>PE1-PE2 core link rides ch 25; ch 26 is lit on ELS-T-1 only</title><rect x="843.9" y="1189.9" width="281.4" height="31" rx="4" fill="#fff6d5" fill-opacity="0.95" stroke="#d9a400"/><text x="848.9" y="1200.9" font-size="10.5" fill="#1d2430">PE1-PE2 core link rides ch 25; ch 26 is lit on</text><text x="848.9" y="1213.9" font-size="10.5" fill="#1d2430">ELS-T-1 only</text></g></g>
+<g class="layer" data-layer="optical" transform="translate(0,0)"><polygon points="40,1076 914,1076 1135.3,1225.9 261.3,1225.9" fill="#3b5bdb" fill-opacity="0.07" stroke="#3b5bdb" stroke-opacity="0.55" stroke-width="1.2"/><text x="269.3" y="1217.9" font-size="12" font-weight="700" fill="#3b5bdb">Optical line system</text><text x="269.3" y="1239.9" font-size="10.5" fill="#5b6675">4 line-system members · 6 optical spans</text><g class="link-optical"><title>PE1 1 — ELS-T-1 25
+optical: ch 25</title><line x1="523.8" y1="1192.5" x2="268.9" y2="1121.1" stroke="#3b5bdb" stroke-width="5" stroke-linecap="round"/><line x1="523.8" y1="1192.5" x2="268.9" y2="1121.1" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><rect x="465.9" y="1171.2" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="472.8" y="1181.7" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="310.1" y="1128.4" width="19.6" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="319.9" y="1138.9" font-size="9.5" text-anchor="middle" fill="#1d2430">25</text><rect x="377.8" y="1149.8" width="37" height="14" rx="7" fill="#fff" stroke="#3b5bdb"/><text x="396.3" y="1160.3" font-size="9.5" text-anchor="middle" fill="#1d2430">ch 25</text></g><g class="link-optical"><title>PE1 2 — ELS-T-1 26
+optical: ch 26 · dark</title><line x1="527" y1="1180.9" x2="272.1" y2="1109.5" stroke="#3b5bdb" stroke-width="5" stroke-linecap="round"/><line x1="527" y1="1180.9" x2="272.1" y2="1109.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><rect x="469.1" y="1159.6" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="476" y="1170.1" font-size="9.5" text-anchor="middle" fill="#1d2430">2</text><rect x="313.3" y="1116.8" width="19.6" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="323.1" y="1127.3" font-size="9.5" text-anchor="middle" fill="#1d2430">26</text><rect x="360.8" y="1138.2" width="77.6" height="14" rx="7" fill="#fff" stroke="#3b5bdb"/><text x="399.6" y="1148.7" font-size="9.5" text-anchor="middle" fill="#1d2430">ch 26 · dark</text></g><g class="link-optical"><title>ELS-T-1 line — ELS-O-1 line
+optical: ch 16, 25, 26</title><line x1="270.5" y1="1115.3" x2="501" y2="1115.3" stroke="#3b5bdb" stroke-width="5" stroke-linecap="round"/><line x1="270.5" y1="1115.3" x2="501" y2="1115.3" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><rect x="301" y="1108.3" width="31.2" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="316.6" y="1118.8" font-size="9.5" text-anchor="middle" fill="#1d2430">line</text><rect x="439.3" y="1108.3" width="31.2" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="454.9" y="1118.8" font-size="9.5" text-anchor="middle" fill="#1d2430">line</text><rect x="344.1" y="1108.3" width="83.4" height="14" rx="7" fill="#fff" stroke="#3b5bdb"/><text x="385.8" y="1118.8" font-size="9.5" text-anchor="middle" fill="#1d2430">ch 16, 25, 26</text></g><g class="link-optical"><title>ELS-O-2 line — ELS-T-2 line
+optical: ch 16, 25, 26</title><line x1="569" y1="1115.3" x2="799.5" y2="1115.3" stroke="#3b5bdb" stroke-width="5" stroke-linecap="round"/><line x1="569" y1="1115.3" x2="799.5" y2="1115.3" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><rect x="599.5" y="1108.3" width="31.2" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="615.1" y="1118.8" font-size="9.5" text-anchor="middle" fill="#1d2430">line</text><rect x="737.8" y="1108.3" width="31.2" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="753.4" y="1118.8" font-size="9.5" text-anchor="middle" fill="#1d2430">line</text><rect x="642.6" y="1108.3" width="83.4" height="14" rx="7" fill="#fff" stroke="#3b5bdb"/><text x="684.3" y="1118.8" font-size="9.5" text-anchor="middle" fill="#1d2430">ch 16, 25, 26</text></g><g class="link-optical"><title>ELS-T-2 25 — PE2 1
+optical: ch 25</title><line x1="799.5" y1="1115.3" x2="755.4" y2="1186.7" stroke="#3b5bdb" stroke-width="5" stroke-linecap="round"/><line x1="799.5" y1="1115.3" x2="755.4" y2="1186.7" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><rect x="780.9" y="1122.6" width="19.6" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="790.7" y="1133.1" font-size="9.5" text-anchor="middle" fill="#1d2430">25</text><rect x="757.3" y="1165.4" width="13.8" height="14" rx="7" fill="#fff" stroke="#9aa4b1"/><text x="764.2" y="1175.9" font-size="9.5" text-anchor="middle" fill="#1d2430">1</text><rect x="759" y="1144" width="37" height="14" rx="7" fill="#fff" stroke="#3b5bdb"/><text x="777.5" y="1154.5" font-size="9.5" text-anchor="middle" fill="#1d2430">ch 25</text></g><g class="device"><title>PE1
+5164 · cn5164 · SAOS 10
+loopback 192.0.2.1
+prefix SID 16001 (index 1)
+IS-IS 49.0001 L2 · 1920.0000.2001
+BGP AS 65000 · route reflector</title><polygon points="545.8,1159.5 573,1177.9 573,1195.9 545.8,1177.5" fill="#c8202f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="505,1177.9 573,1177.9 573,1195.9 505,1195.9" fill="#c8202f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="477.8,1159.5 545.8,1159.5 573,1177.9 505,1177.9" fill="#c8202f" stroke="#fff" stroke-width="0.8"/><rect x="477.8" y="1129.5" width="94" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="482.8" y="1140.5" font-size="12" font-weight="700" fill="#c8202f">PE1  PE · RR</text><text x="482.8" y="1153.5" font-size="10.5" fill="#5b6675">5164 · SAOS 10</text></g><g class="device"><title>PE2
+5162 · cn5162 · SAOS 10
+loopback 192.0.2.2
+prefix SID 16002 (index 2)
+IS-IS 49.0001 L2 · 1920.0000.2002
+BGP AS 65000</title><polygon points="775.8,1159.5 803,1177.9 803,1195.9 775.8,1177.5" fill="#c8202f" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="735,1177.9 803,1177.9 803,1195.9 735,1195.9" fill="#c8202f" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="707.8,1159.5 775.8,1159.5 803,1177.9 735,1177.9" fill="#c8202f" stroke="#fff" stroke-width="0.8"/><rect x="707.8" y="1129.5" width="92.6" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="712.8" y="1140.5" font-size="12" font-weight="700" fill="#c8202f">PE2  PE</text><text x="712.8" y="1153.5" font-size="10.5" fill="#5b6675">5162 · SAOS 10</text></g><g class="device"><title>ELS-T-1
+terminal · els-terminal</title><polygon points="290.9,1088.1 318.1,1106.5 318.1,1124.5 290.9,1106.1" fill="#3b5bdb" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="250.1,1106.5 318.1,1106.5 318.1,1124.5 250.1,1124.5" fill="#3b5bdb" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="222.9,1088.1 290.9,1088.1 318.1,1106.5 250.1,1106.5" fill="#3b5bdb" stroke="#fff" stroke-width="0.8"/><rect x="222.9" y="1058.1" width="145.7" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="227.9" y="1069.1" font-size="12" font-weight="700" fill="#3b5bdb">ELS-T-1  TERM</text><text x="227.9" y="1082.1" font-size="10.5" fill="#5b6675">terminal · els-terminal</text></g><g class="device"><title>ELS-O-1
+oadm · els-oadm</title><polygon points="521.4,1088.1 548.6,1106.5 548.6,1124.5 521.4,1106.1" fill="#3b5bdb" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="480.6,1106.5 548.6,1106.5 548.6,1124.5 480.6,1124.5" fill="#3b5bdb" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="453.4,1088.1 521.4,1088.1 548.6,1106.5 480.6,1106.5" fill="#3b5bdb" stroke="#fff" stroke-width="0.8"/><rect x="453.4" y="1058.1" width="171" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="458.4" y="1069.1" font-size="12" font-weight="700" fill="#3b5bdb">ELS-O-1 | ELS-O-2  OADM</text><text x="458.4" y="1082.1" font-size="10.5" fill="#5b6675">oadm · els-oadm</text></g><g class="device"><title>ELS-O-2
+oadm · els-oadm</title><polygon points="589.4,1088.1 616.6,1106.5 616.6,1124.5 589.4,1106.1" fill="#3b5bdb" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="548.6,1106.5 616.6,1106.5 616.6,1124.5 548.6,1124.5" fill="#3b5bdb" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="521.4,1088.1 589.4,1088.1 616.6,1106.5 548.6,1106.5" fill="#3b5bdb" stroke="#fff" stroke-width="0.8"/></g><g class="device"><title>ELS-T-2
+terminal · els-terminal</title><polygon points="819.9,1088.1 847.1,1106.5 847.1,1124.5 819.9,1106.1" fill="#3b5bdb" stroke="#fff" stroke-width="0.8" style="filter:brightness(0.72)"/><polygon points="779.1,1106.5 847.1,1106.5 847.1,1124.5 779.1,1124.5" fill="#3b5bdb" stroke="#fff" stroke-width="0.8" opacity="0.8"/><polygon points="751.9,1088.1 819.9,1088.1 847.1,1106.5 779.1,1106.5" fill="#3b5bdb" stroke="#fff" stroke-width="0.8"/><rect x="751.9" y="1058.1" width="145.7" height="31" rx="4" fill="#fff" fill-opacity="0.88"/><text x="756.9" y="1069.1" font-size="12" font-weight="700" fill="#3b5bdb">ELS-T-2  TERM</text><text x="756.9" y="1082.1" font-size="10.5" fill="#5b6675">terminal · els-terminal</text></g><g class="note-marker"><title>ELS-O-1: OADM site: the pair back to back, ch 16 added and dropped</title><circle cx="541" cy="1085.3" r="8" fill="#fff6d5" stroke="#d9a400" stroke-width="1.4"/><text x="541" y="1088.8" font-size="10" font-weight="700" text-anchor="middle" fill="#1d2430">1</text></g><g class="note"><title>ELS-O-1: OADM site: the pair back to back, ch 16 added and dropped</title><rect x="849.8" y="1176.9" width="275.5" height="44" rx="4" fill="#fff6d5" fill-opacity="0.95" stroke="#d9a400"/><text x="854.8" y="1187.9" font-size="12" font-weight="700" fill="#1d2430">1 · ELS-O-1</text><text x="854.8" y="1200.9" font-size="10.5" fill="#5b6675">OADM site: the pair back to back, ch 16 added</text><text x="854.8" y="1213.9" font-size="10.5" fill="#5b6675">and dropped</text></g></g>
+<g class="hud">
+<text x="40" y="30" font-size="17" font-weight="700" fill="#1d2430">els-line-system</text>
+<text x="40" y="48" font-size="11" fill="#5b6675">6 devices · 7 links · 1 PW · layout: columns</text>
+<g class="chip" data-layer="optical" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide Optical line system</title><rect x="40" y="58" width="155.39999999999998" height="22" rx="11" fill="#3b5bdb" fill-opacity="0.14" stroke="#3b5bdb"/><circle class="dot" cx="52" cy="69" r="4.5" fill="#3b5bdb"/><text x="62" y="73" font-size="11" fill="#1d2430">Optical line system</text></g>
+<g class="chip" data-layer="physical" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Physical (always shown)</title><rect x="203.39999999999998" y="58" width="82.8" height="22" rx="11" fill="#8b98a8" fill-opacity="0.14" stroke="#8b98a8"/><circle class="dot" cx="215.39999999999998" cy="69" r="4.5" fill="#8b98a8"/><text x="225.39999999999998" y="73" font-size="11" fill="#1d2430">Physical</text></g>
+<g class="chip" data-layer="igp" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide IGP</title><rect x="294.2" y="58" width="49.8" height="22" rx="11" fill="#2e9e5b" fill-opacity="0.14" stroke="#2e9e5b"/><circle class="dot" cx="306.2" cy="69" r="4.5" fill="#2e9e5b"/><text x="316.2" y="73" font-size="11" fill="#1d2430">IGP</text></g>
+<g class="chip" data-layer="mpls" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide MPLS (SR policies / TP)</title><rect x="352" y="58" width="181.79999999999998" height="22" rx="11" fill="#b7791f" fill-opacity="0.14" stroke="#b7791f"/><circle class="dot" cx="364" cy="69" r="4.5" fill="#b7791f"/><text x="374" y="73" font-size="11" fill="#1d2430">MPLS (SR policies / TP)</text></g>
+<g class="chip" data-layer="bgp" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide BGP</title><rect x="541.8" y="58" width="49.8" height="22" rx="11" fill="#7d4cc2" fill-opacity="0.14" stroke="#7d4cc2"/><circle class="dot" cx="553.8" cy="69" r="4.5" fill="#7d4cc2"/><text x="563.8" y="73" font-size="11" fill="#1d2430">BGP</text></g>
+<g class="chip" data-layer="pw" role="button" tabindex="0" aria-pressed="true" style="cursor:pointer"><title>Show or hide Pseudowires</title><rect x="599.5999999999999" y="58" width="102.6" height="22" rx="11" fill="#d63384" fill-opacity="0.14" stroke="#d63384"/><circle class="dot" cx="611.5999999999999" cy="69" r="4.5" fill="#d63384"/><text x="621.5999999999999" y="73" font-size="11" fill="#1d2430">Pseudowires</text></g>
+</g>
+<script><![CDATA[
+(function () {
+  var svgs = document.querySelectorAll('svg.netfacts-snapshot:not([data-wired])');
+  Array.prototype.forEach.call(svgs, function (svg) {
+    svg.setAttribute('data-wired', '1');
+    var gap = +svg.getAttribute('data-gap'), fullH = +svg.getAttribute('data-full-h');
+    var vb = svg.getAttribute('viewBox').split(' ').map(Number);
+    var layers = [].slice.call(svg.querySelectorAll('g.layer'));
+    var order = layers.map(function (g) { return g.getAttribute('data-layer'); }).reverse();
+    var off = {};
+    function apply() {
+      var shown = order.filter(function (id) { return !off[id]; });
+      layers.forEach(function (g) {
+        var id = g.getAttribute('data-layer'), k = shown.indexOf(id);
+        g.style.display = k < 0 ? 'none' : '';
+        if (k >= 0) g.setAttribute('transform', 'translate(0,' + (-k * gap) + ')');
+      });
+      [].forEach.call(svg.querySelectorAll('line.pillar'), function (p) {
+        var ls = (p.getAttribute('data-layers') || '').split(' ');
+        if (p._y0 === undefined) p._y0 = +p.getAttribute('y1');
+        var y0 = p._y0, top = 0, bottom = Infinity;
+        ls.forEach(function (id) { var k = shown.indexOf(id); if (k > top) top = k; if (k >= 0 && k < bottom) bottom = k; });
+        if (bottom === Infinity) bottom = 0;
+        p.setAttribute('y1', y0 - bottom * gap);
+        p.setAttribute('y2', y0 - top * gap);
+      });
+      [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
+        var id = c.getAttribute('data-layer');
+        c.style.opacity = off[id] ? 0.45 : 1;
+        c.querySelector('.dot').setAttribute('fill-opacity', off[id] ? 0 : 1);
+        c.setAttribute('aria-pressed', off[id] ? 'false' : 'true');
+      });
+      var drop = (order.length - shown.length) * gap;
+      svg.setAttribute('viewBox', [vb[0], drop, vb[2], fullH - drop].join(' '));
+      svg.setAttribute('height', fullH - drop);
+      svg.querySelector('g.hud').setAttribute('transform', 'translate(0,' + drop + ')');
+    }
+    [].forEach.call(svg.querySelectorAll('g.chip'), function (c) {
+      var id = c.getAttribute('data-layer');
+      if (id === 'physical') { c.style.cursor = 'default'; return; }
+      function toggle() { off[id] = !off[id]; apply(); }
+      c.addEventListener('click', toggle);
+      c.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    });
+    apply();
+  });
+})();]]></script>
+</svg>

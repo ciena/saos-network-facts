@@ -165,7 +165,7 @@ export function presentLayers(m) {
 // Whether a device is a router, for its symbol on the physical frame: a Ciena SAOS device (its type a Ciena
 // model number, 3984, 5164, 8110, or its record a SAOS extractor's), SAOS 6 and 8 switches included (they
 // route and switch as the SAOS 10 ones do, and one symbol keeps a mixed lab even). A Waveserver, a
-// third-party box, an ELS shelf or a type the library does not know is not.
+// third-party box, an ELS chassis or a type the library does not know is not.
 export function isRouter(n) {
   return /^\d{4}/.test(String(n?.type ?? '')) || !!n?.os;
 }
@@ -181,8 +181,9 @@ export function typeTag(type) {
 }
 
 // A short tag for a device's box: its role (P, PE, CE...), or for a box without facts its
-// equipment (a line-system member's role from the extra file: ROADM, AMP, OT), else '?'.
-const EQUIPMENT_TAG = { roadm: 'ROADM', amplifier: 'AMP', ila: 'ILA', terminal: 'OT', transponder: 'OT', muxponder: 'MXP', router: 'R', switch: 'SW' };
+// equipment (a line-system member's role from the extra file: ROADM, AMP, TERM for a terminal, OADM), else '?'.
+// A transponder (the router-side optics, not a line-system member) is OT.
+const EQUIPMENT_TAG = { roadm: 'ROADM', amplifier: 'AMP', ila: 'ILA', terminal: 'TERM', transponder: 'OT', muxponder: 'MXP', router: 'R', switch: 'SW' };
 export function equipmentTag(n) {
   if (!n.equipment) return null;
   const e = n.equipment.toLowerCase();

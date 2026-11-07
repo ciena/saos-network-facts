@@ -68,7 +68,7 @@ export interface DeviceRecord {
    */
   type: string | null;
   /**
-   * What the device is in the lab, when the inputs say (`--extra`): free text such as `roadm`, `amplifier`, `terminal` for the members of an optical line system, or `router`; `ce`, `pe` or `p` (any case) is the device's network role, which the drawings show for a device without facts as they show the role derived from facts. A line-system member is a record with a role and no facts (`extractor` null, `status` `skipped`): it has no configuration here, and links[] with `kind` `optical` connect it. Since schema 1.9.
+   * What the device is in the lab, when the inputs say (`--extra`). For a member of an optical line system: `terminal` (the end of a line system, channel mux/demux and amplifiers: an ELS terminal or a terminal ROADM), `oadm` (a fixed-filter add/drop, such as an ELS OADM: two chassis back to back over an express link at an add/drop site, drawn as one), `roadm` (a reconfigurable add/drop on a WSS, flexgrid, one or more degrees) or `amplifier` (a line or in-line amplifier); any other value is free text, such as `router`; `ce`, `pe` or `p` (any case) is the device's network role, which the drawings show for a device without facts as they show the role derived from facts. A line-system member is a record with a role and no facts (`extractor` null, `status` `skipped`): it has no configuration here, and links[] with `kind` `optical` connect it. Since schema 1.9.
    */
   role?: string;
   /**

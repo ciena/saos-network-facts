@@ -17,6 +17,47 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-11-07
+
+### Fixed
+
+- **The OADM pair touches in 3D, in the snapshot and on the 2D frames** (#34, @jgroom33) — two OADMs of a
+  line system cabled back to back (the express link between them) share one label and their express link
+  is not drawn, but on the 3D page the two boxes still stood about four box-widths apart. They now move
+  toward each other, each halfway, until their boxes touch (`touchBackToBack` in the viewer's
+  `import/layout.js`). The snapshot pulls them together the same way and gives the pair one label,
+  `A | B`. On the 2D frames the boxes already touched, but each box's white outline and rounded corners
+  left a white seam between them. The pair is now one outlined block with a faint line between its two
+  tags. Labs without an OADM pair are drawn as before.
+- **A free note is shown whole** (#34, @jgroom33) — a note on no device was cut after three lines on the
+  frames and the snapshot (`ports 25…`); it now wraps to as many lines as it needs, and the card grows to
+  fit. A note on a device keeps its three lines, its whole text in the hover title.
+- **A connection over the line system beside a cable reads as two lines, each with its badges**
+  (#34, @jgroom33) — on the physical frame, a rainbow `ch N` connection and a direct cable between the same
+  two routers were drawn 0.9 font units apart and read as one line; they are now 1.25 apart, still meeting
+  the router symbol. The channel chip stays in the middle of its link when the cable beside it has no
+  caption, instead of being pushed toward one end, so the port badges at both ends keep their place on
+  their own link (Team-4-MC_NA's `2/2`).
+
+### Changed
+
+- **ELS terminology** (#34, @jgroom33) — a line-system `terminal` is tagged `TERM` on the 2D frames, the
+  snapshot and the 3D page; `OT` now means a transponder only. The schema's `devices[].role` description
+  (wording only, no schema version change) documents `terminal`, `oadm` (fixed-filter add/drop: two
+  chassis back to back over an express link), `roadm` (reconfigurable, WSS) and `amplifier` (line or
+  in-line amplifier). The README says what lies between the terminals (OADM pairs only for ELS; ROADMs or
+  in-line amplifiers for a ROADM system) and that ELS is amplified and actively controlled with fixed
+  filters, not passive, and says chassis rather than shelf; the layout comment in `js/src/layout.ts` says
+  the same.
+
+### Added
+
+- **An ELS-shaped fixture lab in the site menu** (#34, @jgroom33) — `els-line-system`: a terminal, an
+  OADM pair back to back over an express link, a terminal, the routers on the terminals' channel ports
+  (25, 26), channel 16 added and dropped at the OADM site; facts and render goldens. The OADM-pair tests
+  use it. The ROADM fixture (`line-system`) now types its two ROADMs `roadm-1d`, terminal ROADMs with one
+  line port, as it wires them.
+
 ## [0.23.0] - 2026-11-05
 
 ### Changed

@@ -573,7 +573,7 @@
       "site": "east",
       "status": "skipped",
       "templates": [],
-      "type": "roadm-2d"
+      "type": "roadm-1d"
     },
     {
       "device": "AMP-1",
@@ -596,13 +596,13 @@
       "site": "west",
       "status": "skipped",
       "templates": [],
-      "type": "roadm-2d"
+      "type": "roadm-1d"
     }
   ],
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.23.0"
+    "version": "0.23.1"
   },
   "hosts": [],
   "links": [

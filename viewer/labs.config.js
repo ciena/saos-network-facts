@@ -40,6 +40,11 @@ export const LABS = [
     source: '../tests/fixtures/expected/line-system.facts.json',
   },
   {
+    id: 'els-line-system',
+    title: 'ELS line system: terminals and an OADM pair over an express link (fixture, plain boxes from --extra)',
+    source: '../tests/fixtures/expected/els-line-system.facts.json',
+  },
+  {
     id: 'config-less',
     title: 'Lab without configurations: devices by type, roles from --extra (fixture)',
     source: '../tests/fixtures/expected/config-less.facts.json',

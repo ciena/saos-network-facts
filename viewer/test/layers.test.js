@@ -25,6 +25,7 @@ describe('every published lab lists only the layers it has', () => {
     'srv6-evpn': ['physical', 'isis', 'mpls', 'srv6', 'bgp', 'vrf', 'evpn'],
     'l3vpn-hosts': ['physical', 'isis', 'mpls', 'bgp', 'vrf'],
     'line-system': ['optical', 'physical', 'isis', 'mpls', 'bgp', 'pw'],
+    'els-line-system': ['optical', 'physical', 'isis', 'mpls', 'bgp', 'pw'],
     // no device has facts: its plain boxes on the physical plane, nothing else
     'config-less': ['physical'],
   };
