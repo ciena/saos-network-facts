@@ -40,6 +40,7 @@ def test_example_views_validate(path):
     {"layout": {"hints": {"PE1": [0]}}},
     {"camera": "orbit"},
     {"density": "sparse"},
+    {"embed": "yes"},
     {"device_info": ["role"]},
 ])
 def test_bad_views_do_not_validate(view):
