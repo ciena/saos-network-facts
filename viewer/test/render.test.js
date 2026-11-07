@@ -24,6 +24,8 @@ const LABS = {
   'ospf-tp': 'tests/fixtures/expected/ospf-tp.facts.json',
   'srv6-ospf': 'viewer/test/fixtures/srv6-ospf.facts.json',
   'line-system': 'tests/fixtures/expected/line-system.facts.json',
+  // ELS-shaped: terminal, an OADM pair back to back over an express link, terminal
+  'els-line-system': 'tests/fixtures/expected/els-line-system.facts.json',
   // short host links and a bond's two member cables to one PE: port badges that stacked before
   'vpws-bonds': 'tests/fixtures/expected/vpws-bonds.facts.json',
   // no configurations at all: every device drawn as its type, the roles from the extra file
@@ -136,53 +138,66 @@ describe('frames', () => {
     expect(u.split('id="f-physical"')[0]).toContain('>PE1 1 · ch 25</text>');
   });
 
-  test('two OADMs cabled back to back stand side by side and their express span is not drawn', () => {
-    // the line-system lab with ROADM-A and AMP-1 made OADMs: the span between them is their express span
-    const file = JSON.parse(read(LABS['line-system']));
-    for (const r of file.devices) if (r.device === 'ROADM-A' || r.device === 'AMP-1') r.role = 'oadm';
-    const r = frames(JSON.stringify(file), { preset: 'card-frames' });
+  test('two OADMs cabled back to back stand side by side and their express link is not drawn', () => {
+    // the ELS lab: terminal, ELS-O-1 and ELS-O-2 back to back over their express link, terminal
+    const text = read(LABS['els-line-system']);
+    const r = frames(text, { preset: 'card-frames' });
     // one label over the pair, names left to right, on the optical frame
-    expect(r.svg).toMatch(/>(ROADM-A \| AMP-1|AMP-1 \| ROADM-A)<\/text>/);
-    expect(r.svg).not.toMatch(/>AMP-1<\/text>/);
-    expect(r.svg).not.toContain('span 1 · 40 km');
-    expect(r.svg).toContain('span 2 · 38 km');
-    expect(r.svg).toMatch(/data-title="Optical · 3 line-system members, 1 span/);
+    expect(r.svg).toMatch(/>ELS-O-1 \| ELS-O-2<\/text>/);
+    expect(r.svg).not.toMatch(/>ELS-O-2<\/text>/);
+    expect(r.svg).not.toContain('express · ch 25, 26');
+    expect(r.svg).toContain('ch 16, 25, 26');
+    expect(r.svg).toMatch(/data-title="Optical · 4 line-system members, 2 spans/);
+    // the terminals are tagged TERM (OT is a transponder)
+    expect(r.svg.match(/>TERM<\/text>/g)).toHaveLength(2);
+    expect(r.svg).not.toContain('>OT</text>');
     // a view without the optical layer, the line system on the physical frame: left out there too
-    const flat = frames(JSON.stringify(file), { layers: ['physical'] });
-    expect(flat.svg).not.toContain('span 1 · 40 km');
-    expect(flat.svg).toMatch(/data-title="Physical · 5 devices [^"]*, 5 links \(4 optical\)/);
+    const flat = frames(text, { layers: ['physical'] });
+    expect(flat.svg).not.toContain('express · ch 25, 26');
+    expect(flat.svg).toMatch(/data-title="Physical · 6 devices [^"]*, 6 links \(5 optical\)/);
     // the facts keep the link; the layout puts the two a box apart, the rest of the chain a column apart
-    expect(r.model.links.some((l) => [l.a.node, l.b.node].sort().join() === 'AMP-1,ROADM-A')).toBe(true);
-    const { positions: p } = prepare(JSON.stringify(file), { preset: 'card-frames' });
-    expect(Math.abs(p['ROADM-A'].x - p['AMP-1'].x)).toBeCloseTo(0.3, 5);
-    expect(Math.abs(p['AMP-1'].x - p['ROADM-B'].x)).toBeGreaterThanOrEqual(0.99);
-    // as given (ROADMs and an amplifier), every span is drawn
+    expect(r.model.links.some((l) => [l.a.node, l.b.node].sort().join() === 'ELS-O-1,ELS-O-2')).toBe(true);
+    const { positions: p } = prepare(text, { preset: 'card-frames' });
+    expect(Math.abs(p['ELS-O-1'].x - p['ELS-O-2'].x)).toBeCloseTo(0.3, 5);
+    expect(Math.abs(p['ELS-T-1'].x - p['ELS-O-1'].x)).toBeGreaterThanOrEqual(0.99);
+    expect(Math.abs(p['ELS-O-2'].x - p['ELS-T-2'].x)).toBeGreaterThanOrEqual(0.99);
+    // the ROADM lab (ROADMs and an in-line amplifier): every span is drawn
     expect(frames(read(LABS['line-system']), { preset: 'card-frames' }).svg).toContain('span 1 · 40 km');
   });
 
   test('the OADM pair touches, one unit, on the 2D frames, the snapshot and the 3D page', () => {
-    const file = JSON.parse(read(LABS['line-system']));
-    for (const r of file.devices) if (r.device === 'ROADM-A' || r.device === 'AMP-1') r.role = 'oadm';
-    const text = JSON.stringify(file);
+    const text = read(LABS['els-line-system']);
     // 2D: one block round both boxes (twice a box wide), a faint line between them, both tags
     const optical = frames(text, { preset: 'card-frames' }).svg.split('id="f-optical"')[1].split('</g><g class="frame')[0];
-    const widths = [...optical.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="[\d.]+" rx="[\d.]+" fill="#3b5bdb" stroke="#fff"[^>]*\/>(<line [^>]*stroke-opacity="0.5"\/>)?/g)].map((m) => [Number(m[1]), !!m[2]]);
-    expect(widths).toHaveLength(2);
-    const [pair, single] = widths[0][1] ? widths : [widths[1], widths[0]];
-    expect(pair[1] && !single[1]).toBe(true);
-    expect(pair[0]).toBeCloseTo(2 * single[0], 0);
+    const boxes = [...optical.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="[\d.]+" rx="[\d.]+" fill="#3b5bdb" stroke="#fff"[^>]*\/>(<line [^>]*stroke-opacity="0.5"\/>)?/g)].map((m) => [Number(m[1]), !!m[2]]);
+    // the two terminals and the pair's block
+    expect(boxes).toHaveLength(3);
+    const pair = boxes.filter((x) => x[1]), single = boxes.filter((x) => !x[1]);
+    expect(pair).toHaveLength(1);
+    expect(pair[0][0]).toBeCloseTo(2 * single[0][0], 0);
     expect(optical.match(/>OADM<\/text>/g)).toHaveLength(2);
     // the snapshot: the two boxes a box apart (68 px between centres), one label over the pair
     const snap = snapshot(text).svg;
-    expect(snap).toMatch(/>ROADM-A \| AMP-1 {2}OADM<\/text>/);
-    expect(snap).not.toMatch(/>AMP-1 {2}OADM<\/text>/);
+    expect(snap).toMatch(/>ELS-O-1 \| ELS-O-2 {2}OADM<\/text>/);
+    expect(snap).not.toMatch(/>ELS-O-2 {2}OADM<\/text>/);
+    expect(snap).toMatch(/>ELS-T-1 {2}TERM<\/text>/);
     const fronts = (id) => [...snap.split('data-layer="optical"')[1].matchAll(/<g class="device"><title>([^\n<]+)[\s\S]*?<polygon points="([-\d.]+),/g)].filter((m) => m[1].startsWith(id)).map((m) => Number(m[2]));
-    expect(fronts('AMP-1')[0] - fronts('ROADM-A')[0]).toBeCloseTo(68, 0);
+    expect(fronts('ELS-O-2')[0] - fronts('ELS-O-1')[0]).toBeCloseTo(68, 0);
     // the 3D page: on one row, their 2.4-unit boxes touching
     const pos = Object.fromEntries(importFacts(text).topology.plain.nodes.map((n) => [n.id, n.pos]));
-    expect(pos['AMP-1'].z).toBe(pos['ROADM-A'].z);
-    expect(Math.abs(pos['AMP-1'].x - pos['ROADM-A'].x)).toBeCloseTo(2.4, 5);
-    expect(Math.abs(pos['ROADM-B'].x - pos['AMP-1'].x)).toBeGreaterThan(2.4);
+    expect(pos['ELS-O-2'].z).toBe(pos['ELS-O-1'].z);
+    expect(Math.abs(pos['ELS-O-2'].x - pos['ELS-O-1'].x)).toBeCloseTo(2.4, 5);
+    expect(Math.abs(pos['ELS-T-2'].x - pos['ELS-O-2'].x)).toBeGreaterThan(2.4);
+  });
+
+  test('a long free note is shown whole on the frames and the snapshot', () => {
+    const file = JSON.parse(read(LABS['els-line-system']));
+    const text = 'ELS-1: three sites, the two terminals and, mid-span, the OADM site with the pair back to back (the express ports joined); the OADMs add and drop channel 16 there, ports 25 and 26 run terminal to terminal';
+    file.notes = [{ text }];
+    const words = (svg) => [...svg.matchAll(/<g class="note">[\s\S]*?<\/g>/g)].map((m) => [...m[0].matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((x) => x[1]).join(' '));
+    const r = frames(JSON.stringify(file), { preset: 'card-frames' });
+    expect(words(r.svg)[0]).toBe(text);
+    expect(words(snapshot(JSON.stringify(file)).svg)[0]).toBe(text);
   });
 
   test('the view picks frames and the start frame; empty layers make none', () => {

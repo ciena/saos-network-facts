@@ -117,8 +117,8 @@ describe('every fixture: the same engine output with or without plain boxes', ()
     });
   }
 
-  test('the lab menu demos plain boxes: the line-system and the config-less labs, and only they, have them', () => {
+  test('the lab menu demos plain boxes: the line-system, ELS and config-less labs, and only they, have them', () => {
     const withBoxes = LABS.filter((l) => importFacts(readFileSync(new URL(l.source, new URL('../labs.config.js', import.meta.url)), 'utf8')).topology.plain.nodes.length);
-    expect(withBoxes.map((l) => l.id)).toEqual(['line-system', 'config-less']);
+    expect(withBoxes.map((l) => l.id)).toEqual(['line-system', 'els-line-system', 'config-less']);
   });
 });

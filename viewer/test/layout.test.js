@@ -17,11 +17,20 @@ const LABS = [
     .map((f) => [f.replace('.facts.json', ''), readFileSync(new URL(f, expected), 'utf8')]),
 ];
 
-const minDistance = (positions) => {
-  const pts = Object.values(positions);
+// (two OADMs cabled back to back are one unit, BACK_TO_BACK apart by design: left out, as `pairs`)
+const minDistance = (positions, pairs = new Set()) => {
+  const ids = Object.keys(positions);
   let min = Infinity;
-  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) min = Math.min(min, Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y));
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+    if (pairs.has([ids[i], ids[j]].sort().join('|'))) continue;
+    const [p, q] = [positions[ids[i]], positions[ids[j]]];
+    min = Math.min(min, Math.hypot(p.x - q.x, p.y - q.y));
+  }
   return min;
+};
+const oadmPairs = (model) => {
+  const oadm = (id) => /^oadm$/i.test(model.nodes.find((n) => n.id === id)?.equipment ?? '');
+  return new Set(model.links.filter((l) => oadm(l.a.node) && oadm(l.b.node)).map((l) => [l.a.node, l.b.node].sort().join('|')));
 };
 // Links that run through a device (not at their ends).
 const through = (model, positions) => {
@@ -64,7 +73,10 @@ describe('layout of every fixture lab and the example', () => {
         for (const [view, layout] of Object.entries(views)) {
           const { positions } = layoutFacts(topo, layout);
           expect(Object.keys(positions).sort(), view).toEqual(topo.nodes.map((n) => n.id).sort());
-          if (topo.nodes.length > 1) expect(minDistance(positions), view).toBeGreaterThanOrEqual(0.5);
+          // (a line system squeezes to fit a narrow card: its places at least BACK_TO_BACK apart; the ELS
+          // chain, terminal, OADM pair, terminal, needs 1.3 columns where a two-column card has 1)
+          const squeezed = view === 'narrow card' && oadmPairs(topo).size;
+          if (topo.nodes.length > 1) expect(minDistance(positions, oadmPairs(topo)), view).toBeGreaterThanOrEqual(squeezed ? 0.3 : 0.5);
           expect(through(topo, positions), view).toEqual([]);
         }
         const scene = topo.nodes.map((n) => n.pos);

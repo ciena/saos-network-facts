@@ -405,7 +405,8 @@ function layerObjects(id, model, at, S, cam, { uv, layers, planeU, planeV, full 
   const corner = S(planeU, planeV);
   let k = 0;
   for (const x of mine) {
-    const lines = wrapNote(x.text, 48);
+    // (a free note in full; one on a device at most three lines, its whole text in the hover title)
+    const lines = wrapNote(x.text, 48, x.device ? 3 : Infinity);
     if (x.device) {
       k += 1;
       const p = at(x.device);

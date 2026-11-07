@@ -1,0 +1,15 @@
+# Synthetic two-PE SR-MPLS lab (the sr-l2 configurations) whose core link rides an ELS-shaped optical
+# line system: a terminal, an OADM pair back to back over an express link, a terminal. The line system
+# is not a containerlab node, so extra.yaml gives its members, its links and the PEs' channel ports, and
+# two notes (documentation addresses only).
+name: els-line-system
+topology:
+  defaults:
+    kind: ciena_saos
+  nodes:
+    PE1:
+      type: '5164'
+      startup-config: configs/PE1.cfg
+    PE2:
+      type: '5162'
+      startup-config: configs/PE2.xml

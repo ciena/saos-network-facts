@@ -21,7 +21,7 @@ describe('import', () => {
   const nodes = new Map(drawnNodes(imp.topology).map((n) => [n.id, n]));
 
   test('line-system members are plain boxes with their equipment role, without a warning', () => {
-    expect(imp.topology.plain.nodes.map((n) => [n.id, n.equipment, n.type])).toEqual([['ROADM-A', 'roadm', 'roadm-2d'], ['AMP-1', 'amplifier', 'ila'], ['ROADM-B', 'roadm', 'roadm-2d']]);
+    expect(imp.topology.plain.nodes.map((n) => [n.id, n.equipment, n.type])).toEqual([['ROADM-A', 'roadm', 'roadm-1d'], ['AMP-1', 'amplifier', 'ila'], ['ROADM-B', 'roadm', 'roadm-1d']]);
     expect(imp.report.warnings.filter((w) => /plain box/.test(w))).toEqual([]);
     expect(nodeLabel(nodes.get('AMP-1'))).toBe('AMP-1 amplifier · ila');
     expect(nodeLabel(nodes.get('PE1'))).toBe('PE1 192.0.2.1');
@@ -161,7 +161,7 @@ describe('frames and snapshot', () => {
 
 describe('helpers', () => {
   test('equipment tags and note wrapping', () => {
-    expect(['roadm', 'amplifier', 'terminal', 'Wave Shaper', undefined].map((e) => equipmentTag({ equipment: e }))).toEqual(['ROADM', 'AMP', 'OT', 'WAVE', null]);
+    expect(['roadm', 'amplifier', 'terminal', 'oadm', 'transponder', 'Wave Shaper', undefined].map((e) => equipmentTag({ equipment: e }))).toEqual(['ROADM', 'AMP', 'TERM', 'OADM', 'OT', 'WAVE', null]);
     expect(wrapNote('one two three four five', 9)).toEqual(['one two', 'three', 'four five']);
     expect(wrapNote('one two three four five six', 9)).toEqual(['one two', 'three', 'four fiv…']);
     expect(wrapNote('a'.repeat(5), 9)).toEqual(['aaaaa']);

@@ -1,12 +1,13 @@
 # What the configurations do not say about the line-system lab, as a consumer writes it from its own
 # inventory (synthetic): the members of an optical line system between PE1 and PE2, the spans, the
-# two sites and two notes.
+# two sites and two notes. ROADM-A and ROADM-B are terminal ROADMs (one degree: one line port, with
+# add/drop ports); AMP-1 is an in-line amplifier between them.
 devices:
   PE1: {site: east}
   PE2: {site: west}
-  ROADM-A: {type: roadm-2d, role: roadm, site: east}
+  ROADM-A: {type: roadm-1d, role: roadm, site: east}
   AMP-1: {type: ila, role: amplifier}
-  ROADM-B: {type: roadm-2d, role: roadm, site: west}
+  ROADM-B: {type: roadm-1d, role: roadm, site: west}
 links:
   - {a: "PE1:1", b: "ROADM-A:add-1", kind: optical, label: "ch 25"}
   - {a: "PE1:2", b: "ROADM-A:add-2", kind: optical, label: "ch 26 · dark"}

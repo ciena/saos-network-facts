@@ -131,7 +131,7 @@ export function renderFrames(m, positions, { frames, start, period = 4, cardPosi
   // Wide enough for the longest title, so a small lab keeps its titles whole.
   const W = Math.ceil(Math.max(...sets.map((x) => (x.maxX - x.minX) * U + 2 * mx), Math.max(...Object.values(titles).map((t) => t.length)) * f * 1.15 * 0.6 + f * 2.4));
   // Free notes (no device) sit along the bottom edge: room for the frame with the most of them.
-  const freeLines = Math.max(0, ...frames.map((id) => notesOn(m, id, frames).filter((x) => !x.device).reduce((k, x) => k + wrapNote(x.text, 60).length, 0)));
+  const freeLines = Math.max(0, ...frames.map((id) => notesOn(m, id, frames).filter((x) => !x.device).reduce((k, x) => k + wrapNote(x.text, 60, Infinity).length, 0)));
   const notesH = freeLines ? freeLines * f * 1.0 + f * 1.4 : 0;
   // The optical frame: its labels above the row, its callouts below (room for the tallest block), and
   // room under them for a note on a member.
@@ -250,18 +250,20 @@ function line(a, b, color, w, extra = '') {
 const lerp = (a, b, t) => ({ x: r1(a.x + (b.x - a.x) * t), y: r1(a.y + (b.y - a.y) * t) });
 const title = (t) => `<title>${esc(t)}</title>`;
 
-// Parallel links between one pair get a sideways offset.
+// Parallel links between one pair get a sideways offset; wider where one of them rides the line system
+// (a rainbow beside a cable: both must read), as wide as the router symbol allows, so both still meet it.
 function linkEnds(ctx) {
-  const n = new Map(), seen = new Map();
+  const n = new Map(), seen = new Map(), wide = new Set();
   const key = (l) => [l.a.node, l.b.node].sort().join('|');
   for (const l of ctx.model.links) n.set(key(l), (n.get(key(l)) ?? 0) + 1);
+  for (const l of ctx.model.links) if (l.over) wide.add(key(l));
   const ends = new Map();
   for (const l of ctx.model.links) {
     const i = seen.get(key(l)) ?? 0;
     seen.set(key(l), i + 1);
     const a = ctx.at(l.a.node), b = ctx.at(l.b.node);
     const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    const off = (i - (n.get(key(l)) - 1) / 2) * ctx.f * 0.9;
+    const off = (i - (n.get(key(l)) - 1) / 2) * ctx.f * (wide.has(key(l)) && n.get(key(l)) > 1 ? 1.25 : 0.9);
     const ox = (-(b.y - a.y) / d) * off, oy = ((b.x - a.x) / d) * off;
     ends.set(l.id, [{ x: r1(a.x + ox), y: r1(a.y + oy) }, { x: r1(b.x + ox), y: r1(b.y + oy) }]);
   }
@@ -380,8 +382,10 @@ function draw(id, ctx) {
           : line(a, b, l.plain ? C.plain : C.link, f * 0.16, l.plain ? ' stroke-dasharray="6 5"' : '');
       // The caption on the link, staggered along parallel links; the port pills only where they fit
       // between the device and the caption (else the ports are in the hover title only).
-      const sibs = pairs.get(pair(l));
-      const t = 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3;
+      // (staggered among the captioned ones only: a caption beside an uncaptioned cable stays in the
+      // middle, leaving both ends free for the port badges)
+      const sibs = pairs.get(pair(l)).filter((x) => { const o = model.links.find((y) => y.id === x); return o.over || o.caption; });
+      const t = sibs.length > 1 ? 0.5 + (sibs.indexOf(l.id) - (sibs.length - 1) / 2) * 0.3 : 0.5;
       const len = Math.hypot(b.x - a.x, b.y - a.y);
       // a link over the line system's channel chip is smaller, leaving more of the line to show
       const ck = l.over ? 0.8 : 1;
@@ -724,8 +728,9 @@ function drawNotes(id, ctx, reg) {
     g.push(`<g class="note">${title(`${x.device}: ${x.text}`)}${line(p, q, C.noteEdge, f * 0.08, ` stroke-dasharray="${r1(f * 0.25)} ${r1(f * 0.2)}"`)}${b}</g>`);
   }
   let y = H - notesH + f * 0.6;
+  // (a free note in full: the bottom edge has room for it, H counts its lines)
   for (const x of mine.filter((n) => !n.device)) {
-    const lines = wrapNote(x.text, 60);
+    const lines = wrapNote(x.text, 60, Infinity);
     const w = Math.max(...lines.map((l) => l.length)) * f * 0.85 * 0.58 + f * 0.8;
     const h = lines.length * f * 1.0 + f * 0.4;
     g.push(`<g class="note">${title(x.text)}<rect x="${r1(f)}" y="${r1(y)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(f * 0.3)}" fill="${C.note}" stroke="${C.noteEdge}" stroke-width="${r1(f * 0.08)}"/>${lines.map((l, i) => `<text x="${r1(f * 1.4)}" y="${r1(y + f * 0.95 + i * f)}" font-size="${r1(f * 0.85)}" fill="${C.ink}">${esc(l)}</text>`).join('')}</g>`);
