@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SAOS network facts viewer</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='9' width='14' height='2' fill='%238b98a8'/%3E%3Crect x='1' y='5' width='14' height='2' fill='%233fb950'/%3E%3Crect x='1' y='1' width='14' height='2' fill='%23f778ba'/%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="./assets/index-CZNteogf.js"></script>
+    <script type="module" crossorigin src="./assets/index-t-eGVzCI.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-3erYdzAc.css">
   </head>
   <body>
@@ -19,14 +19,14 @@
           <p class="sub" id="topo-name"></p>
         </header>
 
-        <section>
+        <section id="facts-section">
           <h2>Facts</h2>
           <select id="lab-select" hidden aria-label="Lab"></select>
           <div class="row">
             <button id="facts-example" type="button" title="The Adaptive-SR-CFM lab bundled with this site">Example lab</button>
             <label class="file" title="A facts file written by saos-network-facts extract (schema 1.x)">Load your facts.json<input id="facts-file" type="file" accept=".json,application/json" /></label>
           </div>
-          <p class="sub">A file you load stays in this browser: nothing is uploaded.</p>
+          <p id="facts-note" class="sub">A file you load stays in this browser: nothing is uploaded.</p>
           <p id="facts-error" class="warn" hidden></p>
         </section>
 
