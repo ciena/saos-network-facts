@@ -37,7 +37,7 @@ export type Density = "full" | "compact" | "minimal" | null;
  */
 export interface ViewFile {
   /**
-   * The view schema version the file follows (major.minor; this schema is 1.3: 1.1 added `density`, 1.2 the `optical` layer, 1.3 the `role` layer).
+   * The view schema version the file follows (major.minor; this schema is 1.4: 1.1 added `density`, 1.2 the `optical` layer, 1.3 the `role` layer, 1.4 `embed`).
    */
   view_version?: string;
   preset?: PresetName;
@@ -58,6 +58,10 @@ export interface ViewFile {
   plain?: boolean;
   camera?: Camera;
   density?: Density;
+  /**
+   * Since 1.4: the page is shown inside another one (an iframe) for the lab it was opened on: true leaves out the controls that load something else (the viewer's example-lab button, its facts-file picker and their note, the lab picker, dropping a file on the page), and a facts file that fails to load is reported on its own, with no example behind it; false: the page's own controls.
+   */
+  embed?: boolean;
 }
 /**
  * The 2D frames a card rotates through, one per layer.

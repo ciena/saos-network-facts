@@ -11,7 +11,7 @@ import { VIEW_PRESETS_DATA } from "./generated/view-presets.ts";
 export type * from "./generated/view.ts";
 
 /** The view schema version this reader writes and understands (any 1.x view is read). */
-export const VIEW_VERSION = "1.3";
+export const VIEW_VERSION = "1.4";
 /** The view schema major version this reader understands. */
 export const VIEW_MAJOR = 1;
 
@@ -35,6 +35,8 @@ export interface ResolvedView {
   camera: Camera;
   /** Label density, or null: the page's own choice. */
   density: Density;
+  /** Shown inside another page for one lab: no controls that load something else (since 1.4). */
+  embed: boolean;
 }
 
 export interface ResolvedViewResult {
@@ -44,7 +46,7 @@ export interface ResolvedViewResult {
 }
 
 /** The URL parameters `resolveView` reads; any other parameter belongs to the page and is left alone. */
-export const VIEW_PARAMS = ["preset", "title", "layers", "frames", "start", "period", "variant", "layout", "aspect", "columns", "plain", "camera", "density"] as const;
+export const VIEW_PARAMS = ["preset", "title", "layers", "frames", "start", "period", "variant", "layout", "aspect", "columns", "plain", "camera", "density", "embed"] as const;
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
@@ -79,6 +81,8 @@ function layerList(where: string, value: unknown, warn: Warn): LayerId[] | undef
   return out;
 }
 
+const boolean = (where: string, v: unknown, warn: Warn) => (typeof v === "boolean" ? v : warn(`${where}: expected true or false`));
+
 const SPECS: Record<string, (where: string, v: unknown, warn: Warn) => unknown> = {
   view_version: (where, v, warn) => {
     if (typeof v !== "string" || !/^\d+\.\d+$/.test(v)) return warn(`${where}: expected "major.minor"`);
@@ -87,7 +91,8 @@ const SPECS: Record<string, (where: string, v: unknown, warn: Warn) => unknown> 
   },
   title: (where, v, warn) => (v === null || typeof v === "string" ? v : warn(`${where}: expected a string or null`)),
   layers: layerList,
-  plain: (where, v, warn) => (typeof v === "boolean" ? v : warn(`${where}: expected true or false`)),
+  plain: boolean,
+  embed: boolean,
   camera: (where, v, warn) => oneOf(where, v, ["fit", "top", "iso"], warn),
   density: (where, v, warn) => (v === null ? null : oneOf(where, v, ["full", "compact", "minimal"], warn)),
 };
@@ -156,7 +161,8 @@ function apply(into: ResolvedView, view: unknown, source: string, warn: Warn): v
 }
 
 /** The partial view that URL parameters ask for (see VIEW_PARAMS): lists are comma-separated, `frames`
- * sets `frames.rule` to list, `plain` is 1/0 (or true/false). Values are checked by `resolveView`. */
+ * sets `frames.rule` to list, `plain` and `embed` are 1/0 (or true/false, yes/no). Values are checked by
+ * `resolveView`. */
 export function viewFromParams(params: string | URLSearchParams | Record<string, string>): ViewFile {
   const q = params instanceof URLSearchParams ? params : new URLSearchParams(params);
   const get = (k: string) => q.get(k)?.trim() || null;
@@ -182,8 +188,10 @@ export function viewFromParams(params: string | URLSearchParams | Record<string,
   if (period !== null) set("frames.period_s", Number.isNaN(Number(period)) ? period : Number(period));
   const columns = get("columns");
   if (columns !== null) set("layout.max_columns", Number.isNaN(Number(columns)) ? columns : Number(columns));
-  const plain = get("plain");
-  if (plain !== null) set("plain", ["1", "true", "yes"].includes(plain) ? true : ["0", "false", "no"].includes(plain) ? false : plain);
+  for (const param of ["plain", "embed"] as const) {
+    const v = get(param);
+    if (v !== null) set(param, ["1", "true", "yes"].includes(v) ? true : ["0", "false", "no"].includes(v) ? false : v);
+  }
   return out as ViewFile;
 }
 

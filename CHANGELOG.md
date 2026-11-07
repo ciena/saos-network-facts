@@ -17,6 +17,21 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-11-07
+
+### Added
+
+- **View property `embed`: the viewer inside another page shows its one lab and nothing else to load**
+  (#35, @jgroom33) — a page that opens the viewer in an iframe for one lab's facts
+  (`?facts=…&preset=lab-snapshot&embed=true`) had no way to hide the viewer's *Example lab* button and its
+  *Load your facts.json* picker, which replace the lab on show. `embed` (boolean, default `false`; view
+  schema 1.4, an optional property) is set from a view file or the URL (`embed=true` / `1` / `yes`). With it
+  on, the page leaves out the example button, the file picker and its note, never shows the lab picker,
+  does not read a file dropped on it, and when the facts fail to load shows the error alone instead of the
+  bundled example behind it (the Facts section is shown only for an error). The Import tab and the
+  `#device=` / `#service=` links stay. With it off, the page is as in 0.23.1; the lab cards and render
+  goldens are unchanged.
+
 ## [0.23.1] - 2026-11-07
 
 ### Fixed

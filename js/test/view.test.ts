@@ -151,7 +151,6 @@ test("the defaults and presets are not changed by resolving", () => {
 
 test("the role layer (view 1.3): right after physical; a frame when a device has a role, never the signature", () => {
   assert.deepEqual(LAYER_IDS.slice(0, 3), ["optical", "physical", "role"]);
-  assert.equal(VIEW_VERSION, "1.3");
   const { view } = resolveView(undefined);
   assert.ok(view.layers.includes("role"));
   assert.deepEqual(viewFrames(view, ["physical", "role", "igp", "pw"]), { frames: ["physical", "role", "igp", "pw"], start: "pw" });
@@ -170,4 +169,24 @@ test("the optical layer (view 1.2): first, under physical; a frame when the fact
   // a 1.1 view listing its layers leaves it out, and still validates
   const old = resolveView({ view_version: "1.1", layers: ["physical", "igp"] });
   assert.deepEqual([old.warnings, viewFrames(old.view, ["optical", "physical", "igp"]).frames], [[], ["physical", "igp"]]);
+});
+
+test("embed (view 1.4): false by default, set by a view file or the URL (true/false, 1/0, yes/no), in no preset", () => {
+  assert.equal(VIEW_VERSION, "1.4");
+  assert.equal(VIEW_DEFAULTS.embed, false);
+  for (const name of PRESET_NAMES) assert.equal(resolveView({ preset: name }).view.embed, false, name);
+  assert.deepEqual(viewFromParams("?facts=lab.json&preset=lab-snapshot&embed=true"), { preset: "lab-snapshot", embed: true });
+  for (const [q, want] of [["embed=true", true], ["embed=1", true], ["embed=yes", true], ["embed=false", false], ["embed=0", false], ["embed=no", false]] as const) {
+    assert.deepEqual(resolveView(undefined, q), resolveView({ embed: want }), q);
+  }
+  const fromFile = resolveView({ view_version: "1.4", preset: "lab-snapshot", embed: true });
+  assert.deepEqual([fromFile.warnings, fromFile.view.embed, fromFile.view.camera], [[], true, "iso"]);
+  // the URL wins over the view file, both ways
+  assert.equal(resolveView({ embed: true }, "embed=0").view.embed, false);
+  assert.equal(resolveView({ embed: false }, "embed=1").view.embed, true);
+  // a bad value is reported and the lower layer's value stays
+  const bad = resolveView({ embed: true }, "embed=maybe");
+  assert.deepEqual([bad.view.embed, bad.warnings], [true, ["URL: embed: expected true or false"]]);
+  // an older reader's view without it, and an older view, still resolve without warnings
+  assert.deepEqual(resolveView({ view_version: "1.3", camera: "top" }).warnings, []);
 });

@@ -7,7 +7,8 @@
 // View properties (viewprops.js) come from the lab's view file, ?view= and the URL; the page
 // applies their layers, plain boxes, layout (the library's, js/src/layout.ts), camera and label
 // density and exposes the whole resolved view, with the layout it used and the camera it started
-// from, as window.netfactsView.
+// from, as window.netfactsView. A view with `embed` (an iframe opened on one lab) leaves out the
+// controls that load something else (embed() below).
 
 import exampleFacts from '../../examples/adaptive-sr-cfm/facts.json?raw';
 import { buildNetwork, ccmWalk, evpnWalk, hostSources, hostTargets, hostWalk, isisFloodWalk, locatorTargets, ospfFloodAreas, ospfFloodWalk, failureModes, replayFailure, srv6PingWalk, tpTunnelWalk, vpnRouteChoices, vpnUpdateWalk, vpwsWalk } from './engine/index.js';
@@ -19,7 +20,7 @@ import { LAYERS, LAYER_GAP, LayerView, hex, presentLayers } from './view/layers.
 import { labelOptions } from './view/labels.js';
 import { markStep, renderImportReport, renderStep, renderStepList } from './view/panel.js';
 import { createScene } from './view/scene.js';
-import { cameraPose, densityLabels, importOptions, pageView, viewLayers } from './viewprops.js';
+import { cameraPose, densityLabels, failedLoad, importOptions, nothingNamed, pageControls, pageView, viewLayers } from './viewprops.js';
 import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
@@ -59,6 +60,7 @@ function applyView({ view, warnings }, layout) {
 // view: { viewText, viewError } of the view file for it (labs.js loadView).
 function load(text, name, positions = null, shown = { file: name }, view = urlView) {
   const resolved = pageView(view.viewText, view.viewError, location.search);
+  embed(resolved.view);
   let imp;
   try {
     imp = importFacts(text, { name: name ?? undefined, positions, ...importOptions(resolved.view) });
@@ -87,6 +89,8 @@ function load(text, name, positions = null, shown = { file: name }, view = urlVi
 function showError(text) {
   $('facts-error').hidden = !text;
   $('facts-error').textContent = text ?? '';
+  // Embedded, the Facts section has nothing else in it: shown only for an error.
+  if (embedded) $('facts-section').hidden = !text;
 }
 
 function rebuild(net = null) {
@@ -475,12 +479,35 @@ function dropLabParam() {
   history.replaceState(null, '', `${location.pathname}${q.size ? `?${q}` : ''}`);
   location.hash = '';
 }
-window.addEventListener('dragover', (e) => e.preventDefault());
-window.addEventListener('drop', async (e) => {
+const onDragOver = (e) => e.preventDefault();
+async function onDrop(e) {
   e.preventDefault();
   const file = e.dataTransfer.files[0];
   if (file && load(await file.text(), file.name.replace(/\.json$/i, ''))) dropLabParam();
-});
+}
+
+// ---- embed -----------------------------------------------------------------
+// Embedded (the view's `embed`, viewprops.js pageControls), the page shows the lab it was opened on and
+// nothing else to load: the example button, the file picker and its note are taken out, the lab picker
+// stays hidden and a dropped file is not read. Once on, it stays on for the page. A URL with embed on
+// decides it before anything loads (URL parameters win over a view file), so the drop is never
+// registered; a view file that turns it on (?view=, a lab's view) takes the drop away when it loads.
+let embedded = false;
+function embed(view) {
+  if (embedded || pageControls(view).file) return;
+  embedded = true;
+  $('facts-example').closest('.row').remove();
+  $('facts-note').remove();
+  window.removeEventListener('dragover', onDragOver);
+  window.removeEventListener('drop', onDrop);
+  $('facts-section').hidden = $('facts-error').hidden;
+  $('lab-select').hidden = true;
+}
+embed(pageView(null, null, location.search).view);
+if (!embedded) {
+  window.addEventListener('dragover', onDragOver);
+  window.addEventListener('drop', onDrop);
+}
 
 // ---- frame loop ------------------------------------------------------------
 
@@ -516,7 +543,7 @@ function loadLabResult(lab) {
 
 function fillLabSelect() {
   const sel = $('lab-select');
-  sel.hidden = !labIndex || labIndex.labs.length < 2;
+  sel.hidden = !pageControls({ embed: embedded }, labIndex?.labs.length ?? 0).labPicker;
   if (!labIndex) return;
   const { options: choices, value } = labChoices(labIndex, state.shown ?? {});
   options(sel, choices);
@@ -547,12 +574,20 @@ async function start() {
   try {
     found = await loadFromParams(params, { base: location.href, fetch, loadedView: urlView });
   } catch (err) {
-    load(exampleFacts, EXAMPLE_NAME, null, { example: true });
-    showError(`${err.message}; showing the example`);
+    // Embedded: the error alone (failedLoad), no example behind it.
+    const failed = failedLoad(pageView(urlView.viewText, urlView.viewError, location.search).view, err.message);
+    if (failed.example) load(exampleFacts, EXAMPLE_NAME, null, { example: true });
+    else embed({ embed: true });
+    showError(failed.error);
     return;
   }
   if (!found) {
-    load(exampleFacts, EXAMPLE_NAME, null, { example: true });
+    const none = nothingNamed(pageView(urlView.viewText, urlView.viewError, location.search).view);
+    if (none.example) load(exampleFacts, EXAMPLE_NAME, null, { example: true });
+    else {
+      embed({ embed: true });
+      showError(none.error);
+    }
     return;
   }
   labIndex = found.index;

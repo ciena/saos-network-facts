@@ -1,6 +1,6 @@
 {
   "defaults": {
-    "view_version": "1.3",
+    "view_version": "1.4",
     "title": null,
     "layers": ["optical", "physical", "role", "ring", "igp", "mpls", "srv6", "bgp", "vrf", "pw", "evpn", "cfm"],
     "frames": {"rule": "auto", "list": [], "start": "signature", "period_s": 4},
@@ -8,7 +8,8 @@
     "layout": {"algorithm": "auto", "hints": {}, "aspect": "free", "max_columns": 6},
     "plain": true,
     "camera": "fit",
-    "density": null
+    "density": null,
+    "embed": false
   },
   "presets": {
     "card-frames": {

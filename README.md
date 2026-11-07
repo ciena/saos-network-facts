@@ -490,13 +490,13 @@ page fetches the facts from the same site, so they stay as private as the site t
 A view file says what to show of a facts file, so a site or a lab card never computes a layout or
 draws a diagram itself: which layers, the 2D frames a card rotates through (one per layer), the 3D
 snapshot, the layout, the camera and the label density. Its schema is
-[`view-v1.schema.json`](src/saos_network_facts/schema/view-v1.schema.json) (`view_version` 1.3),
+[`view-v1.schema.json`](src/saos_network_facts/schema/view-v1.schema.json) (`view_version` 1.4),
 the defaults and presets are in [`view-presets-v1.json`](src/saos_network_facts/schema/view-presets-v1.json).
 Every property is optional:
 
 ```json
 {
-  "view_version": "1.3",
+  "view_version": "1.4",
   "preset": "card-frames",
   "layers": ["physical", "ring", "igp", "mpls", "pw", "cfm"],
   "frames": {"rule": "list", "list": ["igp", "ring", "pw", "cfm"], "start": "signature", "period_s": 5},
@@ -504,7 +504,8 @@ Every property is optional:
   "layout": {"algorithm": "auto", "aspect": "card", "max_columns": 4},
   "plain": true,
   "camera": "fit",
-  "density": null
+  "density": null,
+  "embed": false
 }
 ```
 
@@ -523,6 +524,7 @@ Every property is optional:
 | `camera` | `fit` (front and above), `top` (straight down on the top plane), `iso` (from a corner, the whole stack in view) |
 | `density` | `null` (the page's own choice), `full` (names and loopbacks, every iBGP session, LAG labels), `compact` (names, iBGP sessions that are down, LAG labels), `minimal` (names only) |
 | `title` | `null` (named after the lab) |
+| `embed` | `false`; `true` (since 1.4): the page is shown inside another one (an iframe) for the lab it was opened on, so the viewer leaves out what loads something else (the *Example lab* button, the *Load your facts.json* picker and its note, the lab picker, a dropped file), and a facts file that fails to load is reported on its own, with no example behind it |
 
 A view is resolved by merging, lowest first: the defaults, the preset, the view file, then URL
 parameters. Objects merge property by property, lists replace, `layout.hints` add device by device. An
@@ -531,13 +533,14 @@ unknown property or a bad value is reported and ignored (the lower value stays),
 The viewer reads the view of a lab from the lab index (`"view": "core/view.json"`, relative to the
 index), or from `?view=<url>` (which replaces it), then these URL parameters: `preset`, `title`,
 `layers` and `frames` (comma-separated; `frames` sets the rule to `list`), `start`, `period`, `variant`,
-`layout`, `aspect`, `columns`, `plain` (`1` / `0`), `camera`, `density`; for example
+`layout`, `aspect`, `columns`, `plain` (`1` / `0`), `camera`, `density`, `embed` (`1` / `0`); for example
 `index.html?lab=core&preset=card-frames&frames=igp,ring`. The 3D page applies `layers` (it draws and
 lists only the planes both in the view and in the facts; when that leaves none, every plane the facts
 have, with a warning), `plain` (`?plain=0` leaves devices without facts out), `layout` (where the
 devices go, unless a positions file places every one), `camera` (where the camera starts; the sidebar's
 Camera menu switches it) and `density` (the Labels panel starts from it; the visitor's own choice stays
-stored for pages without one), and exposes the whole resolved view, with its warnings, the layout it
+stored for pages without one) and `embed` (`index.html?facts=lab/facts.json&preset=lab-snapshot&embed=true`
+for a page that frames one lab), and exposes the whole resolved view, with its warnings, the layout it
 used and the camera it started from (`camera: { name, target, position }`), as `window.netfactsView`.
 For example `index.html?preset=protocol-stack&layers=igp,mpls&camera=top` opens on the IGP and MPLS
 planes, seen from above. The frames and snapshot properties are for the renderers that read them ([Frames and snapshot](#frames-and-snapshot-the-lab-as-static-svg)).

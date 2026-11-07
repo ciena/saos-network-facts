@@ -84,3 +84,25 @@ export function densityLabels(density, own = {}) {
   const base = labelOptions(own);
   return DENSITY[density] ? { ...base, ...DENSITY[density] } : base;
 }
+
+// ---- embed --------------------------------------------------------------------------------------
+// The page's own controls for a view (view 1.4 `embed`): a page embedded in another one (an iframe
+// opened on one lab) shows that lab and offers nothing else to load: no example-lab button, no
+// facts-file picker or its note, no file drop, and never the lab picker. Not embedded: all of them,
+// the lab picker when the index has two labs or more.
+export function pageControls(view, labCount = 0) {
+  const own = !view?.embed;
+  return { example: own, file: own, drop: own, labPicker: own && labCount >= 2 };
+}
+
+// What the page does when the facts the URL names cannot be loaded (`message`: why): show the bundled
+// example with the error after it, or, embedded, the error alone.
+export function failedLoad(view, message) {
+  return view?.embed ? { example: false, error: message } : { example: true, error: `${message}; showing the example` };
+}
+
+// What the page does when the URL names no facts and the site has no lab index: show the bundled
+// example, or, embedded, say there is nothing to show.
+export function nothingNamed(view) {
+  return view?.embed ? { example: false, error: 'nothing to show: the URL names no facts file (?facts=) or lab (?lab=)' } : { example: true, error: null };
+}
