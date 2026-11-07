@@ -44,7 +44,7 @@ import { CCM_INTERVALS_MS } from '../engine/cfm.js';
 import { hostPrefix, ip6ToBig, isV6, networkOf } from '../engine/ip.js';
 import { BACKBONE, normArea } from '../engine/ospf.js';
 import { rfcVendor } from '../engine/vendor.js';
-import { placeLayout, scalePositions } from './layout.js';
+import { placeLayout, scalePositions, touchBackToBack } from './layout.js';
 
 const DEFAULT_METRIC = 10;
 
@@ -1356,6 +1356,7 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
   const areas = new Map(nodes.map((n) => [n.id, areaOf(n)]));
   const placed = placeNodes(nodes, [...links, ...extras.lightpaths], rings, positions, layout, report, plain, areas);
   for (const n of [...nodes, ...plain.nodes]) n.pos = placed.pos[n.id];
+  touchBackToBack(plain);
   // The 2D cards of a lab with a line system draw it on an optical frame of its own and the routers on
   // the others, so those are laid out without it: the routers (and other devices) alone, each connection
   // over the line system an ordinary link between its routers (render/frames.js). The 3D page and the

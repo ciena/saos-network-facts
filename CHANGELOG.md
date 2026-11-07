@@ -17,6 +17,19 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-11-07
+
+### Fixed
+
+- **The OADM pair touches in 3D, in the snapshot and on the 2D frames** (#34, @jgroom33) — two OADMs of a
+  line system cabled back to back (the express span between them) share one label and their express span
+  is not drawn, but on the 3D page the two boxes still stood about four box-widths apart. They now move
+  toward each other, each halfway, until their boxes touch (`touchBackToBack` in the viewer's
+  `import/layout.js`). The snapshot pulls them together the same way and gives the pair one label,
+  `A | B`. On the 2D frames the boxes already touched, but each box's white outline and rounded corners
+  left a white seam between them. The pair is now one outlined block with a faint line between its two
+  tags. Labs without an OADM pair are drawn as before.
+
 ## [0.23.0] - 2026-11-05
 
 ### Changed
