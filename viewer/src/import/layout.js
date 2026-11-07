@@ -8,6 +8,29 @@ import { forceLayout, layoutFacts } from '../../../js/src/index.ts';
 const WIDTH = 50;
 const DEPTH = 30;
 
+// The width of a plain box in the scene (view/layers.js buildPlain draws it PLAIN_BOX square).
+export const PLAIN_BOX = 2.4;
+
+// Two OADMs of a line system cabled back to back (the express span between them, view/layers.js
+// isExpress) are one unit at one site, express traffic implied: on one row each moves halfway toward
+// the other (or away, were they closer) until their boxes just touch (as render/frames.js and render/snapshot.js draw them). `plain`:
+// the plain boxes ({ nodes, links }) with their scene positions, moved in place.
+export function touchBackToBack(plain) {
+  const oadm = (id) => plain.nodes.find((n) => n.id === id && /^oadm$/i.test(n.equipment ?? ''));
+  const round = (v) => Math.round(v * 100) / 100 + 0;
+  const paired = new Set();
+  for (const l of plain.links) {
+    const [a, b] = [oadm(l.a.node), oadm(l.b.node)];
+    if (!a || !b || a === b || !a.pos || !b.pos || paired.has(a.id) || paired.has(b.id) || Math.abs(a.pos.z - b.pos.z) > 1e-9) continue;
+    const pull = (Math.abs(b.pos.x - a.pos.x) - PLAIN_BOX) / 2;
+    if (Math.abs(pull) < 1e-9) continue;
+    const s = Math.sign(b.pos.x - a.pos.x);
+    a.pos = { ...a.pos, x: round(a.pos.x + s * pull) };
+    b.pos = { ...b.pos, x: round(b.pos.x - s * pull) };
+    paired.add(a.id).add(b.id);
+  }
+}
+
 // { pos: { id: { x, z } }, result } for the importer's topology ({ nodes, links, rings }) and a view's
 // layout. A computed layout keeps its rows and columns (a card's wrapping stays) and is stretched to
 // the frame on each axis, at most 2:1, so a two-row ladder is not a thin strip under the tilted camera;

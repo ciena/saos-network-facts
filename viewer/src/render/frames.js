@@ -391,22 +391,8 @@ function draw(id, ctx) {
       const cls = l.lightpath ? 'lightpath' : l.medium ? `link-${esc(l.medium)}` : null;
       linkDraw.push({ l, a, b, len, head: `<g${cls ? ` class="${cls}"` : ''}>${title(tip)}${body}`, cap });
     }
-    const devices = [];
-    const labels = [];
-    for (const n of model.nodes) {
-      const p = at(n.id);
-      const look = physicalLook(n);
-      const s = f * 1.3;
-      const body = look.router
-        ? routerIcon(p, f, look.dash)
-        : `<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}"${look.dash ? ` fill-opacity="${look.typed ? 1 : 0.35}" stroke-dasharray="${r1(f * 0.3)} ${r1(f * 0.22)}"` : ''} stroke="${look.dash ? (look.typed ? C.ink : C.plain) : '#fff'}" stroke-width="${r1(f * 0.1)}"/><text x="${p.x}" y="${r1(p.y + f * 0.3)}" font-size="${r1(f * (look.tag.length > 5 ? 0.5 : look.tag.length > 4 ? 0.58 : look.tag.length > 3 ? 0.68 : 0.8))}" font-weight="700" text-anchor="middle" fill="${look.text}">${esc(look.tag)}</text>`;
-      devices.push(`<g>${title(deviceDetail(n, model))}${body}</g>`);
-      reg.push(boxes.get(n.id));
-    }
-    // The device labels next, at their usual place beside the device; the badges then keep clear of
-    // them too (a label pushed away by a badge would leave its device).
-    // Two OADMs back to back (their boxes touching) share one label over the pair, names left to right.
-    const subOf = (n) => (n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null]).filter(Boolean).join(' · ');
+    // Two OADMs back to back on one row (model.js isExpress): partner maps the left one to the right one,
+    // the right one to null.
     const drawn = new Set(model.nodes.map((n) => n.id));
     const partner = new Map();
     for (const l of ctx.full.links) {
@@ -416,6 +402,31 @@ function draw(id, ctx) {
       partner.set(a, b);
       partner.set(b, null);
     }
+    const devices = [];
+    const labels = [];
+    for (const n of model.nodes) {
+      const p = at(n.id);
+      const look = physicalLook(n);
+      const s = f * 1.3;
+      const tagOf = (q, lk) => `<text x="${q.x}" y="${r1(q.y + f * 0.3)}" font-size="${r1(f * (lk.tag.length > 5 ? 0.5 : lk.tag.length > 4 ? 0.58 : lk.tag.length > 3 ? 0.68 : 0.8))}" font-weight="700" text-anchor="middle" fill="${lk.text}">${esc(lk.tag)}</text>`;
+      const tag = tagOf(p, look);
+      // The OADM pair, its boxes touching, is one block: one outline round both, a faint line between
+      // them and the two tags, drawn with the left box (the right one draws nothing of its own).
+      const mate = partner.get(n.id);
+      const q = mate && at(mate), mid = mate && r1((p.x + q.x) / 2);
+      const body = partner.has(n.id)
+        ? mate ? `<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(q.x - p.x + 2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}" stroke="#fff" stroke-width="${r1(f * 0.1)}"/>${line({ x: mid, y: r1(p.y - s * 0.6) }, { x: mid, y: r1(p.y + s * 0.6) }, '#fff', r1(f * 0.05), ' stroke-opacity="0.5"')}${tag}${tagOf(q, physicalLook(ctx.nodes.get(mate)))}` : ''
+        : look.router
+          ? routerIcon(p, f, look.dash)
+          : `<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.2)}" fill="${look.color}"${look.dash ? ` fill-opacity="${look.typed ? 1 : 0.35}" stroke-dasharray="${r1(f * 0.3)} ${r1(f * 0.22)}"` : ''} stroke="${look.dash ? (look.typed ? C.ink : C.plain) : '#fff'}" stroke-width="${r1(f * 0.1)}"/>${tag}`;
+      // (the pair's block: both devices in its hover title)
+      if (body) devices.push(`<g>${title(mate ? `${deviceDetail(n, model)}\n\n${deviceDetail(ctx.nodes.get(mate), model)}` : deviceDetail(n, model))}${body}</g>`);
+      reg.push(boxes.get(n.id));
+    }
+    // The device labels next, at their usual place beside the device; the badges then keep clear of
+    // them too (a label pushed away by a badge would leave its device).
+    // Two OADMs back to back (their boxes touching) share one label over the pair, names left to right.
+    const subOf = (n) => (n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null]).filter(Boolean).join(' · ');
     for (const n of model.nodes) {
       if (partner.get(n.id) === null) continue;
       const mate = partner.get(n.id) ? ctx.nodes.get(partner.get(n.id)) : null;

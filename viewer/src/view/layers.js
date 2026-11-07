@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { hostPrefix } from '../engine/ip.js';
 import { prefixSidLabel } from '../engine/mpls.js';
+import { PLAIN_BOX } from '../import/layout.js';
 import { RAINBOW } from '../rainbow.js';
 import { DEFAULT_LABELS, bgpLabel, lagLabel, nodeLabel } from './labels.js';
 
@@ -498,7 +499,7 @@ export class LayerView {
     for (const l of plain.links) if (isExpress(plain, l)) mates.set(l.b.node, l.a.node).set(l.a.node, l.b.node);
     for (const n of plain.nodes) {
       // A line-system member (a role from the extra file, no facts by design): solid, in the optical colour.
-      const geo = new THREE.BoxGeometry(2.4, 1.2, 2.4);
+      const geo = new THREE.BoxGeometry(PLAIN_BOX, 1.2, PLAIN_BOX);
       const mesh = new THREE.Mesh(geo, n.equipment
         ? new THREE.MeshStandardMaterial({ color: OPTICAL, roughness: 0.6, metalness: 0.1 })
         : new THREE.MeshStandardMaterial({ color: PLAIN, roughness: 0.8, metalness: 0, transparent: true, opacity: 0.55 }));

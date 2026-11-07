@@ -13,7 +13,7 @@
 
 import { LAYER_IDS } from '../../../js/src/index.ts';
 import { RAINBOW } from '../rainbow.js';
-import { deviceDetail, equipmentTag, layerModel, noteLayerOf, presentLayers, wrapNote } from './model.js';
+import { deviceDetail, equipmentTag, isExpress, layerModel, noteLayerOf, presentLayers, wrapNote } from './model.js';
 
 const C = {
   ink: '#1d2430', mute: '#5b6675', bg: '#ffffff',
@@ -28,6 +28,8 @@ const CAMERAS = {
   exploded: { U: 230, V: 170, kx: 0.62, ky: 0.42, gapFactor: 1.0, gapPad: 46 },
   stacked: { U: 210, V: 160, kx: 0.62, ky: 0.42, gapFactor: 0.42, gapPad: 0 },
 };
+// A device box on the physical and optical planes: half its width and depth, and its height, in px.
+const BOX = { hw: 34, hd: 22, h: 18 };
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const r1 = (v) => Math.round(v * 10) / 10;
 
@@ -46,7 +48,18 @@ export function renderSnapshot(model, positions, { variant = 'exploded', layers:
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   // Plane coordinates (u right, v into the screen), margin around the devices.
   const mu = 0.75 * cam.U, mv = 0.55 * cam.V;
-  const uv = (id) => ({ u: (P[id].x - minX) * cam.U + mu, v: (P[id].y - minY) * cam.V + mv });
+  // Two OADMs back to back (model.js isExpress) on one row: each moved halfway toward the other until
+  // their boxes touch, one unit as on the 2D frames and the 3D page.
+  const pull = new Map(), paired = new Set();
+  for (const l of model.links) {
+    const [a, b] = [l.a.node, l.b.node];
+    if (!isExpress(model, l) || !P[a] || !P[b] || paired.has(a) || paired.has(b) || Math.abs(P[a].y - P[b].y) > 1e-9) continue;
+    const gap = (Math.abs(P[b].x - P[a].x) * cam.U - 2 * BOX.hw) / 2;
+    const s = Math.sign(P[b].x - P[a].x) || 1;
+    pull.set(a, s * gap).set(b, -s * gap);
+    paired.add(a).add(b);
+  }
+  const uv = (id) => ({ u: (P[id].x - minX) * cam.U + mu + (pull.get(id) ?? 0), v: (P[id].y - minY) * cam.V + mv });
   const planeU = (maxX - minX) * cam.U + 2 * mu, planeV = (maxY - minY) * cam.V + 2 * mv;
   // Screen: x = u + v*kx, y = v*ky (the plane), minus the layer's height.
   const planeH = planeV * cam.ky;
@@ -210,21 +223,32 @@ function layerObjects(id, model, at, S, cam, { uv, layers, planeU, planeV, full 
       const body = l.over ? RAINBOW.map((c, k) => line(a, b, c, 1.8, ` stroke-dasharray="4 20" stroke-dashoffset="${-k * 4}"`)).join('') : optical ? `${line(a, b, C.optical, 5, ' stroke-linecap="round"')}${line(a, b, '#fff', 1.6, ' stroke-linecap="round"')}` : line(a, b, l.plain ? C.plain : '#69768a', 2, l.plain ? ' stroke-dasharray="5 4"' : '');
       g.push(`<g${l.lightpath ? ' class="lightpath"' : l.medium ? ` class="link-${esc(l.medium)}"` : ''}>${title(tip)}${body}${pill(lerp(a, b, 0.2), l.a.port ?? '?', '#9aa4b1')}${pill(lerp(a, b, 0.8), l.b.port ?? '?', '#9aa4b1')}${caption ? pill(lerp(a, b, 0.5), caption, optical || l.over || !l.caption ? C.optical : '#9aa4b1') : ''}</g>`);
     }
+    // Two OADMs back to back (their boxes touching) share one label over the pair, names left to right.
+    const partner = new Map();
+    for (const l of full.links) {
+      if (!isExpress(full, l) || !nodes.has(l.a.node) || !nodes.has(l.b.node)) continue;
+      const [a, b] = uv(l.a.node).u <= uv(l.b.node).u ? [l.a.node, l.b.node] : [l.b.node, l.a.node];
+      if (partner.has(a) || partner.has(b) || Math.abs(uv(a).v - uv(b).v) > 0.5) continue;
+      partner.set(a, b).set(b, null);
+    }
     for (const nd of model.nodes) {
       const p = at(nd.id);
       // A line-system member (no facts, an equipment role): solid, in the optical colour.
       const eq = nd.plain ? equipmentTag(nd) : null;
       const col = eq ? C.optical : C[nd.role] ?? C.plain;
       // A box: top face (a parallelogram on the plane) and a front face, 18 px tall.
-      const hw = 34, hd = 22, h = 18;
+      const { hw, hd, h } = BOX;
       const tl = { x: p.x - hw - hd * cam.kx, y: p.y - hd * cam.ky - h };
       const top = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([du, dv]) => `${r1(p.x + du + dv * cam.kx)},${r1(p.y + dv * cam.ky - h)}`).join(' ');
       const fr = [[-hw, hd, 0], [hw, hd, 0], [hw, hd, h], [-hw, hd, h]].map(([du, dv, z]) => `${r1(p.x + du + dv * cam.kx)},${r1(p.y + dv * cam.ky - h + z)}`).join(' ');
       const side = [[hw, -hd, 0], [hw, hd, 0], [hw, hd, h], [hw, -hd, h]].map(([du, dv, z]) => `${r1(p.x + du + dv * cam.kx)},${r1(p.y + dv * cam.ky - h + z)}`).join(' ');
       const dash = nd.plain && !eq ? ' stroke-dasharray="3 2" fill-opacity="0.35"' : '';
-      const sub = eq ? [[nd.equipment, nd.type].filter(Boolean).join(' · ')] : nd.plain ? [nd.type ?? '', 'no facts'] : [[nd.type, nd.os].filter(Boolean).join(' · ')];
-      const full = deviceDetail(nd, model);
-      g.push(`<g class="device">${title(full)}<polygon points="${side}" fill="${col}" stroke="#fff" stroke-width="0.8"${dash} style="filter:brightness(0.72)"/><polygon points="${fr}" fill="${col}" stroke="#fff" stroke-width="0.8"${dash} opacity="0.8"/><polygon points="${top}" fill="${col}" stroke="#fff" stroke-width="0.8"${dash}/>${block(reg, tl.x, tl.y - 2, [nd.id + (eq ? `  ${eq}` : nd.plain ? '' : `  ${roleTag(nd)}`), ...sub], { color: col })}</g>`);
+      const subOf = (x) => (x.plain && equipmentTag(x) ? [[x.equipment, x.type].filter(Boolean).join(' · ')] : x.plain ? [x.type ?? '', 'no facts'] : [[x.type, x.os].filter(Boolean).join(' · ')]);
+      const mate = partner.get(nd.id) ? nodes.get(partner.get(nd.id)) : null;
+      const sub = mate && subOf(mate)[0] !== subOf(nd)[0] ? [`${subOf(nd)[0]} | ${subOf(mate)[0]}`] : subOf(nd);
+      const name = mate ? `${nd.id} | ${mate.id}` : nd.id;
+      const caption = partner.get(nd.id) === null ? '' : block(reg, tl.x, tl.y - 2, [name + (eq ? `  ${eq}` : nd.plain ? '' : `  ${roleTag(nd)}`), ...sub], { color: col });
+      g.push(`<g class="device">${title(deviceDetail(nd, model))}<polygon points="${side}" fill="${col}" stroke="#fff" stroke-width="0.8"${dash} style="filter:brightness(0.72)"/><polygon points="${fr}" fill="${col}" stroke="#fff" stroke-width="0.8"${dash} opacity="0.8"/><polygon points="${top}" fill="${col}" stroke="#fff" stroke-width="0.8"${dash}/>${caption}</g>`);
     }
   }
 

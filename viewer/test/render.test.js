@@ -160,6 +160,31 @@ describe('frames', () => {
     expect(frames(read(LABS['line-system']), { preset: 'card-frames' }).svg).toContain('span 1 · 40 km');
   });
 
+  test('the OADM pair touches, one unit, on the 2D frames, the snapshot and the 3D page', () => {
+    const file = JSON.parse(read(LABS['line-system']));
+    for (const r of file.devices) if (r.device === 'ROADM-A' || r.device === 'AMP-1') r.role = 'oadm';
+    const text = JSON.stringify(file);
+    // 2D: one block round both boxes (twice a box wide), a faint line between them, both tags
+    const optical = frames(text, { preset: 'card-frames' }).svg.split('id="f-optical"')[1].split('</g><g class="frame')[0];
+    const widths = [...optical.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="[\d.]+" rx="[\d.]+" fill="#3b5bdb" stroke="#fff"[^>]*\/>(<line [^>]*stroke-opacity="0.5"\/>)?/g)].map((m) => [Number(m[1]), !!m[2]]);
+    expect(widths).toHaveLength(2);
+    const [pair, single] = widths[0][1] ? widths : [widths[1], widths[0]];
+    expect(pair[1] && !single[1]).toBe(true);
+    expect(pair[0]).toBeCloseTo(2 * single[0], 0);
+    expect(optical.match(/>OADM<\/text>/g)).toHaveLength(2);
+    // the snapshot: the two boxes a box apart (68 px between centres), one label over the pair
+    const snap = snapshot(text).svg;
+    expect(snap).toMatch(/>ROADM-A \| AMP-1 {2}OADM<\/text>/);
+    expect(snap).not.toMatch(/>AMP-1 {2}OADM<\/text>/);
+    const fronts = (id) => [...snap.split('data-layer="optical"')[1].matchAll(/<g class="device"><title>([^\n<]+)[\s\S]*?<polygon points="([-\d.]+),/g)].filter((m) => m[1].startsWith(id)).map((m) => Number(m[2]));
+    expect(fronts('AMP-1')[0] - fronts('ROADM-A')[0]).toBeCloseTo(68, 0);
+    // the 3D page: on one row, their 2.4-unit boxes touching
+    const pos = Object.fromEntries(importFacts(text).topology.plain.nodes.map((n) => [n.id, n.pos]));
+    expect(pos['AMP-1'].z).toBe(pos['ROADM-A'].z);
+    expect(Math.abs(pos['AMP-1'].x - pos['ROADM-A'].x)).toBeCloseTo(2.4, 5);
+    expect(Math.abs(pos['ROADM-B'].x - pos['AMP-1'].x)).toBeGreaterThan(2.4);
+  });
+
   test('the view picks frames and the start frame; empty layers make none', () => {
     const text = read(LABS['adaptive-sr-cfm']);
     const listed = frames(text, { frames: { rule: 'list', list: ['cfm', 'igp', 'evpn'], start: 'first' } });
