@@ -84,6 +84,10 @@ export interface LayoutLink {
    * of its two terminals): it joins its routers in the layout, but a router with nothing else is still
    * "cabled only to the line system" and stands under its terminal. */
   lightpath?: boolean;
+  /** The channel a link rides over the line system (`over ch 25`): a connection over it, or a routed link
+   * with `over`, drawn with a channel chip between its port badges. Beside a cable between the same two
+   * devices it wants a longer line (the layout gives it ROOM). */
+  over?: string | null;
 }
 
 /** A G.8032 ring: its members (names or { node }) and its links (link ids, or pairs of device names). */
@@ -131,6 +135,16 @@ const CROSSING = 4; // the cost of two core links crossing, in grid units of lin
 const THROUGH = 6; // the cost of a core link running through a device
 const HEIGHT = 1; // on a card, the cost of a row of height in the last untangling pass
 const LENGTH = 0.4; // on a card, the cost of a grid unit of link length in the last untangling pass
+// A connection over the line system beside a cable between the same two devices (parallelPairs): the
+// rainbow's channel chip and the port badges of both links share one line, which needs ROOM columns. A
+// row is ROW of a column on the 2D frames (frames.js: rows 7.6 font units, columns at least 9.4 font
+// units and 160 px), so a vertical link of one row counts as shorter than a horizontal one of one
+// column. In a lab with such a pair the last untangling pass counts SHORT per column missing, and LABEL
+// for each link that runs through one of its own two devices' labels (which would push its badges off).
+const ROOM = 0.9;
+const ROW = 0.62;
+const SHORT = 4;
+const LABEL = 2;
 
 /** Compares device names the way people number them (P2 before P10). */
 export function compareNames(a: string, b: string): number {
@@ -570,7 +584,19 @@ function autoLayout(
 
   // Last, the devices off the cycle (or off the core, without one) are untangled among everything placed.
   const fixed = new Set(cycle.length >= 3 ? cycle : core);
-  if (pos.size > fixed.size) pos = untangle(pos, adj, new Set([...pos.keys()].filter((id) => !fixed.has(id))), true, maxColumns);
+  // With a connection over the line system beside a cable (parallelPairs), the pass also makes room
+  // for it (ROOM); that result is taken only when it has no more crossings and links through devices
+  // than the pass without.
+  if (pos.size > fixed.size) {
+    const movable = new Set([...pos.keys()].filter((id) => !fixed.has(id)));
+    const parallel = parallelPairs(model, adj);
+    const roomy = parallel.size ? untangle(new Map(pos), adj, movable, true, maxColumns, parallel) : null;
+    pos = untangle(pos, adj, movable, true, maxColumns);
+    if (roomy) {
+      const [r, p] = [tangles(roomy, adj), tangles(pos, adj)];
+      if (r.crossings <= p.crossings && r.through <= p.through) pos = roomy;
+    }
+  }
 
   // Islands: rows underneath (at most maxColumns wide on a card).
   islands(ids, pos, maxColumns);
@@ -911,7 +937,8 @@ function rectangle(cycle: string[], adj: Map<string, Set<string>>, width: number
 // layout's box, while that lowers the crossings and links through devices among the links between
 // placed devices (with `keepClear`, never adding a link through a device on the way; a move that only
 // shortens links is not taken, so the ladder's choices stand). On a card the spare spots reach as far to
-// either side as max_columns allows.
+// either side as max_columns allows. `parallel` (parallelPairs): pairs that want ROOM; with any, links
+// through their own devices' labels count too (LABEL).
 // Deterministic: moves are tried in name and grid order, the first improvement taken, until none
 // helps (bounded).
 function untangle(
@@ -920,15 +947,17 @@ function untangle(
   movable: Set<string> = new Set(pos.keys()),
   keepClear = false,
   maxColumns = Infinity,
+  parallel: Set<string> = new Set(),
 ): Map<string, Point> {
   const ids = [...pos.keys()].sort(compareNames);
   const free = ids.filter((id) => movable.has(id));
   const edges = edgeList(ids, new Map(ids.map((id) => [id, new Set([...adj.get(id)!].filter((x) => pos.has(x)))])));
-  // { cost, through }: the weighted crossings and links through devices, and the links through devices.
+  // { cost, through, crossed }: the weighted crossings and links through devices, the links through
+  // devices and the crossings.
   const penalty = (at: Map<string, Point>) => {
     let cost = 0;
-    let through = 0;
-    for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) if (crosses(at, edges[i]!, edges[j]!)) cost += CROSSING;
+    let through = 0, crossed = 0;
+    for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) if (crosses(at, edges[i]!, edges[j]!)) (cost += CROSSING, crossed++);
     for (const [a, b] of edges) for (const id of ids) if (id !== a && id !== b && onLink(at.get(id)!, at.get(a)!, at.get(b)!)) (cost += THROUGH, through++);
     // On a card, each row of height costs a little (less than a crossing) and so does link length, so a
     // device moves into a nearby spare spot inside the card when that adds no crossing: the card stays
@@ -938,9 +967,17 @@ function untangle(
       cost += HEIGHT * (Math.max(...ay) - Math.min(...ay));
       for (const [a, b] of edges) cost += LENGTH * Math.hypot(at.get(a)!.x - at.get(b)!.x, at.get(a)!.y - at.get(b)!.y);
     }
-    return { cost, through };
+    if (parallel.size) {
+      const ay = [...at.values()].map((p) => p.y), mid = (Math.min(...ay) + Math.max(...ay)) / 2;
+      for (const [a, b] of edges) {
+        const p = at.get(a)!, q = at.get(b)!;
+        if (parallel.has(`${a}|${b}`)) cost += SHORT * Math.max(0, ROOM - Math.hypot(p.x - q.x, (p.y - q.y) * ROW));
+        for (const id of [a, b]) if (segmentHitsRect(p, q, labelBox(id, at.get(id)!, mid))) cost += LABEL;
+      }
+    }
+    return { cost, through, crossed };
   };
-  let { cost: cur, through: curThrough } = penalty(pos);
+  let { cost: cur, through: curThrough, crossed: curCrossed } = penalty(pos);
   if (!cur) return pos;
   const xs = [...pos.values()].map((p) => p.x), ys = [...pos.values()].map((p) => p.y);
   // Spare spots: a half-step grid aligned with the layout's corner, half a row beyond it above and below;
@@ -969,12 +1006,14 @@ function untangle(
     }
     for (const move of moves) {
       const next = move();
-      // With keepClear, never a move that adds a link through a device, whatever crossings it removes.
-      const { cost, through } = penalty(next);
-      if (cost < cur - 1e-9 && (!keepClear || through <= curThrough) && narrow(next)) {
+      // With keepClear, never a move that adds a link through a device, whatever crossings it removes;
+      // nor one that adds a crossing to make room for a pair (`parallel`).
+      const { cost, through, crossed } = penalty(next);
+      if (cost < cur - 1e-9 && (!keepClear || through <= curThrough) && (!parallel.size || crossed <= curCrossed) && narrow(next)) {
         for (const [id, p] of next) pos.set(id, p);
         cur = cost;
         curThrough = through;
+        curCrossed = crossed;
         better = true;
         break;
       }
@@ -982,6 +1021,59 @@ function untangle(
     if (!better) break;
   }
   return pos;
+}
+
+// The crossings and the links through devices among the links between placed devices.
+function tangles(pos: Map<string, Point>, adj: Map<string, Set<string>>): { crossings: number; through: number } {
+  const ids = [...pos.keys()].sort(compareNames);
+  const edges = edgeList(ids, new Map(ids.map((id) => [id, new Set([...adj.get(id)!].filter((x) => pos.has(x)))])));
+  let crossings = 0, through = 0;
+  for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) if (crosses(pos, edges[i]!, edges[j]!)) crossings++;
+  for (const [a, b] of edges) for (const id of ids) if (id !== a && id !== b && onLink(pos.get(id)!, pos.get(a)!, pos.get(b)!)) through++;
+  return { crossings, through };
+}
+
+// The pairs of devices (`a|b`, in name order) joined by more than one link, one of them over the line
+// system (LayoutLink over).
+function parallelPairs(model: LayoutModel, adj: Map<string, Set<string>>): Set<string> {
+  const count = new Map<string, number>(), over = new Set<string>();
+  for (const l of model.links) {
+    const [a, b] = [endName(l.a), endName(l.b)].sort((x, y) => compareNames(x ?? "", y ?? ""));
+    if (!a || !b || a === b || !adj.get(a)?.has(b)) continue;
+    count.set(`${a}|${b}`, (count.get(`${a}|${b}`) ?? 0) + 1);
+    if (l.over) over.add(`${a}|${b}`);
+  }
+  return new Set([...over].filter((k) => count.get(k)! > 1));
+}
+
+// Where the 2D frames put a device's label, grown by half a port badge all round, in grid units: above
+// the device in the top half of the drawing (`mid` the middle row), below it in the bottom half; the
+// name over the type, some 4 font units wide; a column 12.3 font units, a row 7.6 (as layout-shapes.ts
+// badgeCollisions).
+function labelBox(id: string, p: Point, mid: number) {
+  const w = (Math.max(id.length * 0.62, 4) + 0.6 + 1.1) / 12.3, h = (2.6 + 1.1) / 7.6, gap = (1 - 0.55) / 7.6;
+  return { x: p.x - w / 2, y: p.y > mid + 1e-9 ? p.y + gap : p.y - gap - h, w, h };
+}
+
+// Whether the segment p-q crosses the rectangle r (Liang-Barsky clipping).
+function segmentHitsRect(p: Point, q: Point, r: { x: number; y: number; w: number; h: number }): boolean {
+  let t0 = 0, t1 = 1;
+  const dx = q.x - p.x, dy = q.y - p.y;
+  for (const [pp, qq] of [[-dx, p.x - r.x], [dx, r.x + r.w - p.x], [-dy, p.y - r.y], [dy, r.y + r.h - p.y]] as const) {
+    if (pp === 0) {
+      if (qq < 0) return false;
+      continue;
+    }
+    const t = qq / pp;
+    if (pp < 0) {
+      if (t > t1) return false;
+      if (t > t0) t0 = t;
+    } else {
+      if (t < t0) return false;
+      if (t < t1) t1 = t;
+    }
+  }
+  return t0 <= t1;
 }
 
 // Increasing choices of `k` columns out of `n` (capped for big rows).

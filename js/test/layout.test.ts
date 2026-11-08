@@ -532,3 +532,31 @@ test("line systems: a router cabled only to the line system stands under its ter
   const c = over(false);
   assert.notDeepEqual([c.PE1!.x, c.PE2!.x], [c["LS-T-1"]!.x, c["LS-T-2"]!.x]);
 });
+
+test("a cable with a connection over the line system beside it: the pair gets room for the chip and badges", () => {
+  // A hub P1 on a cycle with PE1 and PE2, PE3 and PE4 hung off it, PE4 cabled to P1 and joined to it
+  // over the line system too (a channel); CEs off the PEs and off each other. Layouts pulled PE4 in
+  // beside P1 (0.4 to 0.6 columns), too short for the rainbow's chip and the four port badges.
+  const node = (id: string, role: string) => ({ id, role });
+  const lab = (over?: string): LayoutModel => ({
+    nodes: [node("P1", "p"), node("PE1", "pe"), node("PE2", "pe"), node("PE3", "pe"), node("PE4", "pe"), node("CE-1", "ce"), node("CE-2", "ce"), node("CE-3", "ce")],
+    links: [
+      { a: "PE1", b: "PE2" }, { a: "PE1", b: "P1" }, { a: "PE2", b: "P1" }, { a: "P1", b: "PE3" }, { a: "P1", b: "PE4" },
+      { a: "CE-1", b: "PE1" }, { a: "CE-1", b: "PE2" }, { a: "PE4", b: "CE-2" }, { a: "PE3", b: "CE-3" },
+      { a: "CE-1", b: "CE-2" }, { a: "CE-1", b: "CE-3" }, { a: "P1", b: "PE4", over },
+    ],
+  });
+  // drawn length: a row is 0.62 of a column on the 2D frames
+  const length = (p: Record<string, Point>, a: string, b: string) => Math.hypot(p[a]!.x - p[b]!.x, (p[a]!.y - p[b]!.y) * 0.62);
+  for (const opts of [CARD, {}]) {
+    const plain = layoutFacts(lab(), opts).positions;
+    const p = layoutFacts(lab("over ch 25"), opts).positions;
+    assert.ok(length(plain, "P1", "PE4") < 0.9, `short without the channel (${JSON.stringify(opts)})`);
+    assert.ok(length(p, "P1", "PE4") >= 0.9 - 1e-9, `P1-PE4 ${length(p, "P1", "PE4")} long enough (${JSON.stringify(opts)})`);
+    assert.ok(crossings(lab(), p) <= crossings(lab(), plain), "no crossing added");
+    assert.deepEqual(through(lab(), p), []);
+    // the cycle keeps its shape (the layout may shift as a whole)
+    const rel = (q: Record<string, Point>, id: string) => [Math.round((q[id]!.x - q.P1!.x) * 100), Math.round((q[id]!.y - q.P1!.y) * 100)];
+    for (const id of ["PE1", "PE2"]) assert.deepEqual(rel(p, id), rel(plain, id), id);
+  }
+});
