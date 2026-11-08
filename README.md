@@ -592,7 +592,12 @@ ELS, ROADMs or in-line amplifiers for a ROADM system, the other terminal), the e
 the routers at its two ends or a column apart centred over them, within `max_columns`. Two OADMs cabled
 to each other (equipment `oadm`, any case: a back-to-back pair and its express span) take one place in
 the row, `BACK_TO_BACK` (0.3 columns) apart; the frames, the snapshot and the 3D page draw their boxes
-touching and leave the express link out. A router cabled only to the line system (a `lightpath` link does not count) stands under the member it is cabled to. A plain box without an equipment role
+touching and leave the express link out. A router cabled only to the line system (a `lightpath` link does not count) stands under the member it is cabled to.
+Two devices joined by a cable and by a connection over the line system (a link with `over`) share one
+short line between the rainbow's channel chip and four port badges: the last untangling pass moves the
+device off the cycle until that line is at least 0.9 columns long (a row counts as 0.62 of a column, as
+the frames draw it) and clear of both devices' labels, taking the result only when it has no more
+crossings or links through devices than without. A plain box without an equipment role
 (a device without facts in the path) is still laid out with the core, as above.
 
 With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns (role tiers that follow the roles one more: `CE | PE | P | PE | CE` is five): outer devices hang sideways while there is room, a ring too long for the ladder runs
@@ -629,7 +634,7 @@ with the same layout as the 3D page:
   IGP; EVPN instances; CFM MEGs. The view picks them (`layers`, `frames.rule` / `frames.list`) and the
   frame to start on (`frames.start`, by default the lab's signature layer: its services, else its
   transport). Devices stay put from frame to frame; each object carries two or three short labels, each
-  frame a title (port badges and IGP metrics are placed clear of the device boxes and of each other; a port with no room is in its link's hover title), a device without facts is drawn as the same symbol or box with a dashed outline (one without a
+  frame a title (port badges and IGP metrics are placed clear of the device boxes and of each other; a badge whose own device's label lies over the near half of its link may go on the link past the middle, up to 0.6 of its length, before it goes beside the line; a port with no room is in its link's hover title), a device without facts is drawn as the same symbol or box with a dashed outline (one without a
   type a faint grey box; line-system members solid, with their role), and a lab whose devices all lack facts
   (none configured yet, or no extractor for their type) is drawn from its records and links: the physical frame,
   plus the role frame when its records give roles, optical spans a double line with their label, sites a dashed frame, notes yellow (schema 1.9). Each frame is a group `<g id="f-<layer>">`

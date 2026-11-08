@@ -275,6 +275,9 @@ function linkEnds(ctx) {
 // at each size. A badge stays on its link and full size wherever there is room, and no early small badge
 // takes the room a later one needed.
 export const BADGE_STEPS = [0, 1, -1, 2, -2, 3, -3].flatMap((side) => [1, 0.8, 0.65].map((k) => ({ side, k })));
+// On the link, up to 0.6 of its length from the device (past the middle): for a badge its own device's
+// label keeps from the near half of a short link.
+export const FAR_STEPS = [1, 0.8, 0.65].map((k) => ({ side: 0, k, reach: 0.6 }));
 
 // Whether the segment p-q crosses the rectangle r (Liang-Barsky clipping).
 export function segmentHitsRect(p, q, r) {
@@ -291,8 +294,9 @@ export function segmentHitsRect(p, q, r) {
 // Where a port badge goes at one step: on (or beside) the link from its device (`from`) toward the
 // other end (`to`), from the first spot clear of its own device box up to the middle of the link, clear
 // of everything in `taken` (device boxes, captions, labels, badges placed) and, beside the line, of the
-// other links (`others`: [from, to] segments). { x, y, k, rect } or null.
-export function placeBadge(from, to, len, w, f, box, taken, { side = 0, k = 1 } = {}, others = []) {
+// other links (`others`: [from, to] segments); `reach`: how far along the link it may go (the middle).
+// { x, y, k, rect } or null.
+export function placeBadge(from, to, len, w, f, box, taken, { side = 0, k = 1, reach = 0.5 } = {}, others = []) {
   const d = len || 1;
   const ux = (to.x - from.x) / d, uy = (to.y - from.y) / d;
   const pad = f * 0.15;
@@ -301,7 +305,7 @@ export function placeBadge(from, to, len, w, f, box, taken, { side = 0, k = 1 } 
   // the first distance from the device centre at which the badge clears its own box
   const tx = Math.abs(ux) > 1e-6 ? (box.w / 2 + bw / 2 + pad) / Math.abs(ux) : Infinity;
   const ty = Math.abs(uy) > 1e-6 ? (box.h / 2 + bh / 2 + pad) / Math.abs(uy) : Infinity;
-  for (let t = Math.min(tx, ty); t <= d / 2 + 1e-6; t += f * (side ? 0.7 : 0.35)) {
+  for (let t = Math.min(tx, ty); t <= d * reach + 1e-6; t += f * (side ? 0.7 : 0.35)) {
     const c = { x: from.x + ux * t - uy * side * (bh + pad), y: from.y + uy * t + ux * side * (bh + pad) };
     const r = { x: r1(c.x - bw / 2), y: r1(c.y - bh / 2), w: r1(bw), h: r1(bh) };
     // beside its line, a badge must not sit on another link (it would read as that link's port)
@@ -430,6 +434,7 @@ function draw(id, ctx) {
     // The device labels next, at their usual place beside the device; the badges then keep clear of
     // them too (a label pushed away by a badge would leave its device).
     // Two OADMs back to back (their boxes touching) share one label over the pair, names left to right.
+    const ownLabel = new Map();
     const subOf = (n) => (n.plain ? (n.equipment ? [n.equipment, n.type] : [n.type ?? 'no facts']) : [n.type, mixed ? n.os : null]).filter(Boolean).join(' · ');
     for (const n of model.nodes) {
       if (partner.get(n.id) === null) continue;
@@ -439,6 +444,7 @@ function draw(id, ctx) {
       const lines = [mate ? `${n.id} | ${mate.id}` : n.id, sub];
       // on the optical frame above the row, its callouts below
       labels.push(ctx.callouts.length ? block(ctx, reg, p.x, p.y - f * 1.0, lines, { color: physicalLook(n).name, up: true }) : outward(ctx, reg, p, f * 1.0, lines, { color: physicalLook(n).name }));
+      ownLabel.set(n.id, reg[reg.length - 1]);
     }
     // The optical frame's callouts: under each member a router is cabled to, what rides each of its
     // client ports (`PE-1 2/1 · ch 25`), with a short lead from the box.
@@ -455,10 +461,14 @@ function draw(id, ctx) {
     // clear of the boxes, captions, labels and each other. Drawn with their link, under the boxes.
     taken.push(...reg.filter((r) => !taken.includes(r)));
     // (a connection over the line system too: the router port at each end, as its cable's)
-    const want = linkDraw.flatMap((d, i) => [[d.a, d.b, d.l.a], [d.b, d.a, d.l.b]].map(([from, to, end], e) => ({ i, e, from, to, len: d.len, text: end.port ?? '?', box: boxes.get(end.node), spot: null })));
-    for (const step of BADGE_STEPS) {
+    // A badge whose own device's label lies over its link (a short link leaving the device on the
+    // label's side) may go a little past the middle of the link, beyond the label, before it goes
+    // beside the line (FAR_STEPS, after the on-line steps).
+    const want = linkDraw.flatMap((d, i) => [[d.a, d.b, d.l.a], [d.b, d.a, d.l.b]].map(([from, to, end], e) => ({ i, e, from, to, len: d.len, text: end.port ?? '?', box: boxes.get(end.node), spot: null, far: !!ownLabel.get(end.node) && segmentHitsRect(from, to, ownLabel.get(end.node)) })));
+    const steps = [...BADGE_STEPS.filter((x) => !x.side), ...FAR_STEPS, ...BADGE_STEPS.filter((x) => x.side)];
+    for (const step of steps) {
       for (const b of want) {
-        if (b.spot) continue;
+        if (b.spot || (step.reach && !b.far)) continue;
         b.spot = placeBadge(b.from, b.to, b.len, pillW(b.text), f, b.box, taken, step, linkDraw.filter((_, j) => j !== b.i).map((d) => [d.a, d.b]));
         if (b.spot) taken.push(b.spot.rect);
       }

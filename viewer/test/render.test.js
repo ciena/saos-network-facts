@@ -414,5 +414,29 @@ describe('port badges and metric pills never overlap', () => {
     expect(s2.rect.x).toBeGreaterThan(s1.rect.x + s1.rect.w); // slid along past the first badge
     const crowded = placeBadge({ x: 20, y: 12 }, { x: 70, y: 12 }, 50, 20, 13, box, [box, { x: 40, y: -40, w: 40, h: 104 }]);
     expect(crowded).toBeNull(); // no room on a short, crowded link: the port stays in the hover title
+    // reach: up to 0.6 of the link, past its middle (a badge whose own label covers the near half)
+    const up = { x: 20, y: 112 }, top = { x: 20, y: 12 }, own = { x: 0, y: 100, w: 40, h: 24 }, label = { x: -10, y: 65, w: 60, h: 30 };
+    expect(placeBadge(up, top, 100, 20, 13, own, [own, label])).toBeNull();
+    const far = placeBadge(up, top, 100, 20, 13, own, [own, label], { reach: 0.6 });
+    expect(far.x).toBe(20);
+    expect(far.rect.y + far.rect.h).toBeLessThanOrEqual(65);
+    expect(112 - far.y).toBeLessThanOrEqual(60);
+  });
+
+  test('a badge whose own device label lies over its short link sits on the link past the label', () => {
+    // PE2 one row under PE1 in the top half of the drawing: PE2's label (above it) covers the near half
+    // of their link, which put PE2's port badge beside the line, 49 px off it.
+    const view = { preset: 'card-frames', layout: { hints: { PE1: [0, 0], PE2: [0, 1], c1: [1, 2.5], c2: [0, 3] } } };
+    const fr = frameOf(frames(read(LABS['vpws-bonds']), view).svg, 'physical');
+    const g = fr.split('<title>PE1 1 — PE2 1')[1].split('</g>')[0];
+    const [x1, y1, x2, y2] = /<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)"/.exec(g).slice(1).map(Number);
+    const badges = [...g.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"[^>]*\/><text[^>]*>1</g)].map((m) => m.slice(1).map(Number));
+    expect(badges).toHaveLength(2);
+    expect(x1).toBe(x2);
+    for (const [x, y, w, h] of badges) {
+      expect(Math.abs(x + w / 2 - x1)).toBeLessThan(1); // on the (vertical) line
+      expect(y + h / 2).toBeGreaterThan(Math.min(y1, y2));
+      expect(y + h / 2).toBeLessThan(Math.max(y1, y2));
+    }
   });
 });

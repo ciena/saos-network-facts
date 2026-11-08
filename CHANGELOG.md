@@ -17,6 +17,23 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.23.3] - 2026-11-08
+
+### Fixed
+
+- **Port badges on short links sit on their links: room for a connection over the line system beside a
+  cable, and a badge past its own device's label** (#36, @jgroom33) — on a lab card (`card-frames`), two
+  routers joined by a cable and by a connection over the line system (the rainbow, with its `ch 25` chip)
+  were pulled 0.4 columns apart, too short for the chip and four port badges, so both badges of the
+  connection sat beside the line; and a badge whose own device's label lay over the near half of a short
+  link (a router one row under another, its label above it) floated beside the line, 49 px off. The
+  layout's last untangling pass now gives such a pair at least 0.9 columns (a row counting as 0.62 of a
+  column) clear of both devices' labels, taking that result only when it has no more crossings or links
+  through devices than without (layout link property `over`, optional). On the frames such a badge may go
+  on its link past the middle, up to 0.6 of its length, before it goes beside the line. On the 204 labs
+  of a CAL rollout, 11 cards change (badges dropped to the hover title 11 → 1, badges beside their line
+  108 → 90); render goldens are unchanged, facts goldens change their version line.
+
 ## [0.23.2] - 2026-11-07
 
 ### Added
