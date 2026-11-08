@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { labName, main, parseArgs } from '../bin/saos-network-facts-render.mjs';
 import { framePngs, pngName } from '../src/render/png.js';
-import { frameStyle } from '../src/render/frames.js';
+import { frameStyle, segmentHitsRect } from '../src/render/frames.js';
 import { importFacts } from '../src/import/facts.js';
 import { frameLayers, frames, prepare, snapshot } from '../src/render/index.js';
 
@@ -387,6 +387,14 @@ describe('port badges and metric pills never overlap', () => {
         expect(devices.length, `${id}: device boxes found`).toBeGreaterThan(0);
         expect(pairs(badges), `${id}: badge on badge`).toEqual([]);
         expect(pairs(badges, devices), `${id}: badge on device`).toEqual([]);
+        // no badge under another link's line (a parallel link between the same two devices aside)
+        const links = [...fr.matchAll(/<g(?: class="[^"]*")?><title>(\S+) [^\n<]*? — (\S+) [^<]*<\/title>([\s\S]*?)<\/g>/g)].map((m) => ({
+          pair: [m[1], m[2]].sort().join('|'),
+          line: /<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)"/.exec(m[3])?.slice(1).map(Number),
+          badges: rects(m[3], BADGE),
+        })).filter((l) => l.line);
+        const under = links.flatMap((l) => l.badges.flatMap(([x, y, w, h]) => links.filter((o) => o !== l && o.pair !== l.pair && segmentHitsRect({ x: o.line[0], y: o.line[1] }, { x: o.line[2], y: o.line[3] }, { x: x + 1, y: y + 1, w: w - 2, h: h - 2 })).map((o) => `${l.pair} badge under ${o.pair}`)));
+        expect(under, `${id}: badge under another link`).toEqual([]);
       }
       const igp = frameOf(svg, 'igp');
       if (igp) {
@@ -421,6 +429,10 @@ describe('port badges and metric pills never overlap', () => {
     expect(far.x).toBe(20);
     expect(far.rect.y + far.rect.h).toBeLessThanOrEqual(65);
     expect(112 - far.y).toBeLessThanOrEqual(60);
+    // on its link, never under another link's line; a parallel link between the same devices may run by
+    const crossing = [[{ x: 60, y: -20 }, { x: 60, y: 40 }, false]];
+    expect(placeBadge(from, to, 200, 20, 13, box, [box], {}, crossing).rect.x).toBeGreaterThanOrEqual(59);
+    expect(placeBadge(from, to, 200, 20, 13, box, [box], {}, [[crossing[0][0], crossing[0][1], true]]).rect.x).toBeLessThan(60);
   });
 
   test('a badge whose own device label lies over its short link sits on the link past the label', () => {

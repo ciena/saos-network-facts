@@ -294,7 +294,8 @@ export function segmentHitsRect(p, q, r) {
 // Where a port badge goes at one step: on (or beside) the link from its device (`from`) toward the
 // other end (`to`), from the first spot clear of its own device box up to the middle of the link, clear
 // of everything in `taken` (device boxes, captions, labels, badges placed) and, beside the line, of the
-// other links (`others`: [from, to] segments); `reach`: how far along the link it may go (the middle).
+// other links (`others`: [from, to, twin] segments, twin: a parallel link between the same two devices);
+// `reach`: how far along the link it may go (the middle).
 // { x, y, k, rect } or null.
 export function placeBadge(from, to, len, w, f, box, taken, { side = 0, k = 1, reach = 0.5 } = {}, others = []) {
   const d = len || 1;
@@ -308,8 +309,11 @@ export function placeBadge(from, to, len, w, f, box, taken, { side = 0, k = 1, r
   for (let t = Math.min(tx, ty); t <= d * reach + 1e-6; t += f * (side ? 0.7 : 0.35)) {
     const c = { x: from.x + ux * t - uy * side * (bh + pad), y: from.y + uy * t + ux * side * (bh + pad) };
     const r = { x: r1(c.x - bw / 2), y: r1(c.y - bh / 2), w: r1(bw), h: r1(bh) };
-    // beside its line, a badge must not sit on another link (it would read as that link's port)
-    if (!hits(r) && !(side && others.some(([p, q]) => segmentHitsRect(p, q, r)))) return { x: r1(c.x), y: r1(c.y), k, rect: r };
+    // a badge must not sit on another link: beside its own line (it would read as that link's port), nor
+    // on it under another link's line (a line grazing the outline, or a parallel link between the same
+    // two devices running alongside, does not count)
+    const inner = { x: r.x + 1, y: r.y + 1, w: r.w - 2, h: r.h - 2 };
+    if (!hits(r) && !others.some(([p, q, twin]) => (side ? segmentHitsRect(p, q, r) : !twin && segmentHitsRect(p, q, inner)))) return { x: r1(c.x), y: r1(c.y), k, rect: r };
   }
   return null;
 }
@@ -466,10 +470,12 @@ function draw(id, ctx) {
     // beside the line (FAR_STEPS, after the on-line steps).
     const want = linkDraw.flatMap((d, i) => [[d.a, d.b, d.l.a], [d.b, d.a, d.l.b]].map(([from, to, end], e) => ({ i, e, from, to, len: d.len, text: end.port ?? '?', box: boxes.get(end.node), spot: null, far: !!ownLabel.get(end.node) && segmentHitsRect(from, to, ownLabel.get(end.node)) })));
     const steps = [...BADGE_STEPS.filter((x) => !x.side), ...FAR_STEPS, ...BADGE_STEPS.filter((x) => x.side)];
+    // At each step, the badges of a link over the line system first: its chip leaves them the least room.
+    const order = [...want.filter((b) => linkDraw[b.i].l.over), ...want.filter((b) => !linkDraw[b.i].l.over)];
     for (const step of steps) {
-      for (const b of want) {
+      for (const b of order) {
         if (b.spot || (step.reach && !b.far)) continue;
-        b.spot = placeBadge(b.from, b.to, b.len, pillW(b.text), f, b.box, taken, step, linkDraw.filter((_, j) => j !== b.i).map((d) => [d.a, d.b]));
+        b.spot = placeBadge(b.from, b.to, b.len, pillW(b.text), f, b.box, taken, step, linkDraw.filter((_, j) => j !== b.i).map((d) => [d.a, d.b, pair(d.l) === pair(linkDraw[b.i].l)]));
         if (b.spot) taken.push(b.spot.rect);
       }
     }
