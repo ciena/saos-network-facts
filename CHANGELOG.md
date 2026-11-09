@@ -17,6 +17,23 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.23.5] - 2026-11-09
+
+### Fixed
+
+- **Mesh labs laid out like their hand-drawn diagrams** (#38, @jgroom33) — a lab without IGP roles
+  (configs that parse to nothing, such as the 10-, 12- and 13-node base recipes) took its longest cycle as
+  the core and ran it round the card's border, so the other links crossed the empty middle as long
+  diagonals, and in base-10node-10x-8x links lay nearly on top of each other. Two new candidates for such
+  labs (at most 15 devices, no ring, no plain box): `grid`, a mesh on a lattice of whole columns and rows
+  (stress layout snapped by the Hungarian method, then annealed with a fixed seed), and the ladder on
+  another cycle (the routers' own ring, the customer devices hung off it, mirrored so they sit below; one
+  column more on a card; off a card, such a lab takes its card's layout, so the 3D page shows the same
+  structure). The score now counts links lying on top of each other (two links leaving one
+  device less than 15° apart, or sharing a stretch: 3 each) and link length beyond 2.25 grid units.
+  On the 204 na-sales-lab cards, 11 change: crossings 15 → 14, label covers 1 → 3, labels across a link
+  6 → 3, small badges 130 → 118, badges beside their link 54 → 46, none dropped.
+
 ## [0.23.4] - 2026-11-09
 
 ### Fixed

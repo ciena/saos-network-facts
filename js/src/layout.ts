@@ -4,8 +4,9 @@
 // links give the same positions, whatever order they come in. Pure functions, no Node or DOM APIs.
 //
 // algorithm auto (the default) scores candidates and takes the best (chooseLayout below): the ladder
-// described here, and tiers (the network roles as columns, CE | PE | P | PE | CE), radial (a hub lab)
-// and stress (stress majorisation), in layout-shapes.ts. The ladder:
+// described here, and tiers (the network roles as columns, CE | PE | P | PE | CE), radial (a hub lab),
+// stress (stress majorisation) and, for a mesh without IGP roles, grid (a lattice), in layout-shapes.ts,
+// and the ladder on another cycle (innerLadder below). The ladder:
 //   1. The core: the IGP routers (P and PE); in a lab without an IGP router, the G.8032 ring members;
 //      else the devices on the longest cycle; else (a chain or a tree) the devices that link others.
 //      A plain box between two core devices (a line system or a third-party router in the path) is
@@ -56,7 +57,7 @@
 // sit at fractions). A renderer scales them to its own frame.
 
 import type { Layout } from "./generated/view.ts";
-import { clearLinks, radial, scoreLayout, stress, tierRole, tiers, type LayoutScore, type ShapeGraph } from "./layout-shapes.ts";
+import { clearLinks, grid, radial, scoreLayout, stress, tierRole, tiers, type LayoutScore, type ShapeGraph } from "./layout-shapes.ts";
 
 /** A device to place. `role` as the 3D importer gives it: p and pe are the IGP routers. */
 export interface LayoutNode {
@@ -114,8 +115,8 @@ export interface Point {
 export interface LayoutResult {
   /** Device name to position, in grid units (x right, y down). */
   positions: Record<string, Point>;
-  /** What placed the devices: hints, force, ladder, rectangle, columns, tiers, radial, stress or none. */
-  method: "hints" | "force" | "ladder" | "rectangle" | "columns" | "tiers" | "radial" | "stress" | "none";
+  /** What placed the devices: hints, force, ladder, rectangle, columns, tiers, radial, stress, grid or none. */
+  method: "hints" | "force" | "ladder" | "rectangle" | "columns" | "tiers" | "radial" | "stress" | "grid" | "none";
   /** The same, said for a person (which ring or cycle the ladder runs on). */
   description: string;
   /** The core devices, sorted (auto only). */
@@ -322,6 +323,8 @@ const sortedNames = (s: Iterable<string>) => [...s].sort(compareNames);
 // columns), tiers (the roles as columns), radial, stress.
 const ROLE_BONUS = 2;
 const MARGIN = 3;
+const MESH_MAX = 15;
+const MESH_COLUMNS = 4;
 
 function chooseLayout(
   model: LayoutModel,
@@ -362,12 +365,25 @@ function chooseLayout(
     for (const id of ids) positions[id] = { x: round(pos.get(id)!.x), y: round(pos.get(id)!.y) };
     return normalise(positions);
   };
+  // A lab whose routers have no roles (no IGP), no ring and no plain box, of at most MESH_MAX devices:
+  // nothing tiers it, so the mesh candidates (grid, and the ladder on another cycle) are tried too.
+  // (A bigger lab has no room for a mesh on a card, and the searches would take too long.)
+  const plainRouters = ids.length <= MESH_MAX && !roles.has("p") && !roles.has("pe") && !roles.has("plain") && !(model.rings ?? []).length;
+  // Off a card (the 3D page), such a lab whose card takes a mesh candidate (grid, or the ladder on
+  // another cycle) takes the card's layout too (MESH_COLUMNS wide, as the card-frames preset), so the
+  // 3D page and the card show one structure.
+  if (plainRouters && !Number.isFinite(maxColumns)) {
+    const onCard = chooseLayout(model, ids, adj, linkEnds, MESH_COLUMNS);
+    if (onCard.method === "grid" || onCard.description.startsWith("ladder on the cycle")) return onCard;
+  }
   const tierText = both ? "tiers by role: CE | PE | P | PE | CE" : roles.has("p") || roles.has("pe") ? "tiers by role and hops" : "tiers by hops (no IGP router)";
-  const list: Array<{ method: LayoutResult["method"]; description: string; positions: Record<string, Point> | null; bonus: number }> = [
+  const list: Array<{ method: LayoutResult["method"]; description: string; positions: Record<string, Point> | null; bonus: number; extra?: number; scoreFrom?: Record<string, Point> }> = [
     { method: legacy.method, description: legacy.description, positions: legacy.positions, bonus: 0 },
     { method: "tiers", description: tierText, positions: finish(tiers(g, maxColumns)), bonus: -MARGIN },
     { method: "radial", description: "radial round the hub", positions: finish(radial(g, maxColumns)), bonus: -MARGIN },
     { method: "stress", description: "stress majorisation (no tiering fits)", positions: finish(stress(g, maxColumns)), bonus: -MARGIN },
+    ...(plainRouters ? innerLadder(model, ids, adj, linkEnds, maxColumns, legacy, links) : []),
+    { method: "grid", description: "a lattice of rows and columns (a mesh)", positions: plainRouters ? finish(grid(g, maxColumns, legacy.positions)) : null, bonus: -MARGIN },
   ];
   if (both) {
     const of = (r: string) => ids.filter((id) => tierRole(node.get(id)) === r);
@@ -383,8 +399,8 @@ function chooseLayout(
   const span = (p: Record<string, Point>) => Math.max(...Object.values(p).map((q) => q.x)) - Math.min(...Object.values(p).map((q) => q.x));
   const scored = list
     .filter((c): c is typeof c & { positions: Record<string, Point> } => !!c.positions)
-    .filter((c) => c === list[0] || span(c.positions) <= maxColumns - 1 + (c.bonus > 0 ? 1 : 0) + 1e-9)
-    .map((c, i) => ({ ...c, i, s: scoreLayout(new Map(Object.entries(c.positions)), links, maxColumns) }));
+    .filter((c) => c === list[0] || span(c.positions) <= maxColumns - 1 + (c.bonus > 0 ? 1 : (c.extra ?? 0)) + 1e-9)
+    .map((c, i) => ({ ...c, i, s: scoreLayout(new Map(Object.entries(c.scoreFrom ?? c.positions)), links, maxColumns) }));
   const ranked = [...scored].sort((p, q) => p.s.score - p.bonus - (q.s.score - q.bonus) || p.i - q.i);
   const best = ranked[0]!;
   return {
@@ -396,6 +412,76 @@ function chooseLayout(
   };
 }
 
+// The ladder on another cycle. A lab with no IGP router and no ring takes its longest cycle as the core,
+// and that cycle often runs through the customer devices round the outside, leaving the routers' own
+// ring as chords across the middle. Here every other cycle of at least half the lab's devices
+// (INNER_CYCLES of them at most, shortest first) is tried as the core instead, the devices off it hung
+// as usual (between the rows when linked to two or more of it, else outward); the best by scoreLayout
+// is the candidate.
+const INNER_CYCLES = 16;
+function innerLadder(
+  model: LayoutModel,
+  ids: string[],
+  adj: Map<string, Set<string>>,
+  linkEnds: Map<string, [string, string]>,
+  maxColumns: number,
+  legacy: Omit<LayoutResult, "warnings">,
+  links: Array<[string, string]>,
+): Array<{ method: LayoutResult["method"]; description: string; positions: Record<string, Point> | null; bonus: number; extra?: number; scoreFrom?: Record<string, Point> }> {
+  if (legacy.method !== "ladder" && legacy.method !== "rectangle") return [];
+  const linked = ids.filter((id) => adj.get(id)!.size);
+  const longest = new Set(legacy.core);
+  let best: { positions: Record<string, Point>; score: number; core: string[] } | null = null;
+  for (const cyc of cycleSets(linked, adj, Math.max(4, Math.ceil(linked.length / 2)), INNER_CYCLES)) {
+    if (cyc.length === longest.size && cyc.every((id) => longest.has(id))) continue;
+    const r = autoLayout(model, ids, adj, linkEnds, maxColumns + 1, cyc);
+    const score = scoreLayout(new Map(Object.entries(r.positions)), links, maxColumns).score;
+    if (!best || score < best.score - 1e-9) best = { positions: r.positions, score, core: cyc };
+  }
+  if (!best) return [];
+  // The devices off the cycle below it rather than above (customer devices under the network, as a
+  // diagram draws them): mirrored top to bottom when most of them sit above the cycle's middle.
+  const on = new Set(best.core);
+  const ys = best.core.map((id) => best!.positions[id]!.y);
+  const mid = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const off = ids.filter((id) => !on.has(id)).reduce((s, id) => s + best!.positions[id]!.y - mid, 0);
+  const scoreFrom = best.positions;
+  if (off < -1e-9) best.positions = normalise(Object.fromEntries(Object.entries(best.positions).map(([id, p]) => [id, { x: p.x, y: round(-p.y) }])));
+  // (scored as found: the mirror image has the same links and crossings; only the score's guess of which
+  // side a label goes differs, and the frames place labels where they fit)
+  return [{ method: "ladder", description: `ladder on the cycle ${best.core.join(", ")}`, positions: best.positions, bonus: -MARGIN, extra: 1, scoreFrom }];
+}
+
+/** The device sets of the simple cycles among `ids` of at least `min` devices (a bounded search),
+ * shortest first, then in name order; at most `max`. */
+export function cycleSets(ids: string[], adj: Map<string, Set<string>>, min: number, max: number): string[][] {
+  const found = new Map<string, string[]>();
+  let steps = 0;
+  const order = [...ids].sort(compareNames);
+  const within = new Set(order);
+  for (const start of order) {
+    const path = [start];
+    const on = new Set(path);
+    const dfs = (cur: string) => {
+      if (++steps > CYCLE_SEARCH_LIMIT) return;
+      for (const nx of [...(adj.get(cur) ?? [])].filter((x) => within.has(x)).sort(compareNames)) {
+        if (nx === start && path.length >= Math.max(3, min)) {
+          const set = [...path].sort(compareNames);
+          found.set(set.join("|"), set);
+        }
+        if (on.has(nx) || compareNames(nx, start) < 0) continue;
+        path.push(nx);
+        on.add(nx);
+        dfs(nx);
+        path.pop();
+        on.delete(nx);
+      }
+    };
+    dfs(start);
+  }
+  return [...found.values()].sort((a, b) => a.length - b.length || compareNames(a.join("|"), b.join("|"))).slice(0, max);
+}
+
 // ---- auto ----------------------------------------------------------------------------------------
 
 function autoLayout(
@@ -404,6 +490,7 @@ function autoLayout(
   adj: Map<string, Set<string>>,
   linkEnds: Map<string, [string, string]>,
   maxColumns: number,
+  forced?: string[],
 ): Omit<LayoutResult, "warnings"> {
   const card = Number.isFinite(maxColumns);
   const node = new Map(model.nodes.map((n) => [n.id, n]));
@@ -414,7 +501,7 @@ function autoLayout(
     .sort((p, q) => q.members.length - p.members.length || compareNames(String(p.name ?? p.id ?? ""), String(q.name ?? q.id ?? "")));
 
   let transit = false;
-  let core = new Set(ids.filter((id) => node.get(id)?.role === "p" || node.get(id)?.role === "pe"));
+  let core = new Set(forced ?? ids.filter((id) => node.get(id)?.role === "p" || node.get(id)?.role === "pe"));
   if (!core.size) core = new Set(rings.flatMap((r) => r.members));
   // The longest cycle counted in routers: plain boxes add nothing, so a chain of them (a line system's
   // ROADMs and amplifiers, a span between two routers) counts as one link, and of equally long cycles

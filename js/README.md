@@ -63,9 +63,10 @@ import viewSchema from "@ciena/saos-network-facts/view-schema" with { type: "jso
   area); the viewer's imported topology is one. Auto scores candidates and takes the best: the ladder
   (the core, IGP routers, else the G.8032 ring, else the longest cycle, counted in devices with facts, or
   in plain boxes in a lab that has only those, as two rows, the rest hung outward), tiers (`CE | PE | P | PE | CE` as columns, ordered to cross as few links as possible),
-  radial (a hub lab) and stress (stress majorisation, for odd meshes); `candidates` lists each with its
-  score, the chosen one first. `aspect: "card"` keeps it within `max_columns` columns (role tiers one
-  more). Hints are used when they place every device
+  radial (a hub lab), stress (stress majorisation, for odd meshes), and for a mesh without IGP roles
+  grid (a lattice of whole columns and rows) and the ladder on another cycle; `candidates` lists each with its
+  score, the chosen one first. `aspect: "card"` keeps it within `max_columns` columns (role tiers and the
+  ladder on another cycle one more). Hints are used when they place every device
   (a hint for `NAME` places `NAME-*` devices without their own; plain boxes without one go beside their
   neighbours). `forceLayout(ids, edges)`: the force-directed layout alone.
 

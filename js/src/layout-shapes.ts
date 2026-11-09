@@ -7,9 +7,13 @@
 //   stress  stress majorisation (Gansner, Koren and North, "Graph Drawing by Stress Majorization",
 //           2004): link lengths as close to the hops between devices as can be, for a mesh that fits
 //           no tiering.
-//   score   crossings, links through devices, devices too close, port badges likely to collide, how
-//           even the link lengths are and how well the layout fits the frame (a landscape card at
-//           most max_columns wide and three rows tall). Lower is better.
+//   grid    a mesh on a lattice of whole columns and rows, as a hand-drawn diagram draws one: the stress
+//           layout snapped to the lattice (Hungarian method), then annealed on crossings, overlaps,
+//           length and links neither across nor down.
+//   score   crossings, links on top of each other, links through devices, devices too close, port
+//           badges likely to collide, how even the link lengths are, links across the drawing, and how
+//           well the layout fits the frame (a landscape card at most max_columns wide and three rows
+//           tall). Lower is better.
 // Pure functions, deterministic: every list is walked in name order.
 
 import { compareNames, type LayoutNode, type Point } from "./layout.ts";
@@ -505,6 +509,197 @@ function stressPiece(g: ShapeGraph, piece: string[], maxColumns: number): Pos {
   return new Map(piece.map((id, i) => [id, { x: round(P[i]!.x), y: round(P[i]!.y) }]));
 }
 
+// ---- grid ------------------------------------------------------------------------------------------
+
+/** A mesh as a hand-drawn diagram draws it: devices on a lattice of whole columns and rows (on a card at
+ * most max_columns by four), each face of the mesh a small square or triangle, links short and mostly
+ * across or down. The stress layout (and `start`, the ladder's positions, when given) is snapped to the lattice (each device to a cell, the least squared
+ * distance in all, by the Hungarian method), then annealed and settled (devices to empty cells or
+ * swapped while that lowers gridCost): crossings, links through devices, links lying on top of each other, length, and links that
+ * are neither across nor down. Every lattice that holds the piece is tried; the best by scoreLayout is
+ * kept. Only a mesh (six devices or more, at least three independent cycles: links >= devices + 2);
+ * a ring or a butterfly reads better as the other candidates draw it. */
+export function grid(g: ShapeGraph, maxColumns: number, start?: Record<string, Point>): Pos | null {
+  let any = false;
+  const out = perPiece(g, maxColumns, (piece) => {
+    const edges = piece.flatMap((a) => sorted(g.adj.get(a)!).filter((b) => compareNames(a, b) < 0).map((b) => [a, b] as [string, string]));
+    if (piece.length < 6 || edges.length < piece.length + 2) return piece.length <= 3 ? simpleRow(g, piece) : null;
+    const seeds = [stressPiece(g, piece, Infinity)];
+    if (start && piece.every((id) => start[id])) seeds.push(new Map(piece.map((id) => [id, start[id]!])));
+    const p = gridPiece(piece, edges, seeds, maxColumns);
+    if (p) any = true;
+    return p;
+  });
+  return any ? out : null;
+}
+
+const GRID = { crossing: 4, through: 6, overlap: 4, length: 0.4, long: 1, slant: 0.3 };
+const LONG = 1.5; // a link longer than this (more than one cell across and down) costs GRID.long a unit more
+
+function gridPiece(piece: string[], edges: Array<[string, string]>, seeds: Pos[], maxColumns: number): Pos | null {
+  const n = piece.length;
+  const card = Number.isFinite(maxColumns);
+  const maxC = card ? maxColumns : Math.ceil(Math.sqrt(2 * n)) + 1;
+  const maxR = card ? 4 : maxC;
+  let best: { pos: Pos; s: number } | null = null;
+  for (let C = 3; C <= maxC; C++) for (let R = 2; R <= Math.min(maxR, C); R++) {
+    if (C * R < n || C * R > n + Math.ceil(n / 2) + 1) continue;
+    for (const seed of seeds) {
+      const pos = settle(anneal(snap(piece, seed, C, R), edges, C, R), edges, C, R);
+      const s = scoreLayout(pos, edges, maxColumns).score;
+      if (!best || s < best.s - 1e-9) best = { pos, s };
+    }
+  }
+  return best?.pos ?? null;
+}
+
+// The seed scaled onto a C x R lattice and each device given a cell, the least total squared distance.
+function snap(piece: string[], seed: Pos, C: number, R: number): Pos {
+  const pts = piece.map((id) => seed.get(id)!);
+  const lo = (k: "x" | "y") => Math.min(...pts.map((p) => p[k])), span = (k: "x" | "y") => Math.max(...pts.map((p) => p[k])) - lo(k) || 1;
+  const want = pts.map((p) => ({ x: ((p.x - lo("x")) / span("x")) * (C - 1), y: ((p.y - lo("y")) / span("y")) * (R - 1) }));
+  const cells: Point[] = [];
+  for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) cells.push({ x, y });
+  const pick = hungarian(want.map((w) => cells.map((c) => (w.x - c.x) ** 2 + (w.y - c.y) ** 2)));
+  return new Map(piece.map((id, i) => [id, cells[pick[i]!]!]));
+}
+
+/** The Hungarian method for an n x m cost matrix (n <= m): the column each row takes. */
+export function hungarian(cost: number[][]): number[] {
+  const n = cost.length, m = cost[0]?.length ?? 0;
+  const u = new Array(n + 1).fill(0), v = new Array(m + 1).fill(0), p = new Array(m + 1).fill(0), way = new Array(m + 1).fill(0);
+  for (let i = 1; i <= n; i++) {
+    p[0] = i;
+    let j0 = 0;
+    const minv = new Array(m + 1).fill(Infinity), used = new Array(m + 1).fill(false);
+    do {
+      used[j0] = true;
+      const i0 = p[j0];
+      let delta = Infinity, j1 = 0;
+      for (let j = 1; j <= m; j++) {
+        if (used[j]) continue;
+        const cur = cost[i0 - 1]![j - 1]! - u[i0] - v[j];
+        if (cur < minv[j] - 1e-12) (minv[j] = cur, way[j] = j0);
+        if (minv[j] < delta - 1e-12) (delta = minv[j], j1 = j);
+      }
+      for (let j = 0; j <= m; j++) {
+        if (used[j]) (u[p[j]] += delta, v[j] -= delta);
+        else minv[j] -= delta;
+      }
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do {
+      const j1 = way[j0];
+      p[j0] = p[j1];
+      j0 = j1;
+    } while (j0);
+  }
+  const out = new Array(n).fill(0);
+  for (let j = 1; j <= m; j++) if (p[j]) out[p[j] - 1] = j - 1;
+  return out;
+}
+
+// What a lattice placement costs while devices move (cheaper than scoreLayout, same aims; a long link
+// across the mesh costs extra, as a hand-drawn mesh keeps each link to a neighbouring cell).
+function gridCost(pos: Pos, edges: Array<[string, string]>): number {
+  // On the lattice every position is whole, so the tests are exact: a crossing is a proper one, a
+  // device is on a link when it lies on the segment, links overlap when they share a stretch of line
+  // (or leave one device less than OVERLAP_ANGLE apart).
+  const ends = edges.map(([a, b]) => [a, b, pos.get(a)!, pos.get(b)!] as const);
+  const nodes = [...pos];
+  const sinMax = Math.sin(OVERLAP_ANGLE);
+  let len = 0, long = 0, slant = 0, crossings = 0, overlaps = 0, through = 0;
+  const cross = (p: Point, q: Point, r: Point) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const inside = (p: Point, a: Point, b: Point) => (p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y) > 0 && (p.x - b.x) * (a.x - b.x) + (p.y - b.y) * (a.y - b.y) > 0;
+  for (let i = 0; i < ends.length; i++) {
+    const [a, b, p, q] = ends[i]!;
+    const l = Math.hypot(p.x - q.x, p.y - q.y);
+    len += l;
+    long += Math.max(0, l - LONG);
+    if (p.x !== q.x && p.y !== q.y) slant++;
+    for (const [id, r] of nodes) if (id !== a && id !== b && cross(p, q, r) === 0 && inside(r, p, q)) through++;
+    for (let j = i + 1; j < ends.length; j++) {
+      const [c, d, u, w] = ends[j]!;
+      if (a === c || a === d || b === c || b === d) {
+        if ((a === c && b === d) || (a === d && b === c)) continue;
+        const s0 = a === c || a === d ? p : q;
+        const m = s0 === p ? q : p, n = a === c || b === c ? w : u;
+        const mx = m.x - s0.x, my = m.y - s0.y, nx = n.x - s0.x, ny = n.y - s0.y;
+        if (mx * nx + my * ny > 0 && Math.abs(mx * ny - my * nx) < sinMax * Math.hypot(mx, my) * Math.hypot(nx, ny)) overlaps++;
+        continue;
+      }
+      const o1 = Math.sign(cross(p, q, u)), o2 = Math.sign(cross(p, q, w)), o3 = Math.sign(cross(u, w, p)), o4 = Math.sign(cross(u, w, q));
+      if (o1 * o2 < 0 && o3 * o4 < 0) crossings++;
+      else if (o1 === 0 && o2 === 0 && (inside(u, p, q) || inside(w, p, q) || inside(p, u, w) || inside(q, u, w))) overlaps++;
+    }
+  }
+  return GRID.crossing * crossings + GRID.through * through + GRID.overlap * overlaps + GRID.length * len + GRID.long * long + GRID.slant * slant;
+}
+
+// Simulated annealing over the lattice (Kirkpatrick et al. 1983): a device to a random cell (swapping
+// with the device there), kept when gridCost falls or, less and less often, when it rises a little.
+// The random numbers come from a fixed seed (mulberry32) and devices are drawn from the name-sorted
+// list, so the same lab gives the same picture.
+function anneal(pos: Pos, edges: Array<[string, string]>, C: number, R: number): Pos {
+  let seed = 0x9e3779b9;
+  const rand = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const ids = sorted(pos.keys());
+  const cur = new Map(pos);
+  let cost = gridCost(cur, edges);
+  let best = new Map(cur), bestCost = cost;
+  const steps = 1000 * ids.length;
+  for (let k = 0; k < steps; k++) {
+    const T = 2 * Math.pow(0.005, k / steps);
+    const id = ids[Math.floor(rand() * ids.length)]!;
+    const cell = { x: Math.floor(rand() * C), y: Math.floor(rand() * R) };
+    const from = cur.get(id)!;
+    if (from.x === cell.x && from.y === cell.y) continue;
+    let other: string | undefined;
+    for (const [o, q] of cur) if (q.x === cell.x && q.y === cell.y) other = o;
+    cur.set(id, cell);
+    if (other) cur.set(other, from);
+    const c = gridCost(cur, edges);
+    if (c <= cost || rand() < Math.exp((cost - c) / T)) {
+      cost = c;
+      if (c < bestCost - 1e-9) (best = new Map(cur), bestCost = c);
+    } else {
+      cur.set(id, from);
+      if (other) cur.set(other, cell);
+    }
+  }
+  return best;
+}
+
+// Devices to empty cells, or two devices swapped, the best move each pass while one lowers gridCost
+// (in name order, cells in reading order: the same lab, the same picture).
+function settle(pos: Pos, edges: Array<[string, string]>, C: number, R: number): Pos {
+  const ids = sorted(pos.keys());
+  let cost = gridCost(pos, edges);
+  for (let pass = 0; pass < 60; pass++) {
+    let bestMove: Pos | null = null, bestCost = cost - 1e-6;
+    const taken = new Map([...pos].map(([id, p]) => [`${p.x},${p.y}`, id]));
+    for (const id of ids) {
+      for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
+        const other = taken.get(`${x},${y}`);
+        if (other === id || (other && compareNames(other, id) < 0)) continue;
+        const next = new Map(pos).set(id, { x, y });
+        if (other) next.set(other, pos.get(id)!);
+        const c = gridCost(next, edges);
+        if (c < bestCost) (bestCost = c, bestMove = next);
+      }
+    }
+    if (!bestMove) break;
+    pos = bestMove;
+    cost = bestCost;
+  }
+  return pos;
+}
+
 /** Moves a device that sits on a link it is not an end of a little aside (a third of a column across,
  * else half a row up or down), where that clears the link and adds no crossing; in name order. */
 export function clearLinks(pos: Pos, edges: Array<[string, string]>): Pos {
@@ -542,6 +737,7 @@ const onSegment = (p: Point, a: Point, b: Point) => {
 export interface LayoutScore {
   score: number;
   crossings: number;
+  overlaps: number;
   through: number;
   crowded: number;
   badges: number;
@@ -578,6 +774,39 @@ function throughCount(pos: Pos, edges: Array<[string, string]>, near = 0.2): num
       if (id === a || id === b) continue;
       const { d, t } = segmentDistance(r, pos.get(a)!, pos.get(b)!);
       if (d < near && t > 0.01 && t < 0.99) n++;
+    }
+  }
+  return n;
+}
+
+// Links that lie (nearly) on top of each other, so the picture cannot tell them apart: two links leaving
+// one device less than OVERLAP_ANGLE apart, or two other links nearly parallel with an end of one on
+// the other.
+const OVERLAP_ANGLE = 0.27; // radians, about 15 degrees
+function overlapCount(pos: Pos, edges: Array<[string, string]>): number {
+  let n = 0;
+  const sin = (ax: number, ay: number, bx: number, by: number) => Math.abs(ax * by - ay * bx) / ((Math.hypot(ax, ay) * Math.hypot(bx, by)) || 1);
+  for (let i = 0; i < edges.length; i++) {
+    const [a, b] = edges[i]!;
+    const p1 = pos.get(a)!, p2 = pos.get(b)!;
+    for (let j = i + 1; j < edges.length; j++) {
+      const [c, d] = edges[j]!;
+      const p3 = pos.get(c)!, p4 = pos.get(d)!;
+      const shared = a === c || a === d ? a : b === c || b === d ? b : null;
+      if (shared) {
+        if ((a === c && b === d) || (a === d && b === c)) continue;
+        const s = pos.get(shared)!;
+        const u = shared === a ? p2 : p1, w = shared === c ? p4 : p3;
+        const ux = u.x - s.x, uy = u.y - s.y, wx = w.x - s.x, wy = w.y - s.y;
+        if (ux * wx + uy * wy > 0 && sin(ux, uy, wx, wy) < Math.sin(OVERLAP_ANGLE)) n++;
+        continue;
+      }
+      if (sin(p2.x - p1.x, p2.y - p1.y, p4.x - p3.x, p4.y - p3.y) > Math.sin(OVERLAP_ANGLE)) continue;
+      const on = (p: Point, q: Point, r: Point) => {
+        const { d: dist, t } = segmentDistance(p, q, r);
+        return dist < 0.2 && t > 0.01 && t < 0.99;
+      };
+      if (on(p3, p1, p2) || on(p4, p1, p2) || on(p1, p3, p4) || on(p2, p3, p4)) n++;
     }
   }
   return n;
@@ -636,8 +865,12 @@ function badgeCollisions(pos: Pos, edges: Array<[string, string]>, names: boolea
   return n;
 }
 
+// A link longer than this (in grid units: longer than a diagonal two columns across and a row down)
+// costs W.long a unit beyond it: it spans the drawing instead of joining neighbours.
+const SCORE_LONG = 2.25;
+
 // The weights: a crossing costs as much as 4 units of misfit, a link through a device 6.
-const W = { crossing: 4, through: 6, crowded: 6, badge: 1.5, evenness: 3, wide: 1.5, tall: 2, portrait: 2, area: 1.5 };
+const W = { crossing: 4, overlap: 3, long: 1, through: 6, crowded: 6, badge: 1.5, evenness: 3, wide: 1.5, tall: 2, portrait: 2, area: 1.5 };
 
 /** The score of positions for the links `edges` (pairs of names, smaller first; a pair once per link, so
  * parallel links repeat it). `maxColumns` Infinity: no card. */
@@ -645,6 +878,7 @@ export function scoreLayout(pos: Pos, edges: Array<[string, string]>, maxColumns
   const once = new Set<string>();
   const es = edges.filter(([a, b]) => pos.has(a) && pos.has(b) && !once.has(`${a}|${b}`) && !!once.add(`${a}|${b}`));
   const crossings = crossingCount(pos, es);
+  const overlaps = overlapCount(pos, es);
   const through = throughCount(pos, es);
   const ids = [...pos.keys()];
   let crowded = 0;
@@ -654,6 +888,7 @@ export function scoreLayout(pos: Pos, edges: Array<[string, string]>, maxColumns
   }
   const lens = es.map(([a, b]) => Math.hypot(pos.get(a)!.x - pos.get(b)!.x, pos.get(a)!.y - pos.get(b)!.y));
   const badges = badgeCollisions(pos, edges, names);
+  const long = lens.reduce((t, v) => t + Math.max(0, v - SCORE_LONG), 0);
   const mean = lens.reduce((s, v) => s + v, 0) / (lens.length || 1);
   const evenness = lens.length && mean ? Math.sqrt(lens.reduce((s, v) => s + (v - mean) ** 2, 0) / lens.length) / mean : 0;
   const xs = ids.map((id) => pos.get(id)!.x), ys = ids.map((id) => pos.get(id)!.y);
@@ -663,7 +898,7 @@ export function scoreLayout(pos: Pos, edges: Array<[string, string]>, maxColumns
   if (ids.length > 2) fit += W.portrait * Math.max(0, height - width + 0.5);
   // compact: the box's area per device
   fit += (W.area * width * height) / ids.length;
-  const score = W.crossing * crossings + W.through * through + W.crowded * crowded + W.badge * badges + W.evenness * evenness + fit;
+  const score = W.crossing * crossings + W.overlap * overlaps + W.through * through + W.crowded * crowded + W.badge * badges + W.evenness * evenness + W.long * long + fit;
   const r2 = (v: number) => Math.round(v * 100) / 100 + 0;
-  return { score: r2(score), crossings, through, crowded, badges, evenness: r2(evenness), width: r2(width), height: r2(height) };
+  return { score: r2(score), crossings, overlaps, through, crowded, badges, evenness: r2(evenness), width: r2(width), height: r2(height) };
 }
