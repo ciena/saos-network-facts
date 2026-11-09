@@ -577,13 +577,25 @@ lab's shape:
   straight; a PE pair and its dual-homed CE come out mirrored. Without both roles the same runs by hops.
 - **Radial**: one hub linked to most of the lab in the middle, its spokes round it.
 - **Stress** (stress majorisation): link lengths as even as can be, for a mesh no tiering fits.
+- **Grid** (a lab of at most 15 devices without IGP roles, rings or plain boxes, that is a mesh: six
+  devices or more, links at least devices + 2): devices on a lattice of whole columns and rows (at most
+  `max_columns` by four on a card), as a hand-drawn diagram of a mesh draws it: the stress layout and the
+  ladder snapped to the lattice, then annealed (a fixed random seed) on crossings, links through
+  devices, links on top of each other, length, links over one cell long, and links neither across nor
+  down.
+- **Ladder on another cycle** (the same labs): the longest cycle often runs through the customer devices
+  round the outside; the shortest 16 other cycles of at least half the devices are tried as the core,
+  the rest hung off them as usual, the best kept (mirrored so the hung devices sit below), one column
+  more allowed on a card.
 
-The **score** counts link crossings, links through devices, devices too close, port badges that would
-find no room at full size on their link (laid out as the card frames draw them), how even the link
-lengths are, and the fit (`max_columns` wide, three rows tall, wider than tall, compact). The lowest
+The **score** counts link crossings, links lying (nearly) on top of each other (two links leaving a
+device less than 15° apart, or two parallel links sharing a stretch; 3 each, less than a crossing),
+links through devices, devices too close, port badges that would find no room at full size on their
+link (laid out as the card frames draw them), how even the link lengths are, link length beyond 2.25
+(a link across the drawing rather than to a neighbour), and the fit (`max_columns` wide, three rows tall, wider than tall, compact). The lowest
 wins, with two adjustments: in a lab with both P and PE routers, a candidate that follows the roles
 (every P between the outer PEs, no CE between them) counts 2 less, and a candidate that is not the
-ladder (radial and stress always) must beat the ladder by 3. `layoutFacts` returns every candidate
+ladder (radial, stress, grid and the ladder on another cycle always) must beat the ladder by 3. `layoutFacts` returns every candidate
 with its score (`candidates`, the chosen one first) so a page can show why.
 
 **Line systems** (devices without facts with an equipment role, `plain` and `equipment`): the other
@@ -602,7 +614,7 @@ the frames draw it) and clear of both devices' labels, taking the result only wh
 crossings or links through devices than without. A plain box without an equipment role
 (a device without facts in the path) is still laid out with the core, as above.
 
-With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns (role tiers that follow the roles one more: `CE | PE | P | PE | CE` is five): outer devices hang sideways while there is room, a ring too long for the ladder runs
+With `aspect` `card` (a landscape card: wider than tall where it can be), nothing is wider than `max_columns` columns (role tiers that follow the roles one more: `CE | PE | P | PE | CE` is five; the ladder on another cycle one more, for the devices hung off its row ends): outer devices hang sideways while there is room, a ring too long for the ladder runs
 round a rectangle that wide (its rows using the full width, its sides and rotation chosen like the ladder's), a chain wraps into bands, and outer devices hang above and below, so a
 10-device lab stays readable on a ~330 px card (the `card-frames` preset: 4 columns). From JavaScript:
 

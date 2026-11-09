@@ -325,12 +325,19 @@ test("aspect card: the rectangle chooses its split, and an untangling pass remov
     ["X1", "C1"], ["X1", "C3"], ["X2", "C2"], ["X2", "C4"],
   ];
   const lab: LayoutModel = { nodes, links: pairs.map(([a, b]) => ({ a, b })) };
-  const card = layoutFacts(lab, CARD);
-  assert.equal(card.method, "rectangle");
+  const chosen = layoutFacts(lab, CARD);
+  const rect = chosen.candidates!.find((c) => c.method === "rectangle")!;
+  const card = { positions: rect.positions };
   assert.ok(spanX(card.positions) <= 3 + 1e-9);
   assert.ok(minDistance(card.positions) >= 0.5);
   assert.deepEqual(through(lab, card.positions), []);
   assert.ok(crossings(lab, card.positions) <= 5, `card crossings ${crossings(lab, card.positions)}`);
+  // (the ladder on an inner cycle beats it: as few crossings, fewer links on top of each other, one
+  // column more, as a ladder on another cycle may take)
+  assert.equal(chosen.method, "ladder");
+  assert.ok(spanX(chosen.positions) <= 4 + 1e-9);
+  assert.ok(crossings(lab, chosen.positions) <= crossings(lab, card.positions));
+  assert.deepEqual(through(lab, chosen.positions), []);
   // A 10-device ring with two rungs fits a 4-column card without a crossing.
   const ring = ringLab(10, { roles: "pe", ces: [1, 6] });
   ring.links.push({ a: "R2", b: "R9" }, { a: "R4", b: "R7" });
@@ -559,4 +566,54 @@ test("a cable with a connection over the line system beside it: the pair gets ro
     const rel = (q: Record<string, Point>, id: string) => [Math.round((q[id]!.x - q.P1!.x) * 100), Math.round((q[id]!.y - q.P1!.y) * 100)];
     for (const id of ["PE1", "PE2"]) assert.deepEqual(rel(p, id), rel(plain, id), id);
   }
+});
+
+test("mesh labs without an IGP: a lattice (grid), and a ladder on the routers' own ring with the customer devices hung off it", () => {
+  // A mesh of ten devices with no roles, links between neighbouring cells of a lattice four wide and
+  // three deep (across, down, two one-cell diagonals), named out of order. The longest cycle round a
+  // rectangle draws a chord across the card; the grid recovers the lattice, as a hand-drawn diagram.
+  const pairs = [
+    ["R1", "R8"], ["R1", "R6"], ["R8", "R5"], ["R8", "R6"], ["R8", "R7"], ["R5", "R7"], ["R5", "R3"],
+    ["R10", "R6"], ["R10", "R9"], ["R6", "R7"], ["R7", "R4"], ["R9", "R2"], ["R2", "R4"],
+  ] as Array<[string, string]>;
+  const mesh: LayoutModel = { nodes: [...new Set(pairs.flat())].map((id) => ({ id, role: "ce" })), links: pairs.map(([a, b]) => ({ a, b })) };
+  const m = layoutFacts(mesh, CARD);
+  const len = (pos: Record<string, Point>, [a, b]: [string, string]) => Math.hypot(pos[a]!.x - pos[b]!.x, pos[a]!.y - pos[b]!.y);
+  assert.equal(m.method, "grid");
+  const rectangle = m.candidates!.find((c) => c.method === "rectangle")!;
+  assert.ok(Math.max(...pairs.map((p) => len(rectangle.positions, p))) > 2, "the rectangle has a long chord");
+  assert.ok(spanX(m.positions) <= 3 + 1e-9);
+  assert.equal(new Set(Object.values(m.positions).map((p) => p.y)).size, 3, "three rows");
+  for (const p of Object.values(m.positions)) assert.ok(Number.isInteger(p.x) && Number.isInteger(p.y), "on the lattice");
+  assert.equal(crossings(mesh, m.positions), 0);
+  assert.deepEqual(through(mesh, m.positions), []);
+  for (const p of pairs) assert.ok(len(m.positions, p) <= Math.SQRT2 + 1e-9, `${p} joins neighbouring cells`);
+  const straight = pairs.filter(([a, b]) => m.positions[a]!.x === m.positions[b]!.x || m.positions[a]!.y === m.positions[b]!.y).length;
+  assert.ok(straight >= 9, `${straight} of ${pairs.length} links across or down`);
+  // Two rows of three routers facing each other (a ladder of three rungs), a device inside the left
+  // square linked to three of its corners, an end device dual-homed to each end rung, and a device
+  // linked to both end devices. The longest cycle runs through the end devices; the ladder on the
+  // routers' own ring draws it as a diagram does: the rows facing, the end devices at the ends, the
+  // device they share underneath, the inner one between the rows.
+  const ladderLab: LayoutModel = {
+    nodes: ["A1", "A2", "A3", "B1", "B2", "B3", "IN", "EL", "ER", "LOW"].map((id) => ({ id, role: "ce" })),
+    links: [
+      ["A1", "A2"], ["A2", "A3"], ["B1", "B2"], ["B2", "B3"], ["A1", "B1"], ["A2", "B2"], ["A3", "B3"],
+      ["IN", "A1"], ["IN", "A2"], ["IN", "B2"], ["EL", "A1"], ["EL", "B1"], ["EL", "B1"], ["ER", "A3"], ["ER", "B3"], ["ER", "B3"],
+      ["LOW", "EL"], ["LOW", "ER"],
+    ].map(([a, b]) => ({ a: a!, b: b! })),
+  };
+  const l = layoutFacts(ladderLab, CARD);
+  const at = l.positions;
+  assert.equal(l.method, "ladder");
+  assert.equal(crossings(ladderLab, at), 0);
+  assert.deepEqual(through(ladderLab, at), []);
+  for (const [a, b] of [["A1", "B1"], ["A2", "B2"], ["A3", "B3"]]) assert.equal(at[a!]!.x, at[b!]!.x, `${a} over ${b}`);
+  for (const row of [["A1", "A2", "A3"], ["B1", "B2", "B3"]]) assert.equal(new Set(row.map((id) => at[id]!.y)).size, 1, `${row} on a row`);
+  const xs = Object.values(at).map((p) => p.x), ys = Object.values(at).map((p) => p.y);
+  assert.deepEqual([at.EL!.x, at.ER!.x].sort((p, q) => p - q), [Math.min(...xs), Math.max(...xs)], "end devices at the ends");
+  assert.equal(at.LOW!.y, Math.max(...ys), "the shared device underneath");
+  assert.ok(at.LOW!.x > at.EL!.x && at.LOW!.x < at.ER!.x);
+  const rows = [at.A1!.y, at.B1!.y].sort((p, q) => p - q);
+  assert.ok(at.IN!.y > rows[0]! && at.IN!.y < rows[1]!, "the inner device between the rows");
 });
