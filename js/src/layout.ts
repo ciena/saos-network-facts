@@ -324,6 +324,7 @@ const sortedNames = (s: Iterable<string>) => [...s].sort(compareNames);
 const ROLE_BONUS = 2;
 const MARGIN = 3;
 const MESH_MAX = 15;
+const MESH_COLUMNS = 4;
 
 function chooseLayout(
   model: LayoutModel,
@@ -368,6 +369,13 @@ function chooseLayout(
   // nothing tiers it, so the mesh candidates (grid, and the ladder on another cycle) are tried too.
   // (A bigger lab has no room for a mesh on a card, and the searches would take too long.)
   const plainRouters = ids.length <= MESH_MAX && !roles.has("p") && !roles.has("pe") && !roles.has("plain") && !(model.rings ?? []).length;
+  // Off a card (the 3D page), such a lab whose card takes a mesh candidate (grid, or the ladder on
+  // another cycle) takes the card's layout too (MESH_COLUMNS wide, as the card-frames preset), so the
+  // 3D page and the card show one structure.
+  if (plainRouters && !Number.isFinite(maxColumns)) {
+    const onCard = chooseLayout(model, ids, adj, linkEnds, MESH_COLUMNS);
+    if (onCard.method === "grid" || onCard.description.startsWith("ladder on the cycle")) return onCard;
+  }
   const tierText = both ? "tiers by role: CE | PE | P | PE | CE" : roles.has("p") || roles.has("pe") ? "tiers by role and hops" : "tiers by hops (no IGP router)";
   const list: Array<{ method: LayoutResult["method"]; description: string; positions: Record<string, Point> | null; bonus: number; extra?: number; scoreFrom?: Record<string, Point> }> = [
     { method: legacy.method, description: legacy.description, positions: legacy.positions, bonus: 0 },

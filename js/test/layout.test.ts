@@ -590,6 +590,8 @@ test("mesh labs without an IGP: a lattice (grid), and a ladder on the routers' o
   for (const p of pairs) assert.ok(len(m.positions, p) <= Math.SQRT2 + 1e-9, `${p} joins neighbouring cells`);
   const straight = pairs.filter(([a, b]) => m.positions[a]!.x === m.positions[b]!.x || m.positions[a]!.y === m.positions[b]!.y).length;
   assert.ok(straight >= 9, `${straight} of ${pairs.length} links across or down`);
+  // off a card (the 3D page) the same lattice
+  assert.deepEqual(layoutFacts(mesh).positions, m.positions);
   // Two rows of three routers facing each other (a ladder of three rungs), a device inside the left
   // square linked to three of its corners, an end device dual-homed to each end rung, and a device
   // linked to both end devices. The longest cycle runs through the end devices; the ladder on the
@@ -616,4 +618,5 @@ test("mesh labs without an IGP: a lattice (grid), and a ladder on the routers' o
   assert.ok(at.LOW!.x > at.EL!.x && at.LOW!.x < at.ER!.x);
   const rows = [at.A1!.y, at.B1!.y].sort((p, q) => p - q);
   assert.ok(at.IN!.y > rows[0]! && at.IN!.y < rows[1]!, "the inner device between the rows");
+  assert.deepEqual(layoutFacts(ladderLab).positions, at, "off a card, the card's ladder");
 });

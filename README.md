@@ -588,6 +588,9 @@ lab's shape:
   the rest hung off them as usual, the best kept (mirrored so the hung devices sit below), one column
   more allowed on a card.
 
+  Off a card (the 3D page), such a lab whose card takes one of these two takes the card's layout (4 columns,
+  as the `card-frames` preset), so the 3D page shows the structure the card does.
+
 The **score** counts link crossings, links lying (nearly) on top of each other (two links leaving a
 device less than 15° apart, or two parallel links sharing a stretch; 3 each, less than a crossing),
 links through devices, devices too close, port badges that would find no room at full size on their
