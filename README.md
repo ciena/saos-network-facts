@@ -335,7 +335,9 @@ the facts give no such link, two routers
 cabled to the same port of two members of one line system (a terminal's channel port: an ELS terminal's
 port 25 is channel 25) are joined by a connection over it, a rainbow of dashes (a dash of each of six colours in turn, for a wavelength) with the router port badged at each end, `over ch 25` in 3D and `ch 25` on the frames (the two
 cables' label when they have the same one, else `ch N` for a port that is a number), drawn only: it is
-not a link of the network the 3D view runs, and a protocol layer never shows it. Protocol frames leave
+not a link of the network the 3D view runs, and a protocol layer never shows it. In 3D the rainbow is a row
+of thick dashes, wider than a link's tube; where a routed link already joins the two routers (its ports named
+apart from the cables', so it has no `over`), the connection's rainbow wraps that link's tube. Protocol frames leave
 the line system out. A view without `optical` in its `layers` draws the line system on the physical
 layer in 3D too. Sites are a dashed frame round their
 devices (on both layers); notes are yellow, beside their device (the snapshot numbers them and lists them

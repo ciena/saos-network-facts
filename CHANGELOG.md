@@ -17,6 +17,33 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.23.4] - 2026-11-09
+
+### Fixed
+
+- **The rainbow on every link over the line system in 3D, and device labels off other devices, links and
+  rainbows on the frames** (#37, @jgroom33) — in 3D a connection over the line system was six 1 px dashed
+  lines: about 1 px wide at 1x (base-els-2node PE-1–PE-2), and hidden inside the grey tube where a routed
+  link already joins the two routers (Team-3-MC P1–PE4: link P1 2 – PE4 2, its cables to the ELS
+  terminals from 2/1, so the link has no `over` and a connection is derived beside it). Every rainbow is
+  now a row of thick dashes (radius 0.22, wider than a link's 0.13 tube), and such a connection wraps the
+  link's tube. A lone line over the line system has its `over ch N` caption on one side and its port
+  labels on the other, off the rainbow. On the frames a device label takes the nearest spot next to its
+  device (its usual place, the other side, slid sideways up to half its width, up to a label height
+  further out, or beside it) that covers no device box, no other device's link and no rainbow (Team-3-MC:
+  PE4's label lay on PE3's box on the IGP frame, and on the PE3–CE-3 link and the rainbow on the physical
+  frame); on the IGP frame the labels are placed before the metric pills, which slide along their link
+  clear of them; the two port badges of a link are drawn at one size (P1–PE4's two `2/1` badges were
+  not). On the 204 labs of a CAL rollout, 87 cards change (the 3D positions and the snapshots none, no
+  card changes size or gains a crossing): device labels on another device's box, another device's link or
+  a rainbow 56 → 3 (on 24 cards → 3), links with two badge sizes 103 → 0, badges beside their line
+  92 → 56, dropped to the hover title 1 → 0, smaller than full size 99 → 130. Render goldens change:
+  `adaptive-sr-cfm`, `g8032-two-ring`, `l3vpn-hosts`, `line-system`, `srv6-evpn` and `srv6-ospf` frames
+  (labels moved off a box or link: P3, PE1, PE6; RS_1, RM_4, RS_2; PE1, a BGP VRF label and the hosts;
+  PE1, PE2; a route reflector label; PE1, PE2 on the SRv6 frame; one IGP metric pill moves; in the first
+  two a badge takes its link's other badge's size), and `els-line-system` frames (a link's two badges at
+  one size); facts goldens change their version line.
+
 ## [0.23.3] - 2026-11-08
 
 ### Fixed

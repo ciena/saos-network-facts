@@ -156,7 +156,7 @@ export function renderFrames(m, positions, { frames, start, period = 4, cardPosi
     set.at = (id) => ({ x: r1(set.ox + mx + (P[id].x - set.minX) * U + (set.pull.get(id) ?? 0)), y: r1(myTop + (P[id].y - set.minY) * V) });
   }
   const nodes = new Map(m.nodes.map((n) => [n.id, n]));
-  const ctx = { model: m, full: m, at: sets[0]?.at, f, nodes, W, H, frames, notesH };
+  const ctx = { model: m, full: m, at: sets[0]?.at, f, nodes, W, H, frames, notesH, labels: [] };
   const order = start && frames.includes(start) ? [...frames.filter((x) => x !== start), start] : frames;
 
   const open = `<svg xmlns="http://www.w3.org/2000/svg" class="netfacts-frames" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" data-frames="${frames.join(' ')}" data-start="${start ?? ''}">`;
@@ -175,7 +175,9 @@ export function renderFrames(m, positions, { frames, start, period = 4, cardPosi
     if (!groups[id]) throw new Error(`no frame "${id}"`);
     return [open, head, background, groups[id].replace(' class="frame', ' class="still-frame'), '</svg>\n'].join('\n');
   };
-  return { svg: `${svg}\n`, frames: frames.map((id) => ({ id, title: titles[id] })), start, period, width: W, height: H, still };
+  // labels: each device label placed beside its device ({ frame, text, at, rect, covers, across }: the
+  // other device boxes and link lines it covers, the links between it and its device), for the tests.
+  return { svg: `${svg}\n`, frames: frames.map((id) => ({ id, title: titles[id] })), start, period, width: W, height: H, still, labels: ctx.labels };
 }
 
 // A frame's place in the rotation: 0 for the start frame, then the frames after it in the list, round.
@@ -209,7 +211,7 @@ export function frameStyle(frames, start, { period = 4 } = {}) {
 }
 
 // A label block, first line bold; anchored centre-top at (x, y) or above, kept off earlier blocks.
-function block(ctx, reg, x, y, lines, { color = C.ink, anchor = 'middle', up = false, fill = '#fff', stroke = null, bold = true, fixed = false } = {}) {
+function block(ctx, reg, x, y, lines, { color = C.ink, anchor = 'middle', up = false, fill = '#fff', stroke = null, bold = true, fixed = false, around = null } = {}) {
   const { f } = ctx;
   const sz = (i) => (i === 0 && bold ? f : f * 0.85);
   const lh = f * 1.15;
@@ -220,22 +222,94 @@ function block(ctx, reg, x, y, lines, { color = C.ink, anchor = 'middle', up = f
   // Off every label already placed and below the title band: try the preferred side first, then
   // alternate, a label height at a time.
   const base = up ? y - h : y;
-  const hit = (yy) => yy < f * 2.6 || yy + h > ctx.H - 2 || reg.some((b) => x0 < b.x + b.w && b.x < x0 + w && yy < b.y + b.h && b.y < yy + h);
+  const hitAt = (xx, yy) => yy < f * 2.6 || yy + h > ctx.H - 2 || reg.some((b) => xx < b.x + b.w && b.x < xx + w && yy < b.y + b.h && b.y < yy + h);
+  const hit = (yy) => hitAt(x0, yy);
   let y0 = base;
-  for (let i = 1; i < 24 && !fixed && hit(y0); i++) {
+  // A device's label (`around`): the best spot next to its device (aroundSpot) clear of the labels
+  // placed, else as below.
+  const spot = around && aroundSpot(ctx, around, x, y, w, h, up, hitAt);
+  if (spot) [x0, y0] = spot;
+  for (let i = 1; i < 24 && !fixed && !spot && hit(y0); i++) {
     const step = Math.ceil(i / 2) * (h * 0.55) * (i % 2 ? 1 : -1) * (up ? -1 : 1);
     y0 = base + step;
   }
-  if (hit(y0)) y0 = base;
+  if (!spot && hit(y0)) y0 = base;
   reg.push({ x: x0, y: y0, w, h });
   return `<rect x="${r1(x0)}" y="${r1(y0)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(f * 0.3)}" fill="${fill}" fill-opacity="0.9"${stroke ? ` stroke="${stroke}" stroke-width="${r1(f * 0.08)}"` : ''}/>` +
     lines.map((l, i) => `<text x="${r1(x0 + w / 2)}" y="${r1(y0 + f * 0.95 + i * lh)}" font-size="${r1(sz(i))}" text-anchor="middle"${i === 0 && bold ? ' font-weight="700"' : ''} fill="${i === 0 && bold ? color : bold ? C.mute : C.ink}">${esc(l)}</text>`).join('');
 }
 
-// A device's labels go outward: above it in the top half of the drawing, below it in the bottom half.
+// A device's labels go outward: above it in the top half of the drawing, below it in the bottom half;
+// where that covers another device box or a link (ctx.avoid), the other side, beside the device or at a
+// corner (aroundSpots), the first spot clear of them all.
 function outward(ctx, reg, p, gap, lines, opts = {}) {
   const below = p.y > ctx.H * 0.5;
-  return block(ctx, reg, p.x, below ? p.y + gap : p.y - gap, lines, { ...opts, up: !below });
+  const out = block(ctx, reg, p.x, below ? p.y + gap : p.y - gap, lines, { ...opts, up: !below, around: ctx.avoid ? { p, gap } : null });
+  // (what each device label ran into, for renderFrames' `labels`)
+  if (ctx.avoid && ctx.labels) ctx.labels.push({ frame: ctx.frame, text: lines[0], at: p, rect: reg[reg.length - 1], ...labelConflicts(ctx, p, reg[reg.length - 1]) });
+  return out;
+}
+
+// Where a device label (w x h) goes round its device at p: [x0, y0], or null when every spot is taken
+// by a label already placed (`hitAt`). The spots, all next to the device: its usual place (centred at
+// x, at y: above when `up`), then above and below it slid sideways and up to a label height further
+// out, and beside it right and left, kept on the drawing. The one chosen covers the fewest other device
+// boxes, rainbows and other links (none, where it can), then the fewest of its own device's plain links,
+// then is the nearest the device; a spot on the other side, or across a link from the device (it would
+// read as that link's), counts as a little further.
+function aroundSpot(ctx, { p, gap }, x, y, w, h, up, hitAt) {
+  const { f } = ctx;
+  const spots = [[x - w / 2, up ? y - h : y]];
+  for (const above of [up, !up]) {
+    for (let k = 0; k <= 4; k++) {
+      const y0 = above ? p.y - gap - h - k * h * 0.25 : p.y + gap + k * h * 0.25;
+      for (let j = -4; j <= 4; j++) spots.push([p.x - w / 2 + (j * w) / 8, y0]);
+    }
+  }
+  for (const right of [true, false]) {
+    for (let k = 0; k <= 2; k++) {
+      const x0 = right ? p.x + gap + f * (0.4 + k * 0.5) : p.x - gap - f * (0.4 + k * 0.5) - w;
+      for (let j = -4; j <= 4; j++) spots.push([x0, p.y - h / 2 + (j * h) / 4]);
+    }
+  }
+  let best = null;
+  for (const [i, [xx, yy]] of spots.entries()) {
+    const x0 = Math.max(2, Math.min(ctx.W - w - 2, xx));
+    if (hitAt(x0, yy)) continue;
+    const r = { x: x0, y: yy, w, h };
+    const { covers, own, across } = labelConflicts(ctx, p, r);
+    const dx = Math.max(x0 - p.x, 0, p.x - x0 - w), dy = Math.max(yy - p.y, 0, p.y - yy - h);
+    const cost = covers * 1e6 + own * 1e3 + (i ? Math.hypot(dx, dy) + ((up ? yy > p.y : yy + h < p.y) ? f * 0.3 : 0) + across * f * 3 : -1);
+    if (!best || cost < best.cost) best = { cost, at: [x0, yy] };
+  }
+  return best?.at ?? null;
+}
+
+// What a device label at r (its device at p) runs into (ctx.avoid: { boxes: [{ p, r }], segs: [[a, b, na,
+// nb, rainbow]] }; a line grazing its edge does not count): `covers`, the device boxes (its own too), the
+// rainbows and the other devices' links it covers; `own`, its own device's other links it covers;
+// `across`, the other links between the device and the label's nearest point.
+export function labelConflicts(ctx, p, r) {
+  const inner = { x: r.x + 1, y: r.y + 1, w: r.w - 2, h: r.h - 2 };
+  const pad = ctx.f * 0.1;
+  const { boxes, segs } = ctx.avoid;
+  const mine = (na, nb) => { const a = ctx.at(na), b = ctx.at(nb); return (a.x === p.x && a.y === p.y) || (b.x === p.x && b.y === p.y); };
+  let covers = boxes.filter((b) => r.x < b.r.x + b.r.w + pad && b.r.x < r.x + r.w + pad && r.y < b.r.y + b.r.h + pad && b.r.y < r.y + r.h + pad).length;
+  let own = 0;
+  for (const [a, b, na, nb, rainbow] of segs) {
+    if (!segmentHitsRect(a, b, inner)) continue;
+    if (mine(na, nb) && !rainbow) own += 1;
+    else covers += 1;
+  }
+  const q = { x: Math.max(r.x, Math.min(p.x, r.x + r.w)), y: Math.max(r.y, Math.min(p.y, r.y + r.h)) };
+  const across = segs.filter(([a, b, na, nb]) => !mine(na, nb) && segmentsCross(p, q, a, b)).length;
+  return { covers, own, across };
+}
+
+// Whether the segments p-q and a-b cross (touching at an end does not count).
+function segmentsCross(p, q, a, b) {
+  const s = (u, v, w) => Math.sign((v.x - u.x) * (w.y - u.y) - (v.y - u.y) * (w.x - u.x));
+  return s(p, q, a) * s(p, q, b) < 0 && s(a, b, p) * s(a, b, q) < 0;
 }
 
 // A connection over the line system: a rainbow of dashes (six colours, a dash each in turn), a wavelength.
@@ -318,6 +392,10 @@ export function placeBadge(from, to, len, w, f, box, taken, { side = 0, k = 1, r
   return null;
 }
 
+// A device's box in the ghost, and on the role frame.
+const ghostRect = (p, f) => ({ x: p.x - f * 0.9, y: p.y - f * 0.54, w: f * 1.8, h: f * 1.08 });
+const roleRect = (p, f, n) => { const s = f * (n.rr ? 1.6 : 1.3); return { x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s }; };
+
 // The ghost: the physical topology faint, with names, so every frame keeps its bearings.
 function ghost(ctx, ends, reg, { names = true } = {}) {
   const g = [];
@@ -327,8 +405,8 @@ function ghost(ctx, ends, reg, { names = true } = {}) {
   }
   for (const n of ctx.model.nodes) {
     const p = ctx.at(n.id);
-    const s = ctx.f * 0.9;
-    g.push(`<rect x="${r1(p.x - s)}" y="${r1(p.y - s * 0.6)}" width="${r1(2 * s)}" height="${r1(1.2 * s)}" rx="${r1(s * 0.25)}" fill="#eef1f4" stroke="${C.ghost}"/>`);
+    const s = ctx.f * 0.9, r = ghostRect(p, ctx.f);
+    g.push(`<rect x="${r1(r.x)}" y="${r1(r.y)}" width="${r1(r.w)}" height="${r1(r.h)}" rx="${r1(s * 0.25)}" fill="#eef1f4" stroke="${C.ghost}"/>`);
     if (names === true || (typeof names === 'function' && names(n))) {
       const w = n.id.length * ctx.f * 0.8 * 0.58 + 6;
       reg.push({ x: p.x - w / 2, y: p.y + s * 0.7, w, h: ctx.f });
@@ -342,6 +420,14 @@ function draw(id, ctx) {
   const { model, at, f, nodes } = ctx;
   const ends = linkEnds(ctx);
   const reg = [];
+  ctx.frame = id;
+  // What a device label keeps off (outward): the devices' boxes, as this frame draws them (the physical
+  // look, else the ghost's box), and the link lines (a rainbow on the physical and optical frames).
+  const physicalish = id === 'physical' || id === 'optical';
+  ctx.avoid = {
+    boxes: model.nodes.map((n) => ({ p: at(n.id), r: physicalish ? deviceRect(at(n.id), f, physicalLook(n)) : id === 'role' && n.net ? roleRect(at(n.id), f, n) : ghostRect(at(n.id), f) })),
+    segs: model.links.map((l) => [...ends.get(l.id), l.a.node, l.b.node, physicalish && !!l.over]),
+  };
   const g = siteFrames(ctx, reg, id === 'physical' || id === 'optical');
   const dot = (p, color, r = f * 0.55) => `<ellipse cx="${p.x}" cy="${p.y}" rx="${r1(r)}" ry="${r1(r * 0.75)}" fill="${color}" stroke="#fff" stroke-width="${r1(f * 0.1)}"/>`;
   // A pill at p; k < 1 draws it smaller (a badge on a short link), with the same corner radius.
@@ -479,8 +565,13 @@ function draw(id, ctx) {
         if (b.spot) taken.push(b.spot.rect);
       }
     }
+    // The badges of one link at one size, the smaller's, so both ends read alike (each in the middle of the
+    // spot it found, which the smaller badge clears as the larger did; at the larger size it would have
+    // gone beside the line).
     for (const [i, d] of linkDraw.entries()) {
-      const ports = want.filter((b) => b.i === i && b.spot).map((b) => pill(b.spot, b.text, '#9aa4b1', b.spot.k));
+      const mine = want.filter((b) => b.i === i && b.spot);
+      const k = Math.min(...mine.map((b) => b.spot.k));
+      const ports = mine.map((b) => pill(b.spot, b.text, '#9aa4b1', k));
       g.push(`${d.head}${ports.join('')}${d.cap}</g>`);
     }
     g.push(...devices, ...labels);
@@ -531,11 +622,18 @@ function draw(id, ctx) {
 
   if (id === 'igp') {
     g.push(...ghost(ctx, ends, reg, { names: false }));
-    // A metric pill at the middle of its link, else the nearest spot along it (toward either end, up to
-    // a fifth of the length from it) clear of the device boxes and the pills already placed: parallel
-    // and crossing links do not stack their metrics.
+    // The device labels first (next to their devices, aroundSpot), drawn last; then a metric pill at the
+    // middle of its link, else the nearest spot along it (toward either end, up to a fifth of the length
+    // from it) clear of the device boxes, the labels and the pills already placed: parallel and crossing
+    // links do not stack their metrics, and a pill gives way to a label.
+    const shown = model.nodes.filter((n) => model.links.some((l) => l.adj && (l.a.node === n.id || l.b.node === n.id)));
+    const labelled = shown.map((n) => {
+      const p = at(n.id);
+      return `${dot(p, C.igp)}<g>${title(deviceDetail(n, model))}${outward(ctx, reg, p, f * 0.8, [n.id, n.loopback, n.sid ? `SID ${n.sid.label}` : null].filter(Boolean), { color: C.igp })}</g>`;
+    });
+    const labelRects = reg.slice(reg.length - shown.length);
     const pillsTaken = model.nodes.map((n) => { const p = at(n.id), s = f * 0.9; return { x: p.x - s, y: p.y - s * 0.6, w: 2 * s, h: 1.2 * s }; });
-    const clearOf = (r) => !pillsTaken.some((q) => r.x < q.x + q.w && q.x < r.x + r.w && r.y < q.y + q.h && q.y < r.y + r.h);
+    const clearOf = (r) => ![...pillsTaken, ...labelRects].some((q) => r.x < q.x + q.w && q.x < r.x + r.w && r.y < q.y + q.h && q.y < r.y + r.h);
     for (const l of model.links) {
       if (!l.adj) continue;
       const [a, b] = ends.get(l.id);
@@ -545,12 +643,7 @@ function draw(id, ctx) {
       pillsTaken.push(at_(t));
       g.push(`<g>${title(`${l.a.node} — ${l.b.node}: ${l.adj}, metric ${l.metric}\n${l.subnet ?? ''}`)}${line(a, b, l.adj === 'Up' ? C.igp : C.rpl, f * 0.22)}${pill(lerp(a, b, t), l.metric ?? '?', C.igp)}</g>`);
     }
-    for (const n of model.nodes) {
-      if (!model.links.some((l) => l.adj && (l.a.node === n.id || l.b.node === n.id))) continue;
-      const p = at(n.id);
-      g.push(dot(p, C.igp));
-      g.push(`<g>${title(deviceDetail(n, model))}${outward(ctx, reg, p, f * 0.8, [n.id, n.loopback, n.sid ? `SID ${n.sid.label}` : null].filter(Boolean), { color: C.igp })}</g>`);
-    }
+    g.push(...labelled);
   }
 
   if (id === 'pw') {

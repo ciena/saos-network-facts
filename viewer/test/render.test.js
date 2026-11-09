@@ -452,3 +452,49 @@ describe('port badges and metric pills never overlap', () => {
     }
   });
 });
+
+// Measured on the SVG (not with the renderer's own bookkeeping): a device label beside its device (the
+// physical frame and the layer frames; the optical frame keeps its labels above the row) covers no other
+// device's box, not its own, no other device's link line and no rainbow; its own device's plain links may
+// run under it. On a CAL lab at 0.23.3 a router's label lay on the box of the router above it (IGP), and on
+// another link and its own rainbow (physical). At 0.23.3 this failed on adaptive-sr-cfm (P3 on a link, PE6
+// on its box), g8032-two-ring (RM_4 on a box) and line-system (PE1, PE2 on their boxes).
+describe('device labels keep off other devices, links and rainbows', () => {
+  const RAINBOW_STROKES = ['#e03131', '#f08c00', '#e6b800', '#2f9e44', '#1c7ed6', '#7048e8'];
+  const frameBodies = (svg) => [...svg.matchAll(/<g class="frame[ a-z0-9]*" id="f-([a-z0-9]+)"[^>]*>([\s\S]*?)(?=\n<g class="frame|\n<\/svg>)/g)].map((m) => [m[1], m[2]]);
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const labelsOf = (body, names) => [...body.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="#fff" fill-opacity="0.9"\/><text [^>]*font-weight="700" fill="[^"]+">([^<]+)<\/text>/g)]
+    .filter((m) => names.has(m[5])).map((m) => ({ name: m[5], r: { x: +m[1], y: +m[2], w: +m[3], h: +m[4] } }));
+  const boxesOf = (body) => [
+    ...[...body.matchAll(/<g class="router"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map((m) => { const r = (+m[3] * 0.78) / 0.68; return { x: +m[1] - r, y: +m[2] - r, w: 2 * r, h: 2 * r }; }),
+    ...[...body.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="[\d.]+" fill="(?:#eef1f4|#(?!fff)[0-9a-f]{6}"[^>]*stroke="#(?:fff|8a94a3|1d2430|3b5bdb))"/g)].map((m) => ({ x: +m[1], y: +m[2], w: +m[3], h: +m[4] })),
+  ];
+  const linesOf = (body) => [...body.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)" stroke="(#[0-9a-f]{6})"/g)].map((m) => ({ a: { x: +m[1], y: +m[2] }, b: { x: +m[3], y: +m[4] }, rainbow: RAINBOW_STROKES.includes(m[5]) }));
+
+  for (const [lab, path] of Object.entries(LABS)) {
+    test(lab, () => {
+      const svg = frames(read(path), { preset: 'card-frames' }).svg;
+      const bodies = frameBodies(svg);
+      // the device centres, from the physical frame's device groups (the layer frames share its places)
+      const phys = bodies.find(([id]) => id === 'physical')[1];
+      const centre = new Map([...phys.matchAll(/<g><title>([^\n<]+)\n[^<]*<\/title>(?:<g class="router"><circle cx="([\d.]+)" cy="([\d.]+)"|<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)")/g)]
+        .map((m) => [m[1], m[2] ? { x: +m[2], y: +m[3] } : { x: +m[4] + +m[6] / 2, y: +m[5] + +m[7] / 2 }]));
+      const bad = [];
+      for (const [id, body] of bodies) {
+        if (id === 'optical') continue;
+        const boxes = boxesOf(body), lines = linesOf(body);
+        for (const { name, r } of labelsOf(body, new Set(centre.keys()))) {
+          const p = centre.get(name);
+          const own = boxes.find((b) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h);
+          const near = own && { x: own.x - 4, y: own.y - 4, w: own.w + 8, h: own.h + 8 };
+          const mine = (l) => near && [l.a, l.b].some((q) => q.x >= near.x && q.x <= near.x + near.w && q.y >= near.y && q.y <= near.y + near.h);
+          const inner = { x: r.x + 1, y: r.y + 1, w: r.w - 2, h: r.h - 2 };
+          for (const b of boxes) if (hit(inner, b)) bad.push(`${id}: ${name} on ${b === own ? 'its own' : 'a'} device box`);
+          for (const l of lines) if ((l.rainbow || !mine(l)) && segmentHitsRect(l.a, l.b, inner)) bad.push(`${id}: ${name} on ${l.rainbow ? 'a rainbow' : 'a link'} ${l.a.x},${l.a.y}-${l.b.x},${l.b.y}`);
+        }
+      }
+      expect(centre.size, 'device centres found').toBeGreaterThan(0);
+      expect(bad).toEqual([]);
+    });
+  }
+});
