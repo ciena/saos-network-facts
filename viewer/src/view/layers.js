@@ -233,17 +233,33 @@ function dashed(points, color, opacity = 1) {
   return line;
 }
 
-// A connection over the line system: a rainbow of dashes (src/rainbow.js), one dashed line per colour,
-// each starting a dash further along.
-function rainbow(points, dash = 0.6) {
+// A link over the line system, as thick as a tube: a rainbow of dashes (src/rainbow.js) along a->b, a dash of
+// each colour in turn, every dash a short tube of RAINBOW_R, so it reads at 1x from the top and the corner
+// as the 2D frames' rainbow does. Round a link's own tube (radius 0.13) it is a sleeve of dashes, the grey
+// showing between them. `id`: the link it draws (userData.rainbow, for a test and a picker).
+export const RAINBOW_R = 0.22;
+export const RAINBOW_DASH = 0.7;
+export function rainbow(a, b, id = null, { r = RAINBOW_R, dash = RAINBOW_DASH } = {}) {
   const g = new THREE.Group();
+  g.userData.rainbow = id;
+  const len = a.distanceTo(b);
+  if (len < 1e-6) return g;
+  const dir = new THREE.Vector3().subVectors(b, a).normalize();
+  const n = Math.max(RAINBOW.length, Math.round(len / dash));
+  const step = len / n;
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  const scale = new THREE.Vector3(1, step, 1);
+  const geo = new THREE.CylinderGeometry(r, r, 1, 14, 1, false);
   RAINBOW.forEach((c, k) => {
-    const line = dashed(points, new THREE.Color(c).getHex(), 0.95);
-    const dist = line.geometry.getAttribute('lineDistance');
-    for (let i = 0; i < dist.count; i++) dist.setX(i, dist.getX(i) + (RAINBOW.length - k) * dash);
-    line.material.dashSize = dash;
-    line.material.gapSize = dash * (RAINBOW.length - 1);
-    g.add(line);
+    const at = [];
+    for (let i = k; i < n; i += RAINBOW.length) at.push(i);
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: new THREE.Color(c) }), at.length);
+    const m = new THREE.Matrix4();
+    at.forEach((i, j) => mesh.setMatrixAt(j, m.compose(a.clone().addScaledVector(dir, (i + 0.5) * step), q, scale)));
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    mesh.userData.rainbow = id;
+    g.add(mesh);
   });
   return g;
 }
@@ -251,6 +267,15 @@ function rainbow(points, dash = 0.6) {
 function solid(points, color, opacity = 1) {
   const geo = new THREE.BufferGeometry().setFromPoints(points);
   return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity }));
+}
+
+// A label beside the line between nodes na at a and nb at b (in xz, BESIDE units, side +1 or -1): the same
+// side whichever end the line is drawn from (the ends ordered by name), so a caption and its ports face.
+export const BESIDE = 1.1;
+export function beside(a, b, na, nb, side = 1) {
+  const [p, q] = na <= nb ? [a, b] : [b, a];
+  const d = new THREE.Vector3(q.x - p.x, 0, q.z - p.z).normalize();
+  return new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(BESIDE * side);
 }
 
 // Lateral offset (in xz) for member i of n on the segment a->b.
@@ -389,13 +414,15 @@ export class LayerView {
         const mat = new THREE.MeshStandardMaterial({ color: up ? (l.medium === 'optical' ? OPTICAL : l.kind === 'access' ? 0x6e7681 : 0x9aa7b8) : RED, transparent: !up || rides, opacity: rides ? 0.3 : up ? 1 : 0.5 });
         mats.push(mat);
         g.add(cylinder(a.clone().add(off), b.clone().add(off), rides ? 0.05 : 0.13, mat));
-        if (rides) g.add(rainbow([a.clone().add(off), b.clone().add(off)]));
+        if (rides) g.add(rainbow(a.clone().add(off), b.clone().add(off), l.id));
       });
       this.linkMeshes[l.id] = mats;
       const mid = new THREE.Vector3().lerpVectors(a, b, 0.5);
       // A routed link over the line system is captioned as a connection over it (`over ch 25`).
       const caption = l.over ?? l.caption;
-      if (caption) g.add(label(caption, `edge-label${l.medium === 'optical' || l.over || !l.caption ? ' optical' : ''}`, mid.clone().setY(Y + 1.4)));
+      // over the line system, one member: beside the line, so its rainbow shows (the ports on the other side)
+      const at = l.over && l.members.length === 1 ? mid.clone().add(beside(a, b, l.a.node, l.b.node)) : mid;
+      if (caption) g.add(label(caption, `edge-label${l.medium === 'optical' || l.over || !l.caption ? ' optical' : ''}`, at.clone().setY(Y + 1.4)));
       if (l.lag) {
         const ring = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.08, 8, 24), new THREE.MeshStandardMaterial({ color: st.up ? 0xf0b429 : RED }));
         ring.position.copy(mid);
@@ -414,12 +441,24 @@ export class LayerView {
     const plain = net.topo.plain ?? { nodes: [], links: [] };
     this.buildPlain(g, split ? { nodes: plain.nodes.filter((n) => !members.has(n.id)), links: plain.links.filter((l) => !onOptical(l)) } : plain, Y);
     const ls = physicalLineSystem(net);
+    // A connection over the line system between two routers a measured (routed) link already joins is that
+    // link's cable riding the line system: its rainbow wraps the link's tube (member by member), as the 2D
+    // physical frame draws it on the link's line, rather than hide inside it.
+    const routed = new Map(net.topo.links.map((l) => [[l.a.node, l.b.node].sort().join('|'), l]));
     for (const l of ls.lightpaths) {
       const a = this.pos(l.a.node).setY(Y + 0.6), b = this.pos(l.b.node).setY(Y + 0.6);
-      const off = memberOffset(a, b, l.index, l.count, 1.2);
-      g.add(rainbow([a.clone().add(off), b.clone().add(off)]));
-      // side by side connections: their captions staggered along the line, apart
-      g.add(label(l.over, 'edge-label optical', new THREE.Vector3().lerpVectors(a, b, 0.5 + (l.index - (l.count - 1) / 2) * 0.16).add(off).setY(Y + 1.4)));
+      const r = routed.get([l.a.node, l.b.node].sort().join('|'));
+      let off = memberOffset(a, b, l.index, l.count, 1.2);
+      if (r) {
+        const ra = this.pos(r.a.node).setY(Y + 0.6), rb = this.pos(r.b.node).setY(Y + 0.6);
+        off = memberOffset(ra, rb, Math.min(l.index, r.members.length - 1), r.members.length);
+      }
+      g.add(rainbow(a.clone().add(off), b.clone().add(off), l.id));
+      // side by side connections: their captions staggered along the line, apart; a lone one beside it, so
+      // its rainbow shows (its ports on the other side)
+      const at = new THREE.Vector3().lerpVectors(a, b, 0.5 + (l.index - (l.count - 1) / 2) * 0.16).add(off);
+      if (l.count === 1) at.add(beside(a, b, l.a.node, l.b.node));
+      g.add(label(l.over, 'edge-label optical', at.setY(Y + 1.4)));
     }
     this.buildPorts(g, ls.ports.filter((p) => p.lightpath || !split), Y);
     this.buildSites(g, net, Y);
@@ -432,6 +471,8 @@ export class LayerView {
     for (const p of ports) {
       const a = this.pos(p.node).setY(Y + 0.6), b = this.pos(p.toward).setY(Y + 0.6);
       const off = memberOffset(a, b, p.index, p.count, 1.2);
+      // the port of a lone line over the line system: beside it, across from its caption, off its rainbow
+      if (p.lightpath && p.count === 1) off.add(beside(a, b, p.node, p.toward, -1));
       const t = Math.min(0.45, Math.max(0.2, 2.2 / Math.max(a.distanceTo(b), 0.001))) + p.index * 0.1;
       g.add(label(p.port, 'port-label', new THREE.Vector3().lerpVectors(a, b, t).add(off).setY(Y + 0.9)));
     }

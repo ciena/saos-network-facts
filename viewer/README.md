@@ -84,7 +84,12 @@ connection over the line system: a rainbow of dashes over a thin core (which car
 red when it is down), the router port its cable leaves from at each end.
 The physical plane joins two routers cabled to the same port of two members of one line system with a
 `over ch N` connection drawn as a rainbow of dashes (`topology.lightpaths`), the router port at each end; the optical plane
-labels each router end of a cable with its port (`physicalLineSystem`, `buildPorts`).
+labels each router end of a cable with its port (`physicalLineSystem`, `buildPorts`). Every rainbow in 3D is
+a row of thick dashes (`rainbow()`, radius `RAINBOW_R` 0.22, wider than a link's 0.13 tube), so it reads at
+1x from the top and the corner; a connection between two routers that a routed link already joins (its ports
+named apart from the cables', so the link has no `over`: a link from port 2, its cables from 2/1) wraps that
+link's tube. A lone line over the line system has its `over ch N` caption on one side of it and its port
+labels on the other (`beside()`), off the rainbow.
 A view without `optical` keeps everything on the physical plane; devices and hosts get their
 `site`, and `topology.sites` (`[{ name, nodes }]`) is a dashed outline round each site's devices on the
 physical plane; `topology.notes` (`[{ text, device, layer }]`) are yellow labels on their layer (physical
@@ -94,7 +99,12 @@ terminal, two OADMs cabled back to back side by side with their express span lef
 the line system on an optical frame with a callout at each member port a router is cabled to
 (`render/model.js` `cardLayer`), and the routers on the physical frame, laid out without the line system
 (`cardLayout`), two routers cabled to the same channel port of its two terminals joined by a `ch N`
-connection drawn as a rainbow of dashes (`src/rainbow.js`), each router's port badged.
+connection drawn as a rainbow of dashes (`src/rainbow.js`), each router's port badged, the two badges of
+a link at one size. A device label (`outward`) takes the nearest spot next to its device (its usual place,
+the other side, slid sideways up to half its width, up to a label height further out, or beside it) that
+covers no device box, no other device's link and no rainbow; its own device's plain links count against a
+spot only after those. On the IGP frame the labels are placed before the metric pills, which slide along
+their link clear of them.
 
 IPv6: a link may be an IPv6 subnet (link-local addresses never link), and a router whose IS-IS
 interfaces carry IPv6 only, or whose loopback has no IPv4 address, runs IS-IS, BGP and the label
