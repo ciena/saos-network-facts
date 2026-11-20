@@ -168,7 +168,8 @@ since schema 1.6, `address_families`, `multi_topology`, `srv6_enabled`, `srv6_lo
 with `level`, `type`, since schema 1.3 `metrics` (per level the narrow `metric` and `wide_metric`)
 and, SAOS 10 since schema 1.6, `address_families`), `segment_routing` (`srgb`, `prefix_sids`,
 `policies`, `segment_lists`; SAOS 10 since schema 1.6 `srv6.locators` and `flex_algorithms`, see
-[SRv6, Flex-Algo and EVPN](#srv6-flex-algo-and-evpn)),
+[SRv6, Flex-Algo and EVPN](#srv6-flex-algo-and-evpn); since schema 1.10 `prefix_sids[].algorithm_sids`
+and `adjacency_sids`, see [Flex-Algo and adjacency SIDs](#flex-algo-and-adjacency-sids)),
 `bgp` (`instances` with `router_id`, `cluster_id`, `route_reflector` and, SAOS 10 since schema 1.7,
 `srv6_locator` / `srv6_locators` per address family; BGP `peers` carry `peer_group` since schema
 1.6), `pseudowires` (`peer`,
@@ -222,6 +223,29 @@ address families and the EVPN instances (all optional fields: older files stay v
 - `evpn_instances[].type` is `vpls`, `vpws` or `fxc` (VLAN-aware flexible cross-connect); the two ends
   of an EVPN-VPWS share the EVI and mirror `local_service_id` / `remote_service_id`. VRFs (L3VPN) are
   in `vrf_instances` (schema 1.7, below).
+
+### Flex-Algo and adjacency SIDs
+
+Since schema 1.10, SAOS 10 devices also carry a prefix's SID in each Flex-Algo and their static
+adjacency SIDs (optional fields: older files stay valid):
+
+```json
+{
+  "segment_routing": {
+    "prefix_sids": [{"prefix": "192.0.2.1/32", "sid": "1", "value_type": "index", "node": true,
+                     "algorithm_sids": [{"algorithm": "128", "sid": "101", "value_type": "index"}], "...": "..."}],
+    "adjacency_sids": [{"interface": "PE1-P1", "algorithm": "0", "sid": "24001"}]
+  }
+}
+```
+
+- `algorithm_sids` is `connected-prefix-sid-map <prefix> flex-algorithm <n> start-sid <m>`: the
+  prefix's SID in Flex-Algo n (RFC 9350 §8), beside its algorithm 0 `sid`. `value_type` defaults to
+  `index`, as for `sid`.
+- `adjacency_sids` is `segment-routing interfaces interface <name> <algorithm> adjacency-sid <label>`:
+  an absolute label, local to the router, for its adjacency on that IP interface (RFC 8402 §3.4).
+- An SRv6 segment list keeps its SIDs as written (`segment-type-2`, e.g. a uSID written as its
+  locator, `2001:db8:a804::/48`); an SR-MPLS one its labels (`segment-type-1`).
 
 ### VRFs and static routes
 

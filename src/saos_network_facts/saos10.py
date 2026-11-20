@@ -40,7 +40,7 @@ def new_facts():
                   "ospf": {"instances": [], "interfaces": []}, "tp_corouted_tunnels": [], "l2vpn_services": [],
                   "evpn_instances": [], "vrf_instances": [], "static_routes": [], BGP_SETTINGS: {},
                   VRF_SETTINGS: {"bgp": {}, "labels": {}}})
-    facts["segment_routing"].update({"srv6": {"locators": []}, "flex_algorithms": []})
+    facts["segment_routing"].update({"srv6": {"locators": []}, "flex_algorithms": [], "adjacency_sids": []})
     return facts
 
 
@@ -978,13 +978,14 @@ def _flex_algorithms(sr, container):
 
 
 def _segment_routing(facts, container):
-    """``ciena-sr:segment-routing``: connected prefix SIDs (``node`` is decided in ``finish``), SRv6
-    locators and Flex-Algo definitions."""
+    """``ciena-sr:segment-routing``: connected prefix SIDs (``node`` is decided in ``finish``) with their
+    Flex-Algo SIDs, static adjacency SIDs, SRv6 locators and Flex-Algo definitions."""
     sr = facts["segment_routing"]
     if removed(container):
-        sr["prefix_sids"] = []
+        sr["prefix_sids"], sr["adjacency_sids"] = [], []
         sr["srv6"]["locators"], sr["flex_algorithms"] = [], []
         return
+    _adjacency_sids(sr, get(container, "interfaces"))
     if get(container, "srv6") is not None:
         _srv6_locators(sr, get(container, "srv6"))
     _flex_algorithms(sr, container)
@@ -997,10 +998,51 @@ def _segment_routing(facts, container):
             sr["prefix_sids"] = [p for p in sr["prefix_sids"] if p is not current]
             continue
         if current is None:
-            current = {"prefix": prefix, "interface": None, "sid": None, "value_type": None, "node": False}
+            current = {"prefix": prefix, "interface": None, "sid": None, "value_type": None, "node": False,
+                       "algorithm_sids": []}
             sr["prefix_sids"].append(current)
         for key, leaf in (("interface", "interface"), ("sid", "start-sid"), ("value_type", "value-type")):
             _set(current, key, text(get(item, leaf)))
+        _algorithm_sids(current["algorithm_sids"], item)
+
+
+def _algorithm_sids(sids, item):
+    """``connected-prefix-sid-map <prefix> flex-algorithm <128-255> start-sid <n>``: the prefix's SID in
+    each Flex-Algo (RFC 9350 §8), beside its algorithm 0 SID (``start-sid`` of the entry itself)."""
+    for fa in entries(item, "flex-algorithm"):
+        algorithm = text(get(fa, "algorithm"))
+        if not algorithm:
+            continue
+        current = next((s for s in sids if s["algorithm"] == algorithm), None)
+        if removed(fa):
+            if current is not None:
+                sids.remove(current)
+            continue
+        if current is None:
+            current = {"algorithm": algorithm, "sid": None, "value_type": None}
+            sids.append(current)
+        for key, leaf in (("sid", "start-sid"), ("value_type", "value-type")):
+            _set(current, key, text(get(fa, leaf)))
+
+
+def _adjacency_sids(sr, container):
+    """``segment-routing interfaces interface <name> <algorithm> adjacency-sid <label>``: a static
+    SR-MPLS adjacency SID (RFC 8402 §3.4) on an IP interface, an absolute label local to this router."""
+    if removed(container):
+        sr["adjacency_sids"] = []
+        return
+    for item in entries(container, "interface"):
+        name, algorithm = text(get(item, "interface")), text(get(item, "algorithm")) or "0"
+        if not name:
+            continue
+        current = next((a for a in sr["adjacency_sids"] if (a["interface"], a["algorithm"]) == (name, algorithm)), None)
+        if removed(item):
+            sr["adjacency_sids"] = [a for a in sr["adjacency_sids"] if a is not current]
+            continue
+        if current is None:
+            current = {"interface": name, "algorithm": algorithm, "sid": None}
+            sr["adjacency_sids"].append(current)
+        _set(current, "sid", text(get(item, "adjacency-sid")))
 
 
 def _sid(segment):
@@ -1395,6 +1437,9 @@ def finish(facts):
         sid["node"] = sid["interface"] in loopbacks and _host_prefix(sid["prefix"])
         if sid["sid"] is not None and sid["value_type"] is None:
             sid["value_type"] = "index"  # ietf-sr-cmn sid-value-type: a start-sid is an SRGB index unless told otherwise
+        for fa in sid["algorithm_sids"]:
+            if fa["sid"] is not None and fa["value_type"] is None:
+                fa["value_type"] = "index"
     _bgp_resolve(facts)
     for instance in facts["bgp"]["instances"]:
         instance["route_reflector"] = any(p["route_reflector_client"] for p in facts["peers"]

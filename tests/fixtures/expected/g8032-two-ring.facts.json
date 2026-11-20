@@ -199,6 +199,7 @@
           }
         ],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
@@ -384,6 +385,7 @@
           }
         ],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
@@ -569,6 +571,7 @@
           }
         ],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
@@ -800,6 +803,7 @@
           }
         ],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
@@ -985,6 +989,7 @@
           }
         ],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
@@ -1152,6 +1157,7 @@
           }
         ],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
@@ -1263,6 +1269,7 @@
         "recognised": 5,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
@@ -1373,6 +1380,7 @@
         "recognised": 5,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
@@ -1483,6 +1491,7 @@
         "recognised": 5,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [],
@@ -1517,7 +1526,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.23.5"
+    "version": "0.24.0"
   },
   "hosts": [],
   "links": [
@@ -1622,5 +1631,5 @@
       }
     }
   ],
-  "schema_version": "1.9.0"
+  "schema_version": "1.10.0"
 }

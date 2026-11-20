@@ -1,0 +1,6 @@
+# Device types for the synthetic sr-policy square.
+devices:
+  PE1: 5164-10x
+  P1: 5164-10x
+  PE2: 5164-10x
+  P2: 5164-10x

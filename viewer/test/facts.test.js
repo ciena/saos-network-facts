@@ -66,7 +66,7 @@ describe('the bundled Adaptive-SR-CFM example', () => {
   test('the SR policies take their segment lists and all resolve', () => {
     expect(topo.srgb).toEqual({ base: 16000, size: 1001 });
     const pe1 = topo.srPolicies.find((p) => p.headend === 'PE1');
-    expect(pe1).toEqual({ name: 'SR1to9color2', headend: 'PE1', color: 2, endpoint: '10.255.10.9', segmentList: { name: 'PE1_PE9', sids: [16003, 16004, 16009] } });
+    expect(pe1).toEqual({ name: 'SR1to9color2', headend: 'PE1', color: 2, endpoint: '10.255.10.9', segmentList: { name: 'PE1_PE9', type: 'mpls', sids: [16003, 16004, 16009] } });
     expect(net.sr.policies.map((p) => [p.name, p.valid])).toEqual([
       ['SR3to6color2', true], ['SR1to9color2', true], ['SR4to3color2', true], ['SR6to3color2', true], ['SR9to1color2', true],
     ]);

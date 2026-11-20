@@ -147,7 +147,18 @@ The node SID label is the SRGB base + the loopback's prefix SID index (`value_ty
 null `value_type` from facts before 0.13.1 also means: it is the YANG default), or the label itself for
 `absolute` (an absolute label outside the SRGB is shown as is, with a warning); only a router with no
 prefix SID gets the SRGB base + its position in the topology, listed in the import report. The device
-panel, the label tables, the SR policy segment checks and the markers all use this one label. And, when there are no SR policies, an LSP between every two transport endpoints:
+panel, the label tables, the SR policy segment checks and the markers all use this one label.
+
+An SR policy is valid when its segment list can be followed SID by SID from the headend, each SID from
+where the previous one left the packet, and ends at the endpoint (RFC 9256 §5.1). A list is SR-MPLS (all
+labels) or SRv6 (all IPv6 SIDs); a mixed list is reported and not drawn. An SR-MPLS label is, in this
+order: an adjacency SID of the router the packet is at (the packet crosses that link; the adjacency must
+be up), an algorithm 0 Prefix-SID (followed through the label tables, so SR-MPLS must be the active label
+mode), a Flex-Algo Prefix-SID (followed along that algorithm's shortest paths, which every router on the
+way must take part in, see the SRv6 plane above), or else invalid: another router's adjacency SID is
+local to it. An SRv6 SID is followed to the locator it falls in (longest match) along that locator's
+algorithm. A VPWS packet walk over an SR policy follows algorithm 0 Prefix-SID lists only; a pseudowire
+steered onto a Flex-Algo, adjacency or SRv6 policy says so instead of walking. And, when there are no SR policies, an LSP between every two transport endpoints:
 the PEs and any router that ends a VRF (a P with a management VRF counts), a pseudowire, an EVPN
 instance or an MPLS-TP tunnel. The plane is listed when there is a tunnel, an SR policy or a
 label-switching router. Being an endpoint does not make a router a PE. VRFs (`vrf_instances`,

@@ -17,6 +17,21 @@ release.yml tags main vX.Y.Z and creates the GitHub Release from that section.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-20
+
+### Added
+
+- **Flex-Algo, adjacency and SRv6 SR policies resolve** (#39, @ivail-cienapub) — a policy whose segment
+  list used a Flex-Algo Prefix-SID, a static adjacency SID or SRv6 SIDs was always INVALID in the viewer
+  (its SIDs read as unknown, or an IPv6 SID as NaN), because the facts carried neither kind of SID and
+  the viewer resolved algorithm 0 Prefix-SIDs only. Schema 1.10 adds `prefix_sids[].algorithm_sids`
+  (`connected-prefix-sid-map … flex-algorithm <n> start-sid <m>`) and `segment_routing.adjacency_sids`
+  (`segment-routing interfaces interface <name> <algorithm> adjacency-sid <label>`), both optional. The
+  viewer types each segment list SR-MPLS or SRv6 and follows it SID by SID: adjacency SIDs over their
+  link, algorithm 0 SIDs through the label tables, Flex-Algo SIDs along that algorithm's shortest paths,
+  SRv6 SIDs to their locator; an invalid list names the SID and why. A VPWS walk over a Flex-Algo,
+  adjacency or SRv6 policy says the walk cannot follow it rather than dropping. New fixture `sr-policy`.
+
 ## [0.23.5] - 2026-11-09
 
 ### Fixed

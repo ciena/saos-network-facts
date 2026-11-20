@@ -131,7 +131,8 @@ export function computeSrv6(topo, igp) {
       else rib[r][loc.prefix] = { ...base, metric: s.dist[loc.node], nextHops: s.nextHops[loc.node] };
     }
   }
-  return { locators, algorithms, rib };
+  // spfs: per algorithm, per router, { dist, nextHops } (the SR policies' Flex-Algo segments use them).
+  return { locators, algorithms, rib, spfs };
 }
 
 // The route `node` uses for IPv6 destination `ip` among the locators (longest match), or null.

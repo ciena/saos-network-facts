@@ -1173,6 +1173,13 @@
         "node": {
           "type": "boolean",
           "description": "A node SID: a host prefix (/32, /128) on a loopback."
+        },
+        "algorithm_sids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AlgorithmSid"
+          },
+          "description": "SAOS 10: the prefix's SID in each Flex-Algo (`connected-prefix-sid-map ... flex-algorithm N start-sid S`); `sid` is its algorithm 0 SID. Optional: absent in files before schema 1.10. Since schema 1.10."
         }
       },
       "required": [
@@ -1181,6 +1188,63 @@
         "sid",
         "value_type",
         "node"
+      ]
+    },
+    "AlgorithmSid": {
+      "title": "AlgorithmSid",
+      "type": "object",
+      "description": "A prefix SID in one Flex-Algo (RFC 9350 §8).",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "The Flex-Algo, 128-255."
+        },
+        "sid": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The SID value, as written: an index into the SRGB or an absolute label, per `value_type`."
+        },
+        "value_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "How `sid` is read: `index` (into the SRGB; the YANG default) or `absolute` (an MPLS label)."
+        }
+      },
+      "required": [
+        "algorithm",
+        "sid",
+        "value_type"
+      ]
+    },
+    "AdjacencySid": {
+      "title": "AdjacencySid",
+      "type": "object",
+      "description": "A static SR-MPLS adjacency SID (SAOS 10 `segment-routing interfaces interface NAME ALGORITHM adjacency-sid LABEL`, RFC 8402 §3.4): an absolute label, local to the router, that sends the packet out of the interface.",
+      "properties": {
+        "interface": {
+          "type": "string",
+          "description": "The IP interface the adjacency is on."
+        },
+        "algorithm": {
+          "type": "string",
+          "description": "The algorithm (`0`; SAOS 10.12 accepts only 0)."
+        },
+        "sid": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The label."
+        }
+      },
+      "required": [
+        "interface",
+        "algorithm",
+        "sid"
       ]
     },
     "CandidatePath": {
@@ -1336,6 +1400,13 @@
             "$ref": "#/$defs/FlexAlgorithm"
           },
           "description": "SAOS 10: Flex-Algo definitions, in configuration order. Optional: absent in files before schema 1.6. Since schema 1.6."
+        },
+        "adjacency_sids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AdjacencySid"
+          },
+          "description": "SAOS 10: static adjacency SIDs, in configuration order. Optional: absent in files before schema 1.10. Since schema 1.10."
         }
       },
       "required": [

@@ -242,6 +242,10 @@ function buildNodes(devices, igp, report) {
         if (sid.value_type === 'absolute') node.sidLabel = Number(sid.sid);
         else node.sidIndex = Number(sid.sid);
       }
+      // The loopback's SIDs in each Flex-Algo (schema 1.10), beside its algorithm 0 SID.
+      const algoSids = (sid?.algorithm_sids ?? []).filter((s) => s.sid != null)
+        .map((s) => ({ algorithm: algorithmNumber(s.algorithm), ...(s.value_type === 'absolute' ? { label: Number(s.sid) } : { index: Number(s.sid) }) }));
+      if (algoSids.length) node.algoSids = algoSids;
       if (sid && sid.prefix !== hostPrefix(loIp)) sidElsewhere.push(`${name} (${sid.prefix})`);
       if (igp === 'isis' && isis && !isis.system_id) report.warn(`${name}: IS-IS instance ${isis.name} has no NET; its LSP ID is made up`);
     } else if (runsIgp) {
@@ -490,11 +494,40 @@ function buildSrPolicies(devices, report) {
         report.warn(`${name}: SR policy ${p.name} has no explicit segment list in the facts; not drawn`);
         continue;
       }
-      policies.push({ name: p.name, headend: name, color: num(p.color), endpoint: p.endpoint, segmentList: { name: listName, sids: sids.map(Number) } });
+      // An SR-MPLS segment list is labels, an SRv6 one IPv6 SIDs (`2001:db8:f8:3::` or a uSID written
+      // as its locator, `2001:db8:f8:3::/48`).
+      const srv6 = sids.every((x) => isV6(x));
+      if (!srv6 && !sids.every((x) => /^\d+$/.test(String(x)))) {
+        report.warn(`${name}: SR policy ${p.name} segment list ${listName} mixes MPLS labels and SRv6 SIDs; not drawn`);
+        continue;
+      }
+      policies.push({ name: p.name, headend: name, color: num(p.color), endpoint: p.endpoint, segmentList: { name: listName, type: srv6 ? 'srv6' : 'mpls', sids: srv6 ? sids.map(String) : sids.map(Number) } });
     }
   }
-  if (policies.length) report.add('mpls', 'facts', `${policies.length} SR policies`, 'headend, color, endpoint and the segment list of the preferred candidate path');
+  if (policies.length) {
+    const v6 = policies.filter((p) => p.segmentList.type === 'srv6').length;
+    report.add('mpls', 'facts', `${policies.length} SR policies`, `headend, color, endpoint and the segment list of the preferred candidate path${v6 ? `; ${v6} over SRv6 (each SID resolved to the locator that holds it)` : ''}`);
+  }
   return policies;
+}
+
+// Static adjacency SIDs (schema 1.10), each on the link its interface is on: a label local to its router
+// that sends the packet over that link (RFC 8402 §3.4).
+function buildAdjSids(devices, links, report) {
+  const out = [];
+  for (const [name, f] of devices) {
+    for (const a of f.segment_routing?.adjacency_sids ?? []) {
+      if (a.sid == null) continue;
+      const link = links.find((l) => [l.a, l.b].some((e) => e.node === name && e.if === a.interface));
+      if (!link) {
+        report.warn(`${name}: adjacency SID ${a.sid} on ${a.interface}, which is on no link of the view; left out`);
+        continue;
+      }
+      out.push({ node: name, interface: a.interface, label: Number(a.sid), link: link.id, neighbor: (link.a.node === name && link.a.if === a.interface ? link.b : link.a).node });
+    }
+  }
+  if (out.length) report.add('mpls', 'facts', `${out.length} adjacency SIDs`, 'static adjacency SIDs (segment-routing interfaces interface ... adjacency-sid): a label of its router alone that sends the packet over the link of that interface');
+  return out;
 }
 
 function srgbOf(devices, report) {
@@ -522,6 +555,15 @@ function resolveNodeSids(nodes, srgb, report) {
       report.warn(`${n.id}: absolute prefix SID ${n.sidLabel} is outside the SRGB ${srgb.base}-${srgb.base + srgb.size - 1}; shown as its label`);
     }
   }
+  for (const n of routers) {
+    for (const s of n.algoSids ?? []) {
+      if (s.label == null || s.label < srgb.base || s.label >= srgb.base + srgb.size) continue;
+      s.index = s.label - srgb.base;
+      delete s.label;
+    }
+  }
+  const algo = routers.filter((n) => n.algoSids?.length);
+  if (algo.length) report.add('mpls', 'facts', 'Flex-Algo prefix SIDs', `on ${algo.length} routers (algorithm ${[...new Set(algo.flatMap((n) => n.algoSids.map((s) => s.algorithm)))].sort((x, y) => x - y).join(', ')}): SRGB base + the Flex-Algo SID index; a segment to one follows that algorithm's shortest path (RFC 9350 §8)`);
   const noSid = routers.filter((n) => n.loopback && n.sidIndex == null && n.sidLabel == null).map((n) => n.id);
   if (noSid.length) report.add('mpls', 'default', 'node SIDs not configured', `${noSid.join(', ')}: no prefix SID on the loopback; the view gives each the SRGB base + its position in the topology`);
 }
@@ -1319,6 +1361,7 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
   const srgb = srgbOf(devices, report);
   resolveNodeSids(nodes, srgb, report);
   const srPolicies = buildSrPolicies(devices, report);
+  const adjSids = buildAdjSids(devices, links, report);
   const tpTunnels = buildTpTunnels(devices, links, report);
   const pseudowires = buildPseudowires(devices, owner, tpTunnels, report);
   const megs = buildCfm(devices, pseudowires, report);
@@ -1382,6 +1425,7 @@ export function importFacts(input, { name, positions, layout, plain: showPlain =
     vrfs,
     bgp: { sessions: bgp.sessions },
     srPolicies,
+    ...(adjSids.length ? { adjSids } : {}),
     tpTunnels,
     pseudowires,
     cfm: { linkMegs: false, megs },
