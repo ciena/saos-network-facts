@@ -90,6 +90,41 @@ def test_prefix_sid_value_type_defaults_to_index():
         ("192.0.2.1/32", "1001", "index"), ("192.0.2.9/32", "17009", "absolute")]
 
 
+def test_flex_algo_prefix_sids_per_algorithm_and_removal():
+    """``connected-prefix-sid-map <prefix> flex-algorithm <n> start-sid <m>``: one SID per algorithm beside
+    the algorithm 0 SID; ``value-type`` defaults to ``index``, and a later file can remove one algorithm."""
+    f = run(IFACES, {"ciena-sr:segment-routing": {"connected-prefix-sid-map": [
+        {"prefix": "192.0.2.1/32", "interface": "lb0", "start-sid": 1, "flex-algorithm": [
+            {"algorithm": 128, "start-sid": 101}, {"algorithm": 129, "start-sid": 17201, "value-type": "absolute"}]}]}})
+    (sid,) = f["segment_routing"]["prefix_sids"]
+    assert (sid["sid"], sid["algorithm_sids"]) == ("1", [
+        {"algorithm": "128", "sid": "101", "value_type": "index"},
+        {"algorithm": "129", "sid": "17201", "value_type": "absolute"}])
+    f = run(IFACES, {"ciena-sr:segment-routing": {"connected-prefix-sid-map": [
+        {"prefix": "192.0.2.1/32", "interface": "lb0", "start-sid": 1, "flex-algorithm": [
+            {"algorithm": 128, "start-sid": 101}, {"algorithm": 129, "start-sid": 201}]}]}},
+        {"ciena-sr:segment-routing": {"connected-prefix-sid-map": [
+            {"prefix": "192.0.2.1/32", "flex-algorithm": [{"algorithm": 128, "__operation__": "remove"}]}]}})
+    assert [s["algorithm"] for s in f["segment_routing"]["prefix_sids"][0]["algorithm_sids"]] == ["129"]
+
+
+def test_adjacency_sids_by_interface_and_removal():
+    """``segment-routing interfaces interface <name> <algorithm> adjacency-sid <label>``: a static adjacency
+    SID per interface; removing an interface, or the whole container, drops its SIDs."""
+    adj = lambda *items: {"ciena-sr:segment-routing": {"interfaces": {"interface": list(items)}}}  # noqa: E731
+    f = run(IFACES, adj({"interface": "core", "algorithm": 0, "adjacency-sid": 24001},
+                        {"interface": "lb0", "algorithm": 0, "adjacency-sid": 24002}))
+    assert f["segment_routing"]["adjacency_sids"] == [
+        {"interface": "core", "algorithm": "0", "sid": "24001"}, {"interface": "lb0", "algorithm": "0", "sid": "24002"}]
+    f = run(IFACES, adj({"interface": "core", "algorithm": 0, "adjacency-sid": 24001},
+                        {"interface": "lb0", "algorithm": 0, "adjacency-sid": 24002}),
+            adj({"interface": "lb0", "algorithm": 0, "__operation__": "remove"}))
+    assert [a["interface"] for a in f["segment_routing"]["adjacency_sids"]] == ["core"]
+    f = run(IFACES, adj({"interface": "core", "adjacency-sid": 24001}),
+            {"ciena-sr:segment-routing": {"interfaces": {"__operation__": "remove"}}})
+    assert f["segment_routing"]["adjacency_sids"] == []
+
+
 def test_sr_policy_and_segment_lists():
     f = run({"ciena-sr-policy:segment-routing-traffic-engineering": {
         "attributes": {"segment-lists": {"segment-list": [{"name": "L1", "segments": {"segment": [
@@ -486,7 +521,7 @@ def test_flow_points_domains_classifiers_meps_and_sids_merge_across_files():
     (mep,) = f["cfm"]["meps"]
     assert (mep["level"], mep["direction"], mep["interface"], mep["ccm_interval"], mep["port"]) == ("5", "up", "FP1", "10ms", "3")
     assert f["segment_routing"]["prefix_sids"] == [{"prefix": "192.0.2.1/32", "interface": "lb0", "sid": "5",
-                                                    "value_type": "index", "node": False}]
+                                                    "value_type": "index", "node": False, "algorithm_sids": []}]
 
 
 def bgp(*items, **instance):

@@ -38,7 +38,7 @@ export function buildNetwork(topo, { failures = [], labelMode = 'ldp', vendor = 
   const mpls = labels.build(topo, igp, vendor);
   const srv6 = computeSrv6(topo, igp);
   const bgp = computeBgp(topo, igp, mpls, vendor, links, srv6);
-  const sr = computeSrPolicies(topo, igp, mpls, vendor);
+  const sr = computeSrPolicies(topo, igp, mpls, vendor, srv6);
   const tp = computeMplsTp(topo, links, vendor);
   const vpws = computeVpws(topo, igp, mpls, sr, vendor, tp);
   const cfm = computeCfm(topo, links, vendor, vpws);

@@ -1,0 +1,1170 @@
+{
+  "devices": [
+    {
+      "device": "P1",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": []
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-P1-PE1"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-P1-PE2"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-P1-PE1",
+            "logical_port": "1",
+            "name": "FP-P1-PE1"
+          },
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-P1-PE2",
+            "logical_port": "2",
+            "name": "FP-P1-PE2"
+          }
+        ],
+        "gateway": null,
+        "hostname": "P1",
+        "interfaces": [
+          {
+            "description": null,
+            "fd": null,
+            "ip": "192.0.2.2/32",
+            "ipv4": [
+              "192.0.2.2/32"
+            ],
+            "ipv6": [
+              "2001:db8::2/128"
+            ],
+            "isis": "CORE",
+            "kind": "loopback",
+            "mtu": null,
+            "name": "lo0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-P1-PE1",
+            "ip": "198.51.100.1/31",
+            "ipv4": [
+              "198.51.100.1/31"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "P1-PE1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-P1-PE2",
+            "ip": "198.51.100.2/31",
+            "ipv4": [
+              "198.51.100.2/31"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "P1-PE2",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "area": "49.0001.1920.0000.2002.00",
+              "area_id": "49.0001",
+              "level": "level-2",
+              "multi_topology": null,
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2002.00",
+              "nets": [
+                "49.0001.1920.0000.2002.00"
+              ],
+              "sr_enabled": true,
+              "srv6_enabled": true,
+              "srv6_locators": [
+                "LOC"
+              ],
+              "system_id": "1920.0000.2002"
+            }
+          ],
+          "interfaces": [
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "lo0",
+              "level": null,
+              "metrics": [],
+              "type": "point-to-point"
+            },
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "P1-PE1",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            },
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "P1-PE2",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            }
+          ]
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 8,
+        "objects": 8,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          }
+        },
+        "pseudowires": [],
+        "recognised": 7,
+        "rings": [],
+        "segment_routing": {
+          "adjacency_sids": [
+            {
+              "algorithm": "0",
+              "interface": "P1-PE2",
+              "sid": "24001"
+            }
+          ],
+          "flex_algorithms": [],
+          "policies": [],
+          "prefix_sids": [
+            {
+              "algorithm_sids": [],
+              "interface": "lo0",
+              "node": true,
+              "prefix": "192.0.2.2/32",
+              "sid": "2",
+              "value_type": "index"
+            }
+          ],
+          "segment_lists": {},
+          "srgb": [
+            {
+              "instance": "CORE",
+              "lower": "16000",
+              "upper": "23999"
+            }
+          ],
+          "srv6": {
+            "locators": [
+              {
+                "algorithm": null,
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [],
+                "name": "LOC",
+                "node_length": null,
+                "prefix": "2001:db8:a002::/48",
+                "sid_type": "u-sid"
+              }
+            ]
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {},
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5164",
+      "status": "ok",
+      "templates": [
+        "P1.cfg"
+      ],
+      "type": "5164-10x"
+    },
+    {
+      "device": "P2",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": []
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-P2-PE2"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-P2-PE1"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-P2-PE2",
+            "logical_port": "1",
+            "name": "FP-P2-PE2"
+          },
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-P2-PE1",
+            "logical_port": "2",
+            "name": "FP-P2-PE1"
+          }
+        ],
+        "gateway": null,
+        "hostname": "P2",
+        "interfaces": [
+          {
+            "description": null,
+            "fd": null,
+            "ip": "192.0.2.4/32",
+            "ipv4": [
+              "192.0.2.4/32"
+            ],
+            "ipv6": [
+              "2001:db8::4/128"
+            ],
+            "isis": "CORE",
+            "kind": "loopback",
+            "mtu": null,
+            "name": "lo0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-P2-PE2",
+            "ip": "198.51.100.5/31",
+            "ipv4": [
+              "198.51.100.5/31"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "P2-PE2",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-P2-PE1",
+            "ip": "198.51.100.6/31",
+            "ipv4": [
+              "198.51.100.6/31"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "P2-PE1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "area": "49.0001.1920.0000.2004.00",
+              "area_id": "49.0001",
+              "level": "level-2",
+              "multi_topology": null,
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2004.00",
+              "nets": [
+                "49.0001.1920.0000.2004.00"
+              ],
+              "sr_enabled": true,
+              "srv6_enabled": true,
+              "srv6_locators": [
+                "LOC",
+                "LOC-ALGO128"
+              ],
+              "system_id": "1920.0000.2004"
+            }
+          ],
+          "interfaces": [
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "lo0",
+              "level": null,
+              "metrics": [],
+              "type": "point-to-point"
+            },
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "P2-PE2",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            },
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "P2-PE1",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            }
+          ]
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 8,
+        "objects": 8,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          }
+        },
+        "pseudowires": [],
+        "recognised": 7,
+        "rings": [],
+        "segment_routing": {
+          "adjacency_sids": [],
+          "flex_algorithms": [
+            {
+              "admin_groups": {
+                "exclude_any": [],
+                "include_all": [],
+                "include_any": []
+              },
+              "advertise_definition": true,
+              "algorithm": "128",
+              "metric_type": "igp",
+              "priority": "200",
+              "srlg_exclude": []
+            }
+          ],
+          "policies": [],
+          "prefix_sids": [
+            {
+              "algorithm_sids": [
+                {
+                  "algorithm": "128",
+                  "sid": "104",
+                  "value_type": "index"
+                }
+              ],
+              "interface": "lo0",
+              "node": true,
+              "prefix": "192.0.2.4/32",
+              "sid": "4",
+              "value_type": "index"
+            }
+          ],
+          "segment_lists": {},
+          "srgb": [
+            {
+              "instance": "CORE",
+              "lower": "16000",
+              "upper": "23999"
+            }
+          ],
+          "srv6": {
+            "locators": [
+              {
+                "algorithm": null,
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [],
+                "name": "LOC",
+                "node_length": null,
+                "prefix": "2001:db8:a004::/48",
+                "sid_type": "u-sid"
+              },
+              {
+                "algorithm": "128",
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [
+                  "CORE"
+                ],
+                "name": "LOC-ALGO128",
+                "node_length": null,
+                "prefix": "2001:db8:a804::/48",
+                "sid_type": "u-sid"
+              }
+            ]
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {},
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5164",
+      "status": "ok",
+      "templates": [
+        "P2.cfg"
+      ],
+      "type": "5164-10x"
+    },
+    {
+      "device": "PE1",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": []
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-PE1-P1"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-PE1-P2"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-PE1-P1",
+            "logical_port": "1",
+            "name": "FP-PE1-P1"
+          },
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-PE1-P2",
+            "logical_port": "2",
+            "name": "FP-PE1-P2"
+          }
+        ],
+        "gateway": null,
+        "hostname": "PE1",
+        "interfaces": [
+          {
+            "description": null,
+            "fd": null,
+            "ip": "192.0.2.1/32",
+            "ipv4": [
+              "192.0.2.1/32"
+            ],
+            "ipv6": [
+              "2001:db8::1/128"
+            ],
+            "isis": "CORE",
+            "kind": "loopback",
+            "mtu": null,
+            "name": "lo0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-PE1-P1",
+            "ip": "198.51.100.0/31",
+            "ipv4": [
+              "198.51.100.0/31"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "PE1-P1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-PE1-P2",
+            "ip": "198.51.100.7/31",
+            "ipv4": [
+              "198.51.100.7/31"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "PE1-P2",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "area": "49.0001.1920.0000.2001.00",
+              "area_id": "49.0001",
+              "level": "level-2",
+              "multi_topology": null,
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2001.00",
+              "nets": [
+                "49.0001.1920.0000.2001.00"
+              ],
+              "sr_enabled": true,
+              "srv6_enabled": true,
+              "srv6_locators": [
+                "LOC",
+                "LOC-ALGO128"
+              ],
+              "system_id": "1920.0000.2001"
+            }
+          ],
+          "interfaces": [
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "lo0",
+              "level": null,
+              "metrics": [],
+              "type": "point-to-point"
+            },
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "PE1-P1",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            },
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "PE1-P2",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            }
+          ]
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 9,
+        "objects": 9,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          }
+        },
+        "pseudowires": [],
+        "recognised": 8,
+        "rings": [],
+        "segment_routing": {
+          "adjacency_sids": [],
+          "flex_algorithms": [
+            {
+              "admin_groups": {
+                "exclude_any": [],
+                "include_all": [],
+                "include_any": []
+              },
+              "advertise_definition": false,
+              "algorithm": "128",
+              "metric_type": "igp",
+              "priority": null,
+              "srlg_exclude": []
+            }
+          ],
+          "policies": [
+            {
+              "candidate_paths": [
+                {
+                  "discriminator": "1",
+                  "flex_algorithm": null,
+                  "origin": "local",
+                  "originator": "192.0.2.1",
+                  "preference": "100",
+                  "segment_lists": [
+                    "FA128-MPLS"
+                  ]
+                }
+              ],
+              "color": "128",
+              "endpoint": "192.0.2.3",
+              "name": "FA128-MPLS-to-PE2",
+              "source": "192.0.2.1"
+            },
+            {
+              "candidate_paths": [
+                {
+                  "discriminator": "1",
+                  "flex_algorithm": null,
+                  "origin": "local",
+                  "originator": "192.0.2.1",
+                  "preference": null,
+                  "segment_lists": [
+                    "VIA-P1-ADJ"
+                  ]
+                }
+              ],
+              "color": "200",
+              "endpoint": "192.0.2.3",
+              "name": "ADJ-to-PE2",
+              "source": "192.0.2.1"
+            },
+            {
+              "candidate_paths": [
+                {
+                  "discriminator": "1",
+                  "flex_algorithm": null,
+                  "origin": "local",
+                  "originator": "2001:db8::1",
+                  "preference": null,
+                  "segment_lists": [
+                    "FA128-SRV6"
+                  ]
+                }
+              ],
+              "color": "300",
+              "endpoint": "2001:db8::3",
+              "name": "FA128-SRV6-to-PE2",
+              "source": "2001:db8::1"
+            }
+          ],
+          "prefix_sids": [
+            {
+              "algorithm_sids": [
+                {
+                  "algorithm": "128",
+                  "sid": "101",
+                  "value_type": "index"
+                }
+              ],
+              "interface": "lo0",
+              "node": true,
+              "prefix": "192.0.2.1/32",
+              "sid": "1",
+              "value_type": "index"
+            }
+          ],
+          "segment_lists": {
+            "FA128-MPLS": [
+              "16103"
+            ],
+            "FA128-SRV6": [
+              "2001:db8:a804::/48",
+              "2001:db8:a803::/48"
+            ],
+            "VIA-P1-ADJ": [
+              "16002",
+              "24001"
+            ]
+          },
+          "srgb": [
+            {
+              "instance": "CORE",
+              "lower": "16000",
+              "upper": "23999"
+            }
+          ],
+          "srv6": {
+            "locators": [
+              {
+                "algorithm": null,
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [],
+                "name": "LOC",
+                "node_length": null,
+                "prefix": "2001:db8:a001::/48",
+                "sid_type": "u-sid"
+              },
+              {
+                "algorithm": "128",
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [
+                  "CORE"
+                ],
+                "name": "LOC-ALGO128",
+                "node_length": null,
+                "prefix": "2001:db8:a801::/48",
+                "sid_type": "u-sid"
+              }
+            ]
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {},
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5164",
+      "status": "ok",
+      "templates": [
+        "PE1.cfg"
+      ],
+      "type": "5164-10x"
+    },
+    {
+      "device": "PE2",
+      "extractor": "saos10",
+      "facts": {
+        "bgp": {
+          "instances": []
+        },
+        "cfm": {
+          "meps": []
+        },
+        "classifiers": {
+          "UNTAGGED": []
+        },
+        "evpn_instances": [],
+        "fds": [
+          {
+            "mode": "vpls",
+            "name": "FD-PE2-P1"
+          },
+          {
+            "mode": "vpls",
+            "name": "FD-PE2-P2"
+          }
+        ],
+        "fps": [
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-PE2-P1",
+            "logical_port": "1",
+            "name": "FP-PE2-P1"
+          },
+          {
+            "classifiers": [
+              "UNTAGGED"
+            ],
+            "fd": "FD-PE2-P2",
+            "logical_port": "2",
+            "name": "FP-PE2-P2"
+          }
+        ],
+        "gateway": null,
+        "hostname": "PE2",
+        "interfaces": [
+          {
+            "description": null,
+            "fd": null,
+            "ip": "192.0.2.3/32",
+            "ipv4": [
+              "192.0.2.3/32"
+            ],
+            "ipv6": [
+              "2001:db8::3/128"
+            ],
+            "isis": "CORE",
+            "kind": "loopback",
+            "mtu": null,
+            "name": "lo0",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-PE2-P1",
+            "ip": "198.51.100.3/31",
+            "ipv4": [
+              "198.51.100.3/31"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "PE2-P1",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          },
+          {
+            "description": null,
+            "fd": "FD-PE2-P2",
+            "ip": "198.51.100.4/31",
+            "ipv4": [
+              "198.51.100.4/31"
+            ],
+            "ipv6": [],
+            "isis": "CORE",
+            "kind": "ip",
+            "mtu": "9000",
+            "name": "PE2-P2",
+            "vlan": null,
+            "vrf": null,
+            "vs": null
+          }
+        ],
+        "isis": {
+          "instances": [
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "area": "49.0001.1920.0000.2003.00",
+              "area_id": "49.0001",
+              "level": "level-2",
+              "multi_topology": null,
+              "name": "CORE",
+              "net": "49.0001.1920.0000.2003.00",
+              "nets": [
+                "49.0001.1920.0000.2003.00"
+              ],
+              "sr_enabled": true,
+              "srv6_enabled": true,
+              "srv6_locators": [
+                "LOC",
+                "LOC-ALGO128"
+              ],
+              "system_id": "1920.0000.2003"
+            }
+          ],
+          "interfaces": [
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "lo0",
+              "level": null,
+              "metrics": [],
+              "type": "point-to-point"
+            },
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "PE2-P1",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            },
+            {
+              "address_families": [
+                "ipv4 unicast"
+              ],
+              "instance": "CORE",
+              "interface": "PE2-P2",
+              "level": "level-2",
+              "metrics": [
+                {
+                  "level": "level-2",
+                  "metric": null,
+                  "wide_metric": "10"
+                }
+              ],
+              "type": "point-to-point"
+            }
+          ]
+        },
+        "l2vpn_services": [],
+        "lags": [],
+        "lines": 8,
+        "objects": 8,
+        "ospf": {
+          "instances": [],
+          "interfaces": []
+        },
+        "peers": [],
+        "ports": {
+          "1": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          },
+          "2": {
+            "description": null,
+            "lag": null,
+            "roles": [
+              "fp"
+            ],
+            "vlans": []
+          }
+        },
+        "pseudowires": [],
+        "recognised": 7,
+        "rings": [],
+        "segment_routing": {
+          "adjacency_sids": [],
+          "flex_algorithms": [
+            {
+              "admin_groups": {
+                "exclude_any": [],
+                "include_all": [],
+                "include_any": []
+              },
+              "advertise_definition": false,
+              "algorithm": "128",
+              "metric_type": "igp",
+              "priority": null,
+              "srlg_exclude": []
+            }
+          ],
+          "policies": [],
+          "prefix_sids": [
+            {
+              "algorithm_sids": [
+                {
+                  "algorithm": "128",
+                  "sid": "103",
+                  "value_type": "index"
+                }
+              ],
+              "interface": "lo0",
+              "node": true,
+              "prefix": "192.0.2.3/32",
+              "sid": "3",
+              "value_type": "index"
+            }
+          ],
+          "segment_lists": {},
+          "srgb": [
+            {
+              "instance": "CORE",
+              "lower": "16000",
+              "upper": "23999"
+            }
+          ],
+          "srv6": {
+            "locators": [
+              {
+                "algorithm": null,
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [],
+                "name": "LOC",
+                "node_length": null,
+                "prefix": "2001:db8:a003::/48",
+                "sid_type": "u-sid"
+              },
+              {
+                "algorithm": "128",
+                "block_length": null,
+                "end_behavior": null,
+                "function_length": null,
+                "instances": [
+                  "CORE"
+                ],
+                "name": "LOC-ALGO128",
+                "node_length": null,
+                "prefix": "2001:db8:a803::/48",
+                "sid_type": "u-sid"
+              }
+            ]
+          }
+        },
+        "segments": [],
+        "static_routes": [],
+        "sub_ports": [],
+        "tp_corouted_tunnels": [],
+        "vlans": {},
+        "vrf_instances": [],
+        "vrfs": []
+      },
+      "platform": "cn5164",
+      "status": "ok",
+      "templates": [
+        "PE2.cfg"
+      ],
+      "type": "5164-10x"
+    }
+  ],
+  "generator": {
+    "name": "saos-network-facts",
+    "translator": "translator 4.2.1 (recorded)",
+    "version": "0.24.0"
+  },
+  "schema_version": "1.10.0"
+}

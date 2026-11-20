@@ -336,10 +336,12 @@
         "recognised": 11,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [
             {
+              "algorithm_sids": [],
               "interface": "lo0",
               "node": true,
               "prefix": "10.255.0.1/32",
@@ -712,10 +714,12 @@
         "recognised": 9,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [
             {
+              "algorithm_sids": [],
               "interface": "lo0",
               "node": true,
               "prefix": "10.255.0.2/32",
@@ -1050,10 +1054,12 @@
         "recognised": 11,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [
             {
+              "algorithm_sids": [],
               "interface": "lo0",
               "node": true,
               "prefix": "10.255.0.3/32",
@@ -1216,7 +1222,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.23.5"
+    "version": "0.24.0"
   },
   "hosts": [
     {
@@ -1453,5 +1459,5 @@
       }
     }
   ],
-  "schema_version": "1.9.0"
+  "schema_version": "1.10.0"
 }

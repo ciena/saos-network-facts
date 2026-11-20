@@ -36,6 +36,10 @@ function transport(topo, isis, mpls, sr, vendor, end, peer, tp) {
     const p = policyFor(sr, end.node, end.color, peer);
     if (!p) return { error: `no SR policy color ${end.color} to ${peer}` };
     if (!p.valid) return { error: `SR policy ${p.name} invalid: ${p.reason}` };
+    // The packet walk follows algorithm 0 Prefix-SIDs through the LFIB only.
+    if (p.segmentList.type === 'srv6' || p.sids.some((s) => s.algorithm !== 0)) {
+      return { error: `SR policy ${p.name} uses ${p.segmentList.type === 'srv6' ? 'SRv6 SIDs' : 'Flex-Algo or adjacency SIDs'}; the packet walk follows only algorithm 0 Prefix-SID lists` };
+    }
     return { kind: 'sr-policy', policy: p.name, stack: p.segmentList.sids, path: p.path };
   }
   if (!mpls.ftn[end.node]?.[fec]) return { error: `no LSP to ${fec}` };

@@ -2953,6 +2953,391 @@
     }
    }
   },
+  "6d84995d13ddb649452bbebb": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "interface-type": "point-to-point",
+           "name": "lo0"
+          },
+          {
+           "interface-type": "point-to-point",
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "PE1-P1"
+          },
+          {
+           "interface-type": "point-to-point",
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "PE1-P2"
+          }
+         ]
+        },
+        "level-type": "level-2",
+        "net": [
+         "49.0001.1920.0000.2001.00"
+        ],
+        "segment-routing": {
+         "enabled": true,
+         "srgb": [
+          {
+           "lower-bound": 16000,
+           "upper-bound": 23999
+          }
+         ]
+        },
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-PE1-P1"
+       },
+       {
+        "mode": "vpls",
+        "name": "FD-PE1-P2"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-PE1-P1",
+        "logical-port": "1",
+        "name": "FP-PE1-P1"
+       },
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-PE1-P2",
+        "logical-port": "2",
+        "name": "FP-PE1-P2"
+       }
+      ]
+     },
+     "ciena-mpls:mpls": {
+      "interfaces": {
+       "interface": [
+        {
+         "label-switching": true,
+         "name": "lo0"
+        },
+        {
+         "label-switching": true,
+         "name": "PE1-P1"
+        },
+        {
+         "label-switching": true,
+         "name": "PE1-P2"
+        }
+       ]
+      }
+     },
+     "ciena-sr-policy:segment-routing-traffic-engineering": {
+      "attributes": {
+       "segment-lists": {
+        "segment-list": [
+         {
+          "name": "FA128-MPLS",
+          "segments": {
+           "segment": [
+            {
+             "index": 1,
+             "segment-type-1": {
+              "sid-value": 16103
+             }
+            }
+           ]
+          }
+         },
+         {
+          "name": "VIA-P1-ADJ",
+          "segments": {
+           "segment": [
+            {
+             "index": 1,
+             "segment-type-1": {
+              "sid-value": 16002
+             }
+            },
+            {
+             "index": 2,
+             "segment-type-1": {
+              "sid-value": 24001
+             }
+            }
+           ]
+          }
+         },
+         {
+          "name": "FA128-SRV6",
+          "segments": {
+           "segment": [
+            {
+             "index": 1,
+             "segment-type-2": {
+              "sid-value": "2001:db8:a804::/48",
+              "srv6-sid-type": "u-sid"
+             }
+            },
+            {
+             "index": 2,
+             "segment-type-2": {
+              "sid-value": "2001:db8:a803::/48",
+              "srv6-sid-type": "u-sid"
+             }
+            }
+           ]
+          }
+         }
+        ]
+       }
+      },
+      "policies": {
+       "policy": [
+        {
+         "candidate-paths": {
+          "candidate-path": [
+           {
+            "discriminator": 1,
+            "originator": "192.0.2.1",
+            "preference": 100,
+            "protocol-origin": "local",
+            "segment-lists": {
+             "segment-list": [
+              {
+               "name": "FA128-MPLS"
+              }
+             ]
+            }
+           }
+          ]
+         },
+         "color": 128,
+         "endpoint": "192.0.2.3",
+         "name": "FA128-MPLS-to-PE2",
+         "source": "192.0.2.1"
+        },
+        {
+         "candidate-paths": {
+          "candidate-path": [
+           {
+            "discriminator": 1,
+            "originator": "192.0.2.1",
+            "protocol-origin": "local",
+            "segment-lists": {
+             "segment-list": [
+              {
+               "name": "VIA-P1-ADJ"
+              }
+             ]
+            }
+           }
+          ]
+         },
+         "color": 200,
+         "endpoint": "192.0.2.3",
+         "name": "ADJ-to-PE2",
+         "source": "192.0.2.1"
+        },
+        {
+         "candidate-paths": {
+          "candidate-path": [
+           {
+            "discriminator": 1,
+            "originator": "2001:db8::1",
+            "protocol-origin": "local",
+            "segment-lists": {
+             "segment-list": [
+              {
+               "name": "FA128-SRV6"
+              }
+             ]
+            }
+           }
+          ]
+         },
+         "color": 300,
+         "endpoint": "2001:db8::3",
+         "name": "FA128-SRV6-to-PE2",
+         "source": "2001:db8::1"
+        }
+       ]
+      }
+     },
+     "ciena-sr:segment-routing": {
+      "connected-prefix-sid-map": [
+       {
+        "flex-algorithm": [
+         {
+          "algorithm": 128,
+          "start-sid": 101
+         }
+        ],
+        "interface": "lo0",
+        "prefix": "192.0.2.1/32",
+        "start-sid": 1,
+        "value-type": "index"
+       }
+      ],
+      "flex-algorithm": [
+       {
+        "algorithm": 128,
+        "flex-algo-metric": "igp"
+       }
+      ],
+      "srv6": {
+       "locators": {
+        "locator": [
+         {
+          "name": "LOC",
+          "prefix": "2001:db8:a001::/48",
+          "sid-type": "u-sid"
+         },
+         {
+          "algorithm": 128,
+          "instances": {
+           "instance": [
+            {
+             "instance": "CORE"
+            }
+           ]
+          },
+          "name": "LOC-ALGO128",
+          "prefix": "2001:db8:a801::/48",
+          "sid-type": "u-sid"
+         }
+        ]
+       }
+      }
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.1",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.1"
+           }
+          ]
+         }
+        },
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8::1",
+             "prefix-length": 128
+            },
+            "ip": "2001:db8::1"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "name": "lo0"
+        },
+        "name": "lo0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.0",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.0"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-PE1-P1"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE1-P1"
+        },
+        "name": "PE1-P1"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.7",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.7"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-PE1-P2"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE1-P2"
+        },
+        "name": "PE1-P2"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "PE1"
+      }
+     }
+    }
+   }
+  },
   "74c90491008e7f40b2e8776f": {
    "pivot": {
     "yuma-netconf:config": {
@@ -5049,6 +5434,262 @@
     }
    }
   },
+  "be5109a8e515ffc342c8fea9": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "interface-type": "point-to-point",
+           "name": "lo0"
+          },
+          {
+           "interface-type": "point-to-point",
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "P2-PE2"
+          },
+          {
+           "interface-type": "point-to-point",
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "P2-PE1"
+          }
+         ]
+        },
+        "level-type": "level-2",
+        "net": [
+         "49.0001.1920.0000.2004.00"
+        ],
+        "segment-routing": {
+         "enabled": true,
+         "srgb": [
+          {
+           "lower-bound": 16000,
+           "upper-bound": 23999
+          }
+         ]
+        },
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-P2-PE2"
+       },
+       {
+        "mode": "vpls",
+        "name": "FD-P2-PE1"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-P2-PE2",
+        "logical-port": "1",
+        "name": "FP-P2-PE2"
+       },
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-P2-PE1",
+        "logical-port": "2",
+        "name": "FP-P2-PE1"
+       }
+      ]
+     },
+     "ciena-mpls:mpls": {
+      "interfaces": {
+       "interface": [
+        {
+         "label-switching": true,
+         "name": "lo0"
+        },
+        {
+         "label-switching": true,
+         "name": "P2-PE2"
+        },
+        {
+         "label-switching": true,
+         "name": "P2-PE1"
+        }
+       ]
+      }
+     },
+     "ciena-sr:segment-routing": {
+      "connected-prefix-sid-map": [
+       {
+        "flex-algorithm": [
+         {
+          "algorithm": 128,
+          "start-sid": 104
+         }
+        ],
+        "interface": "lo0",
+        "prefix": "192.0.2.4/32",
+        "start-sid": 4,
+        "value-type": "index"
+       }
+      ],
+      "flex-algorithm": [
+       {
+        "advertise-definition": {
+         "priority": 200
+        },
+        "algorithm": 128,
+        "flex-algo-metric": "igp"
+       }
+      ],
+      "srv6": {
+       "locators": {
+        "locator": [
+         {
+          "name": "LOC",
+          "prefix": "2001:db8:a004::/48",
+          "sid-type": "u-sid"
+         },
+         {
+          "algorithm": 128,
+          "instances": {
+           "instance": [
+            {
+             "instance": "CORE"
+            }
+           ]
+          },
+          "name": "LOC-ALGO128",
+          "prefix": "2001:db8:a804::/48",
+          "sid-type": "u-sid"
+         }
+        ]
+       }
+      }
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.4",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.4"
+           }
+          ]
+         }
+        },
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8::4",
+             "prefix-length": 128
+            },
+            "ip": "2001:db8::4"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "name": "lo0"
+        },
+        "name": "lo0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.5",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.5"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-P2-PE2"
+          }
+         },
+         "mtu": 9000,
+         "name": "P2-PE2"
+        },
+        "name": "P2-PE2"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.6",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.6"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-P2-PE1"
+          }
+         },
+         "mtu": 9000,
+         "name": "P2-PE1"
+        },
+        "name": "P2-PE1"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "P2"
+      }
+     }
+    }
+   }
+  },
   "bef20029977c89168aa51518": {
    "pivot": {
     "yuma-netconf:config": {
@@ -6004,6 +6645,259 @@
     }
    }
   },
+  "e0478bb63ae0f1583ee72e1b": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "interface-type": "point-to-point",
+           "name": "lo0"
+          },
+          {
+           "interface-type": "point-to-point",
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "PE2-P1"
+          },
+          {
+           "interface-type": "point-to-point",
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "PE2-P2"
+          }
+         ]
+        },
+        "level-type": "level-2",
+        "net": [
+         "49.0001.1920.0000.2003.00"
+        ],
+        "segment-routing": {
+         "enabled": true,
+         "srgb": [
+          {
+           "lower-bound": 16000,
+           "upper-bound": 23999
+          }
+         ]
+        },
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-PE2-P1"
+       },
+       {
+        "mode": "vpls",
+        "name": "FD-PE2-P2"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-PE2-P1",
+        "logical-port": "1",
+        "name": "FP-PE2-P1"
+       },
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-PE2-P2",
+        "logical-port": "2",
+        "name": "FP-PE2-P2"
+       }
+      ]
+     },
+     "ciena-mpls:mpls": {
+      "interfaces": {
+       "interface": [
+        {
+         "label-switching": true,
+         "name": "lo0"
+        },
+        {
+         "label-switching": true,
+         "name": "PE2-P1"
+        },
+        {
+         "label-switching": true,
+         "name": "PE2-P2"
+        }
+       ]
+      }
+     },
+     "ciena-sr:segment-routing": {
+      "connected-prefix-sid-map": [
+       {
+        "flex-algorithm": [
+         {
+          "algorithm": 128,
+          "start-sid": 103
+         }
+        ],
+        "interface": "lo0",
+        "prefix": "192.0.2.3/32",
+        "start-sid": 3,
+        "value-type": "index"
+       }
+      ],
+      "flex-algorithm": [
+       {
+        "algorithm": 128,
+        "flex-algo-metric": "igp"
+       }
+      ],
+      "srv6": {
+       "locators": {
+        "locator": [
+         {
+          "name": "LOC",
+          "prefix": "2001:db8:a003::/48",
+          "sid-type": "u-sid"
+         },
+         {
+          "algorithm": 128,
+          "instances": {
+           "instance": [
+            {
+             "instance": "CORE"
+            }
+           ]
+          },
+          "name": "LOC-ALGO128",
+          "prefix": "2001:db8:a803::/48",
+          "sid-type": "u-sid"
+         }
+        ]
+       }
+      }
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.3",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.3"
+           }
+          ]
+         }
+        },
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8::3",
+             "prefix-length": 128
+            },
+            "ip": "2001:db8::3"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "name": "lo0"
+        },
+        "name": "lo0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.3",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.3"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-PE2-P1"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE2-P1"
+        },
+        "name": "PE2-P1"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.4",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.4"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-PE2-P2"
+          }
+         },
+         "mtu": 9000,
+         "name": "PE2-P2"
+        },
+        "name": "PE2-P2"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "PE2"
+      }
+     }
+    }
+   }
+  },
   "e732f1a4820eaad217c1ebe6": {
    "pivot": {
     "yuma-netconf:config": {
@@ -6430,6 +7324,243 @@
   },
   "f2078f741d308c8be1f57755": {
    "error": "Unknown top-level command: frobnicate"
+  },
+  "f36f75d4a326b66c09e81903": {
+   "pivot": {
+    "yuma-netconf:config": {
+     "ciena-isis:isis": {
+      "instance": [
+       {
+        "interfaces": {
+         "interface": [
+          {
+           "interface-type": "point-to-point",
+           "name": "lo0"
+          },
+          {
+           "interface-type": "point-to-point",
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "P1-PE1"
+          },
+          {
+           "interface-type": "point-to-point",
+           "level-2": {
+            "wide-metric": 10
+           },
+           "level-type": "level-2",
+           "name": "P1-PE2"
+          }
+         ]
+        },
+        "level-type": "level-2",
+        "net": [
+         "49.0001.1920.0000.2002.00"
+        ],
+        "segment-routing": {
+         "enabled": true,
+         "srgb": [
+          {
+           "lower-bound": 16000,
+           "upper-bound": 23999
+          }
+         ]
+        },
+        "tag": "CORE"
+       }
+      ]
+     },
+     "ciena-mef-classifier:classifiers": {
+      "classifier": [
+       {
+        "filter-entry": [
+         {
+          "filter-parameter": "ciena-mef-classifier:vtag-stack",
+          "untagged-exclude-priority-tagged": false
+         }
+        ],
+        "name": "UNTAGGED"
+       }
+      ]
+     },
+     "ciena-mef-fd:fds": {
+      "fd": [
+       {
+        "mode": "vpls",
+        "name": "FD-P1-PE1"
+       },
+       {
+        "mode": "vpls",
+        "name": "FD-P1-PE2"
+       }
+      ]
+     },
+     "ciena-mef-fp:fps": {
+      "fp": [
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-P1-PE1",
+        "logical-port": "1",
+        "name": "FP-P1-PE1"
+       },
+       {
+        "classifier-list": [
+         "UNTAGGED"
+        ],
+        "fd-name": "FD-P1-PE2",
+        "logical-port": "2",
+        "name": "FP-P1-PE2"
+       }
+      ]
+     },
+     "ciena-mpls:mpls": {
+      "interfaces": {
+       "interface": [
+        {
+         "label-switching": true,
+         "name": "lo0"
+        },
+        {
+         "label-switching": true,
+         "name": "P1-PE1"
+        },
+        {
+         "label-switching": true,
+         "name": "P1-PE2"
+        }
+       ]
+      }
+     },
+     "ciena-sr:segment-routing": {
+      "connected-prefix-sid-map": [
+       {
+        "interface": "lo0",
+        "prefix": "192.0.2.2/32",
+        "start-sid": 2,
+        "value-type": "index"
+       }
+      ],
+      "interfaces": {
+       "interface": [
+        {
+         "adjacency-sid": 24001,
+         "algorithm": 0,
+         "interface": "P1-PE2"
+        }
+       ]
+      },
+      "srv6": {
+       "locators": {
+        "locator": [
+         {
+          "name": "LOC",
+          "prefix": "2001:db8:a002::/48",
+          "sid-type": "u-sid"
+         }
+        ]
+       }
+      }
+     },
+     "openconfig-interfaces:interfaces": {
+      "interface": [
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "192.0.2.2",
+             "prefix-length": 32
+            },
+            "ip": "192.0.2.2"
+           }
+          ]
+         }
+        },
+        "ciena-openconfig-if-ip:ipv6": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "2001:db8::2",
+             "prefix-length": 128
+            },
+            "ip": "2001:db8::2"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "loopback",
+         "name": "lo0"
+        },
+        "name": "lo0"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.1",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.1"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-P1-PE1"
+          }
+         },
+         "mtu": 9000,
+         "name": "P1-PE1"
+        },
+        "name": "P1-PE1"
+       },
+       {
+        "ciena-openconfig-if-ip:ipv4": {
+         "addresses": {
+          "address": [
+           {
+            "config": {
+             "ip": "198.51.100.2",
+             "prefix-length": 31
+            },
+            "ip": "198.51.100.2"
+           }
+          ]
+         }
+        },
+        "config": {
+         "ciena-openconfig-interfaces:type": "ip",
+         "ciena-underlay-binding:underlay-binding": {
+          "config": {
+           "fd": "FD-P1-PE2"
+          }
+         },
+         "mtu": 9000,
+         "name": "P1-PE2"
+        },
+        "name": "P1-PE2"
+       }
+      ]
+     },
+     "openconfig-system:system": {
+      "config": {
+       "hostname": "P1"
+      }
+     }
+    }
+   }
   }
  },
  "saos_version": "10_12_00_0228",

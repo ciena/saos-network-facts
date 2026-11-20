@@ -725,6 +725,10 @@ export interface SegmentRouting {
    * SAOS 10: Flex-Algo definitions, in configuration order. Optional: absent in files before schema 1.6. Since schema 1.6.
    */
   flex_algorithms?: FlexAlgorithm[];
+  /**
+   * SAOS 10: static adjacency SIDs, in configuration order. Optional: absent in files before schema 1.10. Since schema 1.10.
+   */
+  adjacency_sids?: AdjacencySid[];
 }
 /**
  * A segment-routing label block (SRGB).
@@ -773,6 +777,30 @@ export interface PrefixSid {
    * A node SID: a host prefix (/32, /128) on a loopback.
    */
   node: boolean;
+  /**
+   * SAOS 10: the prefix's SID in each Flex-Algo (`connected-prefix-sid-map ... flex-algorithm N start-sid S`); `sid` is its algorithm 0 SID. Optional: absent in files before schema 1.10. Since schema 1.10.
+   */
+  algorithm_sids?: AlgorithmSid[];
+}
+/**
+ * A prefix SID in one Flex-Algo (RFC 9350 §8).
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "AlgorithmSid".
+ */
+export interface AlgorithmSid {
+  /**
+   * The Flex-Algo, 128-255.
+   */
+  algorithm: string;
+  /**
+   * The SID value, as written: an index into the SRGB or an absolute label, per `value_type`.
+   */
+  sid: string | null;
+  /**
+   * How `sid` is read: `index` (into the SRGB; the YANG default) or `absolute` (an MPLS label).
+   */
+  value_type: string | null;
 }
 /**
  * An SR-TE policy, keyed by color and endpoint.
@@ -932,6 +960,26 @@ export interface FlexAlgoAdminGroups {
    * A link with any of these groups is not used (`exclude-any-admin-group`).
    */
   exclude_any: string[];
+}
+/**
+ * A static SR-MPLS adjacency SID (SAOS 10 `segment-routing interfaces interface NAME ALGORITHM adjacency-sid LABEL`, RFC 8402 §3.4): an absolute label, local to the router, that sends the packet out of the interface.
+ *
+ * This interface was referenced by `FactsFile`'s JSON-Schema
+ * via the `definition` "AdjacencySid".
+ */
+export interface AdjacencySid {
+  /**
+   * The IP interface the adjacency is on.
+   */
+  interface: string;
+  /**
+   * The algorithm (`0`; SAOS 10.12 accepts only 0).
+   */
+  algorithm: string;
+  /**
+   * The label.
+   */
+  sid: string | null;
 }
 /**
  * BGP instances; the neighbours are `peers` of kind `bgp`.

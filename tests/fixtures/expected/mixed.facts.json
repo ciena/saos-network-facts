@@ -313,10 +313,12 @@
         "recognised": 10,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [],
           "policies": [],
           "prefix_sids": [
             {
+              "algorithm_sids": [],
               "interface": "lb0",
               "node": true,
               "prefix": "203.0.113.30/32",
@@ -383,7 +385,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.23.5"
+    "version": "0.24.0"
   },
-  "schema_version": "1.9.0"
+  "schema_version": "1.10.0"
 }

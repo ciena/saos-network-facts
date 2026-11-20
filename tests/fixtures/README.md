@@ -68,6 +68,15 @@ documentation ranges) and services are made up.
   startup-config, as a lab looks before anyone configures it (every record `skipped`, "no configuration"),
   and an `extra.yaml` giving five of them a network role (`ce`, `pe`, `p`; MGMT has none). The viewer
   draws it from the records: each device as its type, and a role frame CE | PE | P | PE | CE.
+- `labs/sr-policy/`: a configs directory of four SAOS 10 devices in a square PE1 - P1 - PE2 - P2 - PE1
+  (IS-IS level 2, every metric 10, SRGB 16000 - 23999, Prefix-SID index = node number), with three SR
+  policies on PE1 to PE2 that each need something algorithm 0 does not give. PE1, P2 and PE2 take part in
+  Flex-Algo 128 (P2 advertises the definition, priority 200) with a Flex-Algo Prefix-SID (index 100 +
+  node number) and an SRv6 locator `LOC-ALGO128` (`2001:db8:a80<n>::/48`, algorithm 128); P1 takes no
+  part, so algorithm 128 runs PE1 - P2 - PE2. P1 has a static adjacency SID 24001 on its link to PE2.
+  `FA128-MPLS-to-PE2` (color 128) is PE2's Flex-Algo SID `[16103]`, `ADJ-to-PE2` (color 200) is
+  `[16002, 24001]` (P1, then its adjacency to PE2) and `FA128-SRV6-to-PE2` (color 300, to PE2's IPv6
+  loopback) is the uSID list `[2001:db8:a804::/48, 2001:db8:a803::/48]`.
 - `cases.yaml`: the extraction cases the tests run; `expected/`: their facts files.
 - `pivots.json`: the translator's recorded replies for every SAOS 10 file (`scripts/record_pivots.py`),
   all recorded with translator 4.2.1.

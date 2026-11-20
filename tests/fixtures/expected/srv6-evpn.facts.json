@@ -249,6 +249,7 @@
         "recognised": 10,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [
             {
               "admin_groups": {
@@ -268,6 +269,7 @@
           "policies": [],
           "prefix_sids": [
             {
+              "algorithm_sids": [],
               "interface": "lo0",
               "node": true,
               "prefix": "192.0.2.3/32",
@@ -630,6 +632,7 @@
         "recognised": 24,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [
             {
               "admin_groups": {
@@ -649,6 +652,7 @@
           "policies": [],
           "prefix_sids": [
             {
+              "algorithm_sids": [],
               "interface": "lo0",
               "node": true,
               "prefix": "192.0.2.1/32",
@@ -1077,6 +1081,7 @@
         "recognised": 24,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [
             {
               "admin_groups": {
@@ -1096,6 +1101,7 @@
           "policies": [],
           "prefix_sids": [
             {
+              "algorithm_sids": [],
               "interface": "lo0",
               "node": true,
               "prefix": "192.0.2.2/32",
@@ -1411,6 +1417,7 @@
         "recognised": 13,
         "rings": [],
         "segment_routing": {
+          "adjacency_sids": [],
           "flex_algorithms": [
             {
               "admin_groups": {
@@ -1430,6 +1437,7 @@
           "policies": [],
           "prefix_sids": [
             {
+              "algorithm_sids": [],
               "interface": "lo0",
               "node": true,
               "prefix": "192.0.2.4/32",
@@ -1482,7 +1490,7 @@
   "generator": {
     "name": "saos-network-facts",
     "translator": "translator 4.2.1 (recorded)",
-    "version": "0.23.5"
+    "version": "0.24.0"
   },
   "hosts": [
     {
@@ -1574,5 +1582,5 @@
       ]
     }
   ],
-  "schema_version": "1.9.0"
+  "schema_version": "1.10.0"
 }

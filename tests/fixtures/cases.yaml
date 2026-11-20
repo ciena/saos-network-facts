@@ -53,3 +53,6 @@ config-less:
   clab: labs/config-less/topo.clab.yml
   extra: labs/config-less/extra.yaml
   recipe: config-less
+sr-policy:
+  configs: [labs/sr-policy]
+  platform_map: labs/sr-policy/platform-map.yaml
